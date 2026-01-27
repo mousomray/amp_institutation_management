@@ -1,0 +1,18 @@
+const router = require("express").Router();
+
+const {adminDashboard,adminLogOut,recentInstitution, registerAdmin, loginAdmin, GetAdminProfile ,findOneInstitution, addInstitution, updateInstitution, deleteInstitution, getAllInstitutions} = require("../controller/admin.controller.js");
+const verifyJwt = require("../middleware/verifiyUser.js");
+
+router.post("/register", registerAdmin);
+router.post("/login", loginAdmin);
+router.get("/admin-profile",verifyJwt, GetAdminProfile);
+router.post("/create-institution",verifyJwt, addInstitution);
+router.put("/update-institution/:id",verifyJwt, updateInstitution);
+router.delete("/delete-institution/:id",verifyJwt, deleteInstitution);
+router.get("/all-institutions",verifyJwt, getAllInstitutions);
+router.get("/institution/:id", findOneInstitution);
+router.get("/recent-institutions", recentInstitution);
+router.post("/logout", verifyJwt, adminLogOut);
+router.get("/dashboard",verifyJwt,adminDashboard)
+
+module.exports = router;
