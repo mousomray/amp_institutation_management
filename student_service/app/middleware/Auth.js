@@ -8,18 +8,44 @@ const comparePassword = (password, hashPassword) => {
 
 // Fit token in API header
 const Auth = async (req, res, next) => {
-  const token = req?.body?.token || req?.query?.token || req.headers["x-access-token"];
-  if (!token) {
-    return res.status(403).send({ message: "A token is required for authentication" });
-  }
   try {
-    const decoded = jwt.verify(token, process.env.API_KEY);
-    req.user = decoded;
-    console.log('Decord user...', req.user);
-  } catch (err) {
-    return res.status(401).send({ messaage: "Invalid Token" });
+    const authHeader = req.headers.authorization;
+   console.log("aurh header", authHeader)
+   
+    const token =
+      (authHeader?.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : null) ||
+      req.cookies?.["admin-token"] ||
+      req.cookies?.["institution-token"];
+
+     console.log("token, ", token)
+
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized request" });
+    }
+
+    console.log('==>' , token)
+
+
+    const decoded = jwt.verify(token, process.env.TOKEN_SECRET);
+
+
+    const user = await User.findById(decoded.userId).select("-password");
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+
+    req.user = user;
+    req.userRole = user.role;
+
+    next();
+  } catch (error) {
+    console.error("JWT error:", error.message);
+    return res.status(401).json({ message: "Invalid or expired token" });
   }
-  return next();
-}
+};
 
 module.exports = { comparePassword, Auth };

@@ -42,6 +42,8 @@ export default function AddCourseForm() {
     if (storedToken) setToken(storedToken);
   }, []);
 
+   console.log("imageFile.....:", imageFile);
+
   const onSubmit = async (data: CourseFormData) => {
     try {
       if (!imageFile) {

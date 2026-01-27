@@ -15,7 +15,7 @@ export const InstitutionSchema = zod.object({
 
   email: zod.string().email('Invalid institution email'),
 
- phone: zod
+  phone: zod
     .string()
     .min(10, "Phone must be at least 10 digits")
     .max(10, "Phone number too long"),
@@ -69,4 +69,32 @@ export const StudentSchema = zod.object({
   admissionDate: zod.date().refine((val) => val instanceof Date && !isNaN(val.getTime()), {
     message: "Admission date is required",
   }),
+});
+
+export const BookSchema = zod.object({
+  name: zod
+    .string()
+    .min(3, "Name must be at least 3 characters long"),
+
+  authorName: zod
+    .string()
+    .min(3, "Author Name must be at least 3 characters long"),
+
+  language: zod
+    .string()
+    .min(3, "Language must be at least 3 characters long"),
+
+  description: zod
+    .string()
+    .min(3, "Description must be at least 3 characters long"),
+
+  isAvailable: zod
+    .boolean()
+    .optional()
+    .default(true),
+
+  isDeleted: zod
+    .boolean()
+    .optional()
+    .default(false),
 });

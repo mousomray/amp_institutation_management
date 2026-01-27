@@ -1,4 +1,5 @@
 const BookModel = require('../model/book');
+const uploadSingleImage = require("../helper/upload.js")
 
 class BookController {
 
@@ -6,13 +7,14 @@ class BookController {
     async create(req, res) {
         try {
             // Image Path Validation
-            if (!req.file) {
-                return res.status(400).json({
-                    message: "Validation error",
-                    errors: ["Book image is required"]
-                });
-            }
-            const bookdata = new BookModel({ ...req.body, image: req.file.path });
+            // if (!req.file) {
+            //     return res.status(400).json({
+            //         message: "Validation error",
+            //         errors: ["Book image is required"]
+            //     });
+            // }
+            const imageUrl = await uploadSingleImage(req.file);
+            const bookdata = new BookModel({ ...req.body, image: imageUrl });
             const data = await bookdata.save();
             res.status(201).json({ message: "Book added successfully in Library", data });
         } catch (error) {

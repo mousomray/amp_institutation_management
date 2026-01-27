@@ -2,6 +2,7 @@ const express = require('express'); // Import For Express
 const dotenv = require('dotenv'); // For .env file 
 const cors = require('cors'); // For to run different server when I run use React with node 
 const connectDB = require('./app/config/db.js'); // Connect Database
+const cookieParser = require('cookie-parser')
 
 dotenv.config(); // .env with config
 const app = express();
@@ -9,7 +10,14 @@ connectDB()
 
 
 app.use(express.json()); // use Express
-app.use((cors())); // Use Cors  
+app.use(cors(
+    {
+        origin : ["http://localhost:3000"],
+        methods: ["GET", "POST", "PUT", "PUTCH", "DELETE"],
+        credentials: true
+    }
+)) 
+app.use(cookieParser())
 app.use('/uploads', express.static(__dirname + '/uploads'));
 
 // Auth router

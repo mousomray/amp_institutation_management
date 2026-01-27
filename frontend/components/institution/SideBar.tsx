@@ -18,6 +18,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ImportContactsIcon from '@mui/icons-material/ImportContacts';
 import SupervisedUserCircleIcon from '@mui/icons-material/SupervisedUserCircle';
+import MenuBookIcon from '@mui/icons-material/MenuBook'; // added for Books section
 
 const sidebarItems = [
   {
@@ -52,15 +53,36 @@ const sidebarItems = [
     icon: <SupervisedUserCircleIcon />,
     children: [
       {
-        id: "2-1",
+        id: "3-1",
         label: "Add Student",
         path: "/institution/dashboard/student/add-student",
         icon: <NoteAltIcon />,
       },
       {
-        id: "2-2",
+        id: "3-2",
         label: "Student List",
         path: "/institution/dashboard/student",
+        icon: <ViewListIcon />,
+      },
+    ],
+  },
+
+  // New Books section
+  {
+    id: "4",
+    label: "Books",
+    icon: <MenuBookIcon />,
+    children: [
+      {
+        id: "4-1",
+        label: "Add Book",
+        path: "/institution/dashboard/book/add-book",
+        icon: <AddBoxIcon />,
+      },
+      {
+        id: "4-2",
+        label: "Book List",
+        path: "/institution/dashboard/book",
         icon: <ViewListIcon />,
       },
     ],
