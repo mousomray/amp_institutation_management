@@ -13,8 +13,9 @@ class BookController {
             //         errors: ["Book image is required"]
             //     });
             // }
+            console.log("Requested userId:", req.user.id);
             const imageUrl = await uploadSingleImage(req.file);
-            const bookdata = new BookModel({ ...req.body, image: imageUrl });
+            const bookdata = new BookModel({ ...req.body, userId: req.user.id, image: imageUrl });
             const data = await bookdata.save();
             res.status(201).json({ message: "Book added successfully in Library", data });
         } catch (error) {
@@ -28,10 +29,10 @@ class BookController {
         }
     }
 
-    // Get Student List
+    // Get Book List
     async getall(req, res) {
         try {
-            const data = await BookModel.find({ isDeleted: false })
+            const data = await BookModel.find({ isDeleted: false, userId: req.user.id })
             res.status(200).json({
                 message: "All Books are Fetched successfully",
                 total: data.length,
@@ -47,7 +48,7 @@ class BookController {
     async getsingle(req, res) {
         const id = req.params.id;
         try {
-            const data = await BookModel.findById(id);
+            const data = await BookModel.findOne({ _id: id, userId: req.user.id });
             res.status(200).json({ message: "Single data fetched", data });
         } catch (error) {
             console.log(error);
@@ -59,10 +60,11 @@ class BookController {
     async bookupdate(req, res) {
         const id = req.params.id;
         try {
-            const updatedbook = await BookModel.findByIdAndUpdate(id, req.body, { new: true, runValidators: true }
+            const updatedbook = await BookModel.findByIdAndUpdate(id, { ...req.body, userId: req.user.id }, { new: true, runValidators: true }
             );
             if (req.file) {
-                updatedbook.image = req.file.path
+                const imageUrl = await uploadSingleImage(req.file);
+                updatedbook.image = imageUrl;
                 await updatedbook.save();
             }
             if (!updatedbook) {
@@ -73,7 +75,7 @@ class BookController {
             const statusCode = error.name === 'ValidationError' ? 400 : 500;
             const message = error.name === 'ValidationError'
                 ? { message: "Validation error", errors: Object.values(error.errors).map(err => err.message) }
-                : { message: "Error updating Student data" };
+                : { message: "Error updating Book data" };
 
             console.error(error);
             res.status(statusCode).json(message);

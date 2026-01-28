@@ -6,7 +6,7 @@ import microInstance from "@/service/micro.service";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import { Dialog } from "primereact/dialog";
-import EditCourseForm from "@/components/institution/EditCoures";
+import EditBookForm from "@/components/institution/EditBooks";
 function Page() {
   const [loading, setLoading] = useState(false);
   const [bookData, setBookData] = useState<any[]>([]);
@@ -14,7 +14,7 @@ function Page() {
   const [token, setToken] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
 
-  const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
+  const [selectedBook, setSelectedBook] = useState<any | null>(null);
   /* ================= GET TOKEN ================= */
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -82,7 +82,7 @@ function Page() {
   }
   const handleUpdate = (rowData: any) => {
     console.log("==>", rowData)
-    setSelectedCourse(rowData);
+    setSelectedBook(rowData);
     setVisible(true);
   };
 
@@ -96,7 +96,7 @@ function Page() {
         style={{ width: "30vw" }}
         onHide={() => setVisible(false)}
       >
-        <EditCourseForm onClose={() => setVisible(false)} course={selectedCourse} refetch={bookDataGet} />
+        <EditBookForm onClose={() => setVisible(false)} book={selectedBook} refetch={bookDataGet} />
       </Dialog>
     </div>
   );

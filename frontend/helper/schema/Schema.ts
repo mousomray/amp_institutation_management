@@ -98,3 +98,15 @@ export const BookSchema = zod.object({
     .optional()
     .default(false),
 });
+
+// Add IssueSchema for book issuing
+export const IssueSchema = zod.object({
+  book_id: zod.string().min(1, "Select a book"),
+  student_id: zod.string().min(1, "Select a student"),
+  base_rate: zod
+    .number({ error: "Base rate must be a number" })
+    .min(0, "Base rate cannot be negative"),
+  return_date: zod
+    .string()
+    .refine((d) => !isNaN(Date.parse(d)), "Invalid return date"),
+});

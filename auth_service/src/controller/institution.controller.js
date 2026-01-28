@@ -443,6 +443,16 @@ const getMyStudents = async (req, res) => {
   }
 }
 
+const StudentDropDown = async (req, res) => {
+  try {
+    const data = await Student.find()
+    return res.status(200).json({ message: "All students fetched successfully", data })
+  } catch (error) {
+    console.error("Get all students error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 const updateStudent = async (req, res) => {
   try {
     const studentId = req.params.id;
@@ -523,7 +533,7 @@ const studentDetails = async (req, res) => {
         $match: { _id: new mongoose.Types.ObjectId(studentId) },
       },
 
-      
+
       {
         $lookup: {
           from: "users",
@@ -534,7 +544,7 @@ const studentDetails = async (req, res) => {
       },
       { $unwind: "$user" },
 
-      
+
       {
         $lookup: {
           from: "courses",
@@ -676,9 +686,9 @@ const courseDetails = async (req, res) => {
       },
       {
         $lookup: {
-          from: "students",                
-          localField: "_id",                 
-          foreignField: "courses",          
+          from: "students",
+          localField: "_id",
+          foreignField: "courses",
           as: "students",
         },
       },
@@ -698,7 +708,7 @@ const courseDetails = async (req, res) => {
       data: result[0],
     });
   } catch (err) {
-    console.log("-->",err)
+    console.log("-->", err)
     console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
@@ -707,14 +717,14 @@ const courseDetails = async (req, res) => {
 
 const resentCourse = async (req, res) => {
   const institutionUser = req.user._id
-   const institutionId = req.user._id
-    if (!institutionId) {
-      return res.status(403).json({ message: "Only institution can delete students" });
-    }
-    const isinstitution = await User.findById(institutionId);
-    if (!isinstitution || isinstitution.role !== "institution") {
-      return res.status(403).json({ message: "Only institution can delete students" });
-    }
+  const institutionId = req.user._id
+  if (!institutionId) {
+    return res.status(403).json({ message: "Only institution can delete students" });
+  }
+  const isinstitution = await User.findById(institutionId);
+  if (!isinstitution || isinstitution.role !== "institution") {
+    return res.status(403).json({ message: "Only institution can delete students" });
+  }
 }
 
 
@@ -902,10 +912,10 @@ const buyCourse = async (req, res) => {
       });
     }
 
-   
+
     student.courses.push(courseId);
 
-   
+
     course.students.push(studentId);
 
     await student.save();
@@ -930,4 +940,4 @@ const buyCourse = async (req, res) => {
 
 
 
-module.exports = {buyCourse,institutionLogOut,institutionDashboard,courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, createStudent, deleteStudent, updateStudent };
+module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent };

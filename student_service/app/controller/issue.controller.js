@@ -10,15 +10,6 @@ class IssueController {
         try {
             const { book_id, student_id, base_rate, return_date } = req.body
 
-            // 1Validate student
-            const student = await StudentModel.findOne({
-                _id: student_id,
-                isDeleted: false
-            })
-            if (!student) {
-                return res.status(404).json({ message: "Student not found" })
-            }
-
             // 2 Validate book
             const book = await BookModel.findOne({
                 _id: book_id,
@@ -38,7 +29,8 @@ class IssueController {
                 book_id,
                 student_id,
                 base_rate,
-                return_date
+                return_date,
+                userId: req.user.id 
             })
 
             await issue.save()
@@ -61,43 +53,44 @@ class IssueController {
     // Return a Book
     async returnBook(req, res) {
         const issueId = req.params.id;
+
         try {
             const issue = await IssueModel.findById(issueId);
             if (!issue) {
                 return res.status(404).json({ message: "Issue record not found" });
             }
+
             if (issue.status === "returned") {
                 return res.status(400).json({ message: "Book already returned" });
             }
+
             const actualReturnDate = new Date();
             actualReturnDate.setHours(0, 0, 0, 0);
+
             const returnDate = new Date(issue.return_date);
             returnDate.setHours(0, 0, 0, 0);
-            issue.actual_return_date = actualReturnDate;
-            let lateDays = 0;
-            let fine = 0;
-            if (actualReturnDate > returnDate) {
-                const diffTime = actualReturnDate - returnDate;
-                lateDays = diffTime / (1000 * 60 * 60 * 24); 
-                fine = lateDays * issue.base_rate;
-            }
 
-            issue.fine = fine;
-            issue.total_amount = issue.base_rate + fine;
+            issue.actual_return_date = actualReturnDate;
             issue.status = "returned";
+
+            // ❌ Fine calculation removed
+            issue.fine = 0;
+            issue.total_amount = issue.base_rate;
 
             await issue.save();
 
-            // Make book available again
+            // Book available again
             await BookModel.findByIdAndUpdate(issue.book_id, {
                 isAvailable: true
             });
 
+            const isLate = actualReturnDate > returnDate;
+
             return res.status(200).json({
                 message: "Book returned successfully",
-                lateDays,
+                isLate,
                 base_rate: issue.base_rate,
-                fine,
+                fine: issue.fine,
                 total_amount: issue.total_amount
             });
 
@@ -107,12 +100,58 @@ class IssueController {
         }
     }
 
+    async setFineAmount(req, res) {
+        const issueId = req.params.id;
+        const { fine } = req.body; 
 
+        try {
+            const issue = await IssueModel.findById(issueId);
+            if (!issue) {
+                return res.status(404).json({ message: "Issue record not found" });
+            }
 
-    //  Get all issued books
+            if (issue.status !== "returned") {
+                return res.status(400).json({
+                    message: "Book must be returned before applying fine"
+                });
+            }
+
+            issue.fine = Number(fine) || 0;
+            issue.total_amount = issue.base_rate + issue.fine;
+
+            await issue.save();
+
+            return res.status(200).json({
+                message: "Fine updated successfully",
+                base_rate: issue.base_rate,
+                fine: issue.fine,
+                total_amount: issue.total_amount
+            });
+
+        } catch (error) {
+            console.error("Set fine error:", error);
+            return res.status(500).json({
+                message: "Error updating fine"
+            });
+        }
+    }
+
+    // Get all issued books (with full details)
     async getAllIssues(req, res) {
         try {
+            const institutionId = req.user.id; 
+
+            console.log("Fetching issues for institution:", institutionId);
+
             const issues = await IssueModel.aggregate([
+                // 🔹 Institution filter (important for microservice)
+                {
+                    $match: {
+                        userId: institutionId
+                    }
+                },
+
+                // 🔹 Book lookup
                 {
                     $lookup: {
                         from: "books",
@@ -121,7 +160,14 @@ class IssueController {
                         as: "book"
                     }
                 },
-                { $unwind: "$book" },
+                {
+                    $unwind: {
+                        path: "$book",
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+
+                // 🔹 Student lookup
                 {
                     $lookup: {
                         from: "students",
@@ -130,7 +176,42 @@ class IssueController {
                         as: "student"
                     }
                 },
-                { $unwind: "$student" },
+                {
+                    $unwind: {
+                        path: "$student",
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+
+                // 🔹 Duration calculation
+                {
+                    $addFields: {
+                        issue_duration_days: {
+                            $dateDiff: {
+                                startDate: "$issue_date",
+                                endDate: {
+                                    $ifNull: ["$actual_return_date", "$$NOW"]
+                                },
+                                unit: "day"
+                            }
+                        },
+                        delay_days: {
+                            $cond: [
+                                { $gt: ["$actual_return_date", "$return_date"] },
+                                {
+                                    $dateDiff: {
+                                        startDate: "$return_date",
+                                        endDate: "$actual_return_date",
+                                        unit: "day"
+                                    }
+                                },
+                                0
+                            ]
+                        }
+                    }
+                },
+
+                // 🔹 Final projection
                 {
                     $project: {
                         _id: 1,
@@ -141,9 +222,14 @@ class IssueController {
                         fine: 1,
                         total_amount: 1,
                         status: 1,
+
+                        issue_duration_days: 1,
+                        delay_days: 1,
+
                         "book._id": 1,
                         "book.name": 1,
                         "book.authorName": 1,
+                        "book.language": 1,
 
                         "student._id": 1,
                         "student.name": 1,
@@ -151,19 +237,24 @@ class IssueController {
                         "student.phone": 1
                     }
                 }
-            ])
+            ]);
 
-            res.status(200).json({
+            return res.status(200).json({
+                success: true,
                 message: "Issued books fetched successfully",
                 total: issues.length,
                 data: issues
-            })
+            });
 
         } catch (error) {
-            console.error(error)
-            res.status(500).json({ message: "Error fetching issue data" })
+            console.error("Get all issues error:", error);
+            return res.status(500).json({
+                success: false,
+                message: "Error fetching issue data"
+            });
         }
     }
+
 
 
     //  Get issues by student

@@ -85,6 +85,18 @@ const sidebarItems = [
         path: "/institution/dashboard/book",
         icon: <ViewListIcon />,
       },
+      {
+        id: "4-3",
+        label: "Book Issue",
+        path: "/institution/dashboard/book/book-issue",
+        icon: <NoteAltIcon />,
+      },
+      {
+        id: "4-4",
+        label: "Issued Books",
+        path: "/institution/dashboard/book/issued-books",
+        icon: <ViewListIcon />,
+      },
     ],
   },
 ];

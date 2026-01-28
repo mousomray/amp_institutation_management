@@ -11,8 +11,8 @@ import { InputIcon } from "primereact/inputicon";
 import EditStudent from "@/components/institution/EditStudent";
 import axiosInstance from "@/service/axios.service";
 import axios from "axios";
-import { toast , ToastContainer } from "react-toastify";
-import { formatDateTime,formatDate } from "@/helper/DateTime";
+import { toast, ToastContainer } from "react-toastify";
+import { formatDateTime, formatDate } from "@/helper/DateTime";
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { useRouter } from "next/navigation";
 
@@ -77,15 +77,15 @@ export default function StudentTable() {
 
   /* ================= ACTIONS ================= */
   const handleUpdate = (rowData: any) => {
-  setSelectedStudent(rowData);
-  setVisible(true);
-};
+    setSelectedStudent(rowData);
+    setVisible(true);
+  };
 
-const onRowClick = (e: any) => {
-  router.push(`/institution/dashboard/student/${e.data._id}`);
-};
+  const onRowClick = (e: any) => {
+    router.push(`/institution/dashboard/student/${e.data._id}`);
+  };
 
-    const confirmDelete = (rowData: any) => {
+  const confirmDelete = (rowData: any) => {
     confirmDialog({
       message: `Are you sure you want to delete "${rowData.name}"?`,
       header: "Delete Confirmation",
@@ -94,7 +94,7 @@ const onRowClick = (e: any) => {
 
       accept: async () => {
         try {
-         const res =  await axiosInstance.delete(`/institution/delete-student/${rowData._id}`, {
+          const res = await axiosInstance.delete(`/institution/delete-student/${rowData._id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -134,23 +134,23 @@ const onRowClick = (e: any) => {
   );
 
   const actionTemplate = (rowData: any) => (
-  <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
-    <Button
-      icon="pi pi-pencil"
-      rounded
-      text
-      severity="info"
-      onClick={() => handleUpdate(rowData)}
-    />
-    <Button
-      icon="pi pi-trash"
-      rounded
-      text
-      severity="danger"
-      onClick={() => confirmDelete(rowData)}
-    />
-  </div>
-);
+    <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
+      <Button
+        icon="pi pi-pencil"
+        rounded
+        text
+        severity="info"
+        onClick={() => handleUpdate(rowData)}
+      />
+      <Button
+        icon="pi pi-trash"
+        rounded
+        text
+        severity="danger"
+        onClick={() => confirmDelete(rowData)}
+      />
+    </div>
+  );
 
   /* ================= HEADER ================= */
   const header = (
@@ -174,25 +174,25 @@ const onRowClick = (e: any) => {
   return (
     <div className="card bg-white p-4 rounded-lg shadow">
       <DataTable
-       value={students}
-  loading={loading}
-  paginator
-  lazy
-  first={(page - 1) * rows}
-  rows={rows}
-  totalRecords={totalRecords}
-  rowsPerPageOptions={[5, 10, 25, 50]}
-  onPage={(e) => {
-    setPage((e.page ?? 0) + 1);
-    setRows(e.rows ?? 5);
-  }}
-  stripedRows
-  responsiveLayout="scroll"
-  globalFilter={globalFilter}
-  header={header}
-  emptyMessage="No students found"
-  onRowClick={onRowClick}      
-  selectionMode="single"
+        value={students}
+        loading={loading}
+        paginator
+        lazy
+        first={(page - 1) * rows}
+        rows={rows}
+        totalRecords={totalRecords}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        onPage={(e) => {
+          setPage((e.page ?? 0) + 1);
+          setRows(e.rows ?? 5);
+        }}
+        stripedRows
+        responsiveLayout="scroll"
+        globalFilter={globalFilter}
+        header={header}
+        emptyMessage="No students found"
+        onRowClick={onRowClick}
+        selectionMode="single"
       >
         <Column field="studentId" header="Student ID" />
         <Column header="Photo" body={photoTemplate} />
@@ -200,10 +200,10 @@ const onRowClick = (e: any) => {
         <Column field="email" header="Email" />
         <Column field="phone" header="Phone" />
         <Column
-  field="dob"
-  header="Date of Birth"
-  body={(rowData) => formatDate(rowData.dob)}
-/>
+          field="dob"
+          header="Date of Birth"
+          body={(rowData) => formatDate(rowData.dob)}
+        />
         <Column field="fatherName" header="Father Name" />
         <Column field="bloodGroup" header="Blood Group" />
         <Column field="admissionDate" body={(rowData) => formatDate(rowData.admissionDate)} header="Admission Date" />
@@ -217,10 +217,10 @@ const onRowClick = (e: any) => {
         style={{ width: "50vw" }}
         onHide={() => setVisible(false)}
       >
-        <EditStudent onClose={() => setVisible(false)} student={selectedStudent} refetch={studentGet}/>
+        <EditStudent onClose={() => setVisible(false)} student={selectedStudent} refetch={studentGet} />
       </Dialog>
-       <ConfirmDialog />
-       <ToastContainer/>
+      <ConfirmDialog />
+      <ToastContainer />
     </div>
   );
 }
