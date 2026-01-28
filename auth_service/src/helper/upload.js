@@ -1,4 +1,5 @@
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client } = require("@aws-sdk/client-s3");
+const { Upload } = require("@aws-sdk/lib-storage");
 
 const s3 = new S3Client({
   region: process.env.YOUR_BUCKET_REGION,
@@ -9,16 +10,21 @@ const s3 = new S3Client({
 });
 
 const uploadSingleImage = async (file) => {
-  const key = `courses/${Date.now()}-${file.originalname}`;
+  if (!file) return null;
 
-  const uploadParams = {
-    Bucket: process.env.BUCKETNAME,
-    Key: key,
-    Body: file.buffer,
-    ContentType: file.mimetype,
-  };
+  const key = `institutions/${Date.now()}-${file.originalname}`;
 
-  await s3.send(new PutObjectCommand(uploadParams));
+  const upload = new Upload({
+    client: s3,
+    params: {
+      Bucket: process.env.BUCKETNAME,
+      Key: key,
+      Body: file.buffer,      
+      ContentType: file.mimetype,
+    },
+  });
+
+  await upload.done();
 
   return `https://${process.env.BUCKETNAME}.s3.${process.env.YOUR_BUCKET_REGION}.amazonaws.com/${key}`;
 };

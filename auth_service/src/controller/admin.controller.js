@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const { AdminRegisterSchema, AdminLoginSchema, institutionSchema } = require("../schema/Schema.js");
+const uploadSingleImage = require("../helper/upload.js");
 
 const registerAdmin = async (req, res) => {
   try {
@@ -140,7 +141,18 @@ const GetAdminProfile = async (req, res) => {
 
 const addInstitution = async (req, res) => {
   try {
-    const parsedData = institutionSchema.parse(req.body);
+      const { lat, lng, ...body } = req.body;
+
+    const parsedData = institutionSchema.parse(body);
+
+
+    if (!lat || !lng) {
+      return res.status(400).json({ message: "Location is required" });
+    }
+    
+    if(!req.files?.photo?.[0]){
+      return res.status(400).json({ message: "Image is requrird is required" })
+    }
 
     const adminId = req.user?._id;
     if (!adminId) {
@@ -151,8 +163,18 @@ const addInstitution = async (req, res) => {
     if (!isAdmin || isAdmin.role !== "admin") {
       return res.status(403).json({ message: "Only admins can add institutions" });
     }
+     
 
+    const photoFile = req.files.photo[0];
+    const bannerFile = req.files?.banner?.[0];
 
+    const photoUrl = await uploadSingleImage(photoFile);
+    let bannerUrl = null;
+
+    if (bannerFile) {
+      bannerUrl = await uploadSingleImage(bannerFile);
+    }
+    
     const plainPassword = passwordGenerator();
 
 
@@ -170,8 +192,14 @@ const addInstitution = async (req, res) => {
       phone: parsedData.phone,
       website: parsedData.website,
       registrationNo: parsedData.registrationNo,
-      establishDate: new Date(parsedData.establishDate),
+      establishDate: parsedData.establishDate ?  new Date(parsedData.establishDate) : null,
       address: parsedData.address,
+      geoLocation: {
+       lat: lat,
+       lng: lng   
+      },
+      institutionBanner: bannerUrl | null,
+      institutionImage: photoUrl,
       adminUser: institutionUser._id,
     });
 
@@ -191,7 +219,7 @@ const addInstitution = async (req, res) => {
   } catch (error) {
    if (error.code === 11000 && error.keyPattern?.email) {
     return res.status(409).json({
-      message: "Email already in use",
+      message: "Email or phone  already in use",
     });
   }
 
@@ -209,6 +237,64 @@ const addInstitution = async (req, res) => {
   
   }
 };
+
+const updateStatus  = async (req, res) => {
+  try {
+        const adminId = req.user?._id;
+    if (!adminId) {
+      return res.status(403).json({ message: "Only admins can add institutions" });
+    }
+
+
+
+    const isAdmin = await User.findById(adminId);
+    if (!isAdmin || isAdmin.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can add institutions" });
+    }
+
+    const institutionId = req.params.id;
+    const institution = await Institution.findById(institutionId);
+    if (!institution) {
+      return res.status(404).json({ message: "Institution not found" });
+    }
+     
+       const {status} =  req.body
+
+       if(!status){
+        return res.status(404).json({
+          message: "Status is not found"
+        })
+       }
+
+       await Institution.findByIdAndUpdate(institutionId,{
+        status: status
+       })
+
+       return res.status(200).json({
+        message: "Status updated "
+       })
+       
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.email) {
+    return res.status(409).json({
+      message: "Email already in use",
+    });
+  }
+
+  if (error.name === "ZodError") {
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: error.errors,
+    });
+  }
+
+  console.error("Create student error:", error);
+  return res.status(500).json({
+    message: "Internal server error",
+  });
+  
+  }
+}
 
 
 const updateInstitution = async (req, res) => {
@@ -339,6 +425,7 @@ const getAllInstitutions = async (req, res) => {
       password: inst.adminUser?.password || null,
       userEmail: inst.adminUser?.email || null,
       role: inst.adminUser?.role || null,
+      status: inst.status
     }));
 
     return res.status(200).json({
@@ -444,5 +531,5 @@ const adminDashboard = async (req, res) => {
 
 
 
-module.exports = {adminDashboard, adminLogOut, registerAdmin, loginAdmin, GetAdminProfile, addInstitution, getAllInstitutions, updateInstitution, deleteInstitution, findOneInstitution, recentInstitution };
+module.exports = {updateStatus,adminDashboard, adminLogOut, registerAdmin, loginAdmin, GetAdminProfile, addInstitution, getAllInstitutions, updateInstitution, deleteInstitution, findOneInstitution, recentInstitution };
 

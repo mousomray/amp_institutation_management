@@ -143,19 +143,20 @@ const createCourse = async (req, res) => {
 
 const getMyCourses = async (req, res) => {
   try {
-
     const userId = req.user?._id;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
+
     const institutionUser = await User.findById(userId);
-    console.log("==>", institutionUser)
+    console.log("==>", institutionUser);
 
     if (!institutionUser || institutionUser.role !== "institution") {
       return res.status(403).json({
         message: "Only institutions can create courses",
       });
     }
+
     const institution = await Institution.findOne({
       adminUser: institutionUser._id,
     });
@@ -165,23 +166,17 @@ const getMyCourses = async (req, res) => {
         message: "Institution not found",
       });
     }
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
 
-    const result = await Course.aggregate([
-
+   
+    const courses = await Course.aggregate([
       {
         $match: {
           institution: institution._id,
         },
       },
-
-
       {
         $sort: { createdAt: -1 },
       },
-
       {
         $lookup: {
           from: "institutions",
@@ -190,11 +185,7 @@ const getMyCourses = async (req, res) => {
           as: "institution",
         },
       },
-
-
       { $unwind: "$institution" },
-
-
       {
         $project: {
           name: 1,
@@ -210,28 +201,12 @@ const getMyCourses = async (req, res) => {
           },
         },
       },
-
-
-      {
-        $facet: {
-          data: [{ $skip: skip }, { $limit: limit }],
-          totalCount: [{ $count: "count" }],
-        },
-      },
     ]);
-
-    const courses = result[0].data;
-    const total = result[0].totalCount[0]?.count || 0;
 
     return res.status(200).json({
       message: "My courses fetched successfully",
       data: courses,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      total: courses.length,
     });
   } catch (error) {
     console.error("Get my courses error:", error);
@@ -240,12 +215,12 @@ const getMyCourses = async (req, res) => {
 };
 
 
-
 const createStudent = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    // ✅ Validate body
     const parsedData = StudentSchema.parse(req.body);
 
     const userId = req.user?._id;
@@ -255,18 +230,20 @@ const createStudent = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const institutionUser = await User.findById(userId);
+    // ✅ Check institution user
+    const institutionUser = await User.findById(userId).session(session);
     if (!institutionUser || institutionUser.role !== "institution") {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({
-        message: "Only institutions can create students",
-      });
+      return res
+        .status(403)
+        .json({ message: "Only institutions can create students" });
     }
 
+    // ✅ Find institution
     const institution = await Institution.findOne({
       adminUser: institutionUser._id,
-    });
+    }).session(session);
 
     if (!institution) {
       await session.abortTransaction();
@@ -274,26 +251,34 @@ const createStudent = async (req, res) => {
       return res.status(404).json({ message: "Institution not found" });
     }
 
+    // ✅ Validate files
     if (!req.files?.image || !req.files?.signature) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({
-        message: "Image and signature are required",
-      });
+      return res
+        .status(400)
+        .json({ message: "Image and signature are required" });
     }
 
-    const emailExists = await User.findOne({ email: parsedData.email });
+
+    const emailExists = await User.findOne({
+      email: parsedData.email,
+    }).session(session);
+
     if (emailExists) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(409).json({ message: "Email already in use" });
+      return res.status(409).json({ message: "Email already exists" });
     }
 
+ 
     const photoUrl = await uploadSingleImage(req.files.image[0]);
     const signatureUrl = await uploadSingleImage(req.files.signature[0]);
 
+    
     const plainPassword = passwordGenerator();
 
+    
     const [user] = await User.create(
       [
         {
@@ -305,25 +290,61 @@ const createStudent = async (req, res) => {
       { session }
     );
 
+    
     const [student] = await Student.create(
       [
         {
-          ...parsedData,
+          studentId: parsedData.studentId,
+          name: parsedData.name,
+          phone: parsedData.phone,
+          fatherName: parsedData.fatherName,
+          bloodGroup: parsedData.bloodGroup,
+          admissionDate: parsedData.admissionDate || null,
+          dob: parsedData.dob || null,
           institution: institution._id,
           photo: photoUrl,
           signature: signatureUrl,
           user: user._id,
+          email: parsedData.email
         },
       ],
       { session }
     );
 
+   
     await User.findByIdAndUpdate(
       user._id,
       { student: student._id },
       { session }
     );
 
+    // ✅ COURSE LINKING (IMPORTANT FIX)
+    if (parsedData.courseId) {
+      const course = await Course.findById(parsedData.courseId).session(
+        session
+      );
+
+      if (!course) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      // ✔ Atomic & safe
+      await Student.findByIdAndUpdate(
+        student._id,
+        { $addToSet: { courses: course._id } },
+        { session }
+      );
+
+      await Course.findByIdAndUpdate(
+        course._id,
+        { $addToSet: { students: student._id } },
+        { session }
+      );
+    }
+
+    // ✅ Commit transaction
     await session.commitTransaction();
     session.endSession();
 
@@ -336,10 +357,14 @@ const createStudent = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error)
+    console.error(error);
+
     await session.abortTransaction();
     session.endSession();
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: error?.message || "Internal server error",
+    });
   }
 };
 

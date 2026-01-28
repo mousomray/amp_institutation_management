@@ -26,10 +26,21 @@ const institutionSchema = new Schema(
     email: { type: String, required: true, unique: true },
     phone: String,
     website: String,
-    registrationNo: { type: String, required: true, unique: true },
+    registrationNo: { type: String},
     establishDate: Date,
     address: String,
+    geoLocation: {
+      lat: String,
+    lng: String,
+    },
+    institutionImage: {type: String, default: null},
+    institutionBanner: String,
     adminUser: { type: Schema.Types.ObjectId, ref: "User" },
+    status: {
+       type: String,                    
+    enum: ["ACTIVE", "INACTIVE"],     
+    default: "ACTIVE"   
+    }
   },
   { timestamps: true }
 );
@@ -68,10 +79,8 @@ const studentSchema = new Schema(
   {
     studentId: {
       type: String,
-      unique: true,
       trim: true,
     },
-
     name: { type: String, required: true, trim: true },
 
     email: {

@@ -9,6 +9,7 @@ import { Calendar } from "primereact/calendar";
 import { StudentSchema } from "@/helper/schema/Schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastContainer, toast } from "react-toastify";
+import axiosInstance from "@/service/axios.service";
 import { z } from "zod";
 import axios from "axios";
 
@@ -31,13 +32,24 @@ export default function Page() {
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signPreview, setSignPreview] = useState<string | null>(null);
-
+  const [loading, setLoading] = useState(false);
+  const [courseData, setCourseData] = useState<any[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
   // ✅ Read token ONCE
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
   }, []);
 
+
+
+
+
+  useEffect(() => {
+    if (token) {
+      courseDataGet()
+    }
+  }, [token])
   const {
     register,
     handleSubmit,
@@ -54,35 +66,71 @@ export default function Page() {
       if (!signatureFile) return toast.error("Signature is required");
 
       const formData = new FormData();
-      formData.append("studentId", data.studentId);
       formData.append("name", data.name);
       formData.append("email", data.email);
       formData.append("phone", data.phone);
-      formData.append("dob", data.dob.toISOString());
-      formData.append("fatherName", data.fatherName);
-      formData.append("bloodGroup", data.bloodGroup);
-      formData.append("admissionDate", data.admissionDate.toISOString());
+
+      // Optional fields
+      if (data.studentId) formData.append("studentId", data.studentId);
+      if (data.dob) formData.append("dob", data.dob.toISOString());
+      if (data.fatherName) formData.append("fatherName", data.fatherName);
+      if (data.bloodGroup) formData.append("bloodGroup", data.bloodGroup);
+      if (data.admissionDate) formData.append("admissionDate", data.admissionDate.toISOString());
+      if (selectedCourse) formData.append("courseId", selectedCourse._id); // send course ID
+
+      // Files
       formData.append("image", photoFile);
       formData.append("signature", signatureFile);
 
-     if (token) {
-      const res = await axios.post("/institution/create-student", formData, {
+      if (token) {
+        const res = await axiosInstance.post("/institution/create-student", formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        toast.success(res.data.message);
+        reset();
+        setPhotoFile(null);
+        setSignatureFile(null);
+        setPhotoPreview(null);
+        setSignPreview(null);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Something went wrong");
+      reset();
+        setPhotoFile(null);
+        setSignatureFile(null);
+        setPhotoPreview(null);
+        setSignPreview(null);
+    }
+  };
+
+
+  const courseDataGet = async () => {
+    try {
+      setLoading(true);
+
+      const res = await axiosInstance.get("/institution/get-course", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        withCredentials: true,
       });
 
-      toast.success(res.data.message);
-      reset();
-      setPhotoFile(null);
-      setSignatureFile(null);
-      setPhotoPreview(null);
-      setSignPreview(null);
-    }
+      setCourseData(res.data.data);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Something went wrong");
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Something went wrong");
+      } else {
+        toast.error("Unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
     }
   };
+
+  console.log("=>", courseData)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-6">
@@ -212,6 +260,57 @@ export default function Page() {
                 {errors.bloodGroup.message}
               </small>
             )}
+          </div>
+
+
+          <div>
+            <label className="text-sm font-medium">Add Course</label>
+            <Controller
+              name="course"
+              control={control}
+              render={({ field }) => (
+                <Dropdown
+                  {...field}
+                  value={selectedCourse}
+                  options={courseData}
+                  optionLabel="name"
+                  placeholder="Select Course"
+                  className="w-full mt-1"
+                  onChange={(e) => {
+                    setSelectedCourse(e.value);
+                    field.onChange(e.value);
+                  }}
+                  itemTemplate={(course) => (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={course.image}
+                        alt={course.name}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                      <div>
+                        <div className="font-medium">{course.name}</div>
+                        <div className="text-sm text-gray-500">${course.fee}</div>
+                      </div>
+                    </div>
+                  )}
+                  valueTemplate={(course) =>
+                    course ? (
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={course.image}
+                          alt={course.name}
+                          className="w-6 h-6 object-cover rounded"
+                        />
+                        <span>{course.name}</span>
+                      </div>
+                    ) : (
+                      <span>Select course</span>
+                    )
+                  }
+                />
+              )}
+            />
+
           </div>
 
           {/* ADMISSION DATE */}

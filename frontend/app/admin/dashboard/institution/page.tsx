@@ -15,6 +15,9 @@ import { ToastContainer, toast } from 'react-toastify';
 import axiosInstance from "@/service/axios.service";
 import { useAppSelector } from "@/lib/store/hooks"
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { Menu } from 'primereact/menu';
+import { MoreVertical } from 'lucide-react';
+import { useRef } from 'react';
 
 
 export default function InstitutionTable() {
@@ -28,23 +31,29 @@ export default function InstitutionTable() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const menuRef = React.useRef<Menu>(null);
+  const [remarksDialog, setRemarksDialog] = useState(false);
+
+  const [actionInstitution, setActionInstitution] = useState<any | null>(null)
 
 
-  
+
+
+
   const [selectedInstitution, setSelectedInstitution] = useState<any | null>(null);
 
   useEffect(() => {
-      const storedToken = localStorage.getItem("admin-token");
-       setToken(storedToken)
-   }, []);
+    const storedToken = localStorage.getItem("admin-token");
+    setToken(storedToken)
+  }, []);
 
-   useEffect(() => {
-  if (token !== null) {
-    institutionDataGet();
-  }
-}, [token, page, rows]);
- 
- 
+  useEffect(() => {
+    if (token !== null) {
+      institutionDataGet();
+    }
+  }, [token, page, rows]);
+
+
 
   const institutionDataGet = async () => {
     try {
@@ -144,27 +153,72 @@ export default function InstitutionTable() {
   };
 
 
-  const actionTemplate = (rowData: any) => (
-    <div className="flex gap-2">
-      <Button
-        icon="pi pi-pencil"
-        rounded
-        text
-        severity="info"
-        onClick={() => handleUpdate(rowData)}
-        tooltip="Update"
-      />
-      <Button
-        icon="pi pi-trash"
-        rounded
-        text
-        severity="danger"
-        onClick={() => confirmDeleteInstitution(rowData)}
-        tooltip="Delete"
-      />
-    </div>
-  );
+  const updateStatus = async (status: "ACTIVE" | "INACTIVE",rowData :any) => {
+    try {
+         const res =  await axiosInstance.post(`/admin/update-status/${rowData._id}`,{status}, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          toast.success(res.data.message);
+          institutionDataGet();
+        } catch (error: any) {
+          if (axios.isAxiosError(error)) {
+            toast.error(error.response?.data?.message || "Delete failed");
+          } else {
+            toast.error("Unexpected error occurred");
+          }
+        
+      }
+  };
 
+
+
+  const actionTemplate = (rowData: any) => {
+    const menuRef = React.useRef<Menu>(null);
+
+    const menuItems = [
+      {
+      label: "Edit",
+      icon: "pi pi-pencil",
+      command: () => handleUpdate(rowData),
+    },
+    {
+      label: "Mark Active",
+      icon: "pi pi-check",
+      command: () => updateStatus("ACTIVE", rowData),
+    },
+    {
+      label: "Mark Inactive",
+      icon: "pi pi-times",
+      className: "p-menuitem-danger",
+      command: () => {
+        setActionInstitution(rowData);
+        updateStatus("INACTIVE", rowData);
+        setRemarksDialog(true);
+      },
+    },
+    {
+      label: "Delete",
+      icon: "pi pi-trash",
+      className: "p-menuitem-danger",
+      command: () => confirmDeleteInstitution(rowData),
+    },
+    ];
+
+    return (
+      <>
+        <Menu model={menuItems} popup ref={menuRef} />
+        <Button
+          icon="pi pi-ellipsis-v"
+          text
+          rounded
+          onClick={(e) => menuRef.current?.toggle(e)}
+          tooltip="Actions"
+        />
+      </>
+    );
+  };
 
 
   const header = (
@@ -242,6 +296,19 @@ export default function InstitutionTable() {
         <Column field="establishDate" header="Establish Date" />
         <Column field="registrationNo" header="Registration No" />
         <Column header="Password" body={passwordTemplate} />
+        <Column
+          header="Status"
+          body={(row) => (
+            <span
+              className={`px-2 py-1 rounded text-xs font-semibold ${row.status === "ACTIVE"
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+                }`}
+            >
+              {row.status?.toUpperCase() || "INACTIVE"}
+            </span>
+          )}
+        />
         <Column header="Actions" body={actionTemplate} />
       </DataTable>
 

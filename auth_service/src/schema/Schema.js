@@ -14,26 +14,23 @@ const AdminLoginSchema = zod.object({
 
 
 const institutionSchema = zod.object({
-  name: zod.string().min(2, "Institution name must be at least 2 characters"),
-
-  email: zod.string().email("Invalid institution email"),
-
-  phone: zod
-    .string()
-    .regex(/^[0-9]{10}$/, "Phone number must be 10 digits"),
-
-  website: zod.preprocess(
-    (val) => (val === "" ? undefined : val),
-    zod.string()
-  ),
-
-  registrationNo: zod.string().min(3, "Registration number is required"),
-
-  establishDate: zod
-    .string()
-    .refine((date) => !isNaN(Date.parse(date)), "Invalid establish date"),
-
-  address: zod.string().min(5, "Address must be at least 5 characters"),
+  name: zod.string().min(2, 'Institution name must be at least 2 characters'),
+    email: zod.string().email('Invalid institution email'),
+    phone: zod
+      .string()
+      .min(10, "Phone must be at least 10 digits")
+      .max(10, "Phone number too long"),
+  
+    // Optional fields
+    website: zod.string().optional(),
+    registrationNo: zod.string().optional(),
+    establishDate: zod
+      .string()
+      .refine((date) => !date || !isNaN(Date.parse(date)), 'Invalid establish date')
+      .optional(),
+    address: zod
+      .string()
+      .optional(),
 });
 
  const CourseSchema = zod.object({
@@ -53,52 +50,24 @@ const institutionSchema = zod.object({
 });
 
  const StudentSchema = zod.object({
-  studentId: zod.string().min(1, "Student ID is required"),
-
-  name: zod.string().min(1, "Name is required"),
-
-  email: zod.string().email("Invalid email address"),
-
-  phone: zod
-    .string()
-    .regex(/^[0-9]{10,15}$/, "Phone number must be 10–15 digits"),
-
-  dob: zod
-    .union([zod.string(), zod.date()])
-    .transform((val) => new Date(val))
-    .refine(
-      (date) => !isNaN(date.getTime()),
-      "Invalid date of birth"
-    )
-    .refine(
-      (date) => date < new Date(),
-      "Date of birth must be in the past"
-    ),
-
-  fatherName: zod.string().min(1, "Father name is required"),
-
-  bloodGroup: zod.enum([
-    "A+",
-    "A-",
-    "B+",
-    "B-",
-    "O+",
-    "O-",
-    "AB+",
-    "AB-",
-  ]),
-
- admissionDate: zod
-    .union([zod.string(), zod.date()])
-    .transform((val) => new Date(val))
-    .refine(
-      (date) => !isNaN(date.getTime()),
-      "Invalid admission date"
-    )
-    .refine(
-      (date) => date <= new Date(),
-      "Admission date cannot be in the future"
-    ),
+  studentId: zod.string().optional(), 
+    name: zod.string().min(1, "Name is required"), 
+    email: zod.string().email("Invalid email address"),
+    phone: zod
+      .string()
+      .min(10, "Phone must be at least 10 digits")
+      .max(10, "Phone number too long"),
+    dob: zod
+     .string()
+      .refine((date) => !date || !isNaN(Date.parse(date)), 'Invalid establish date')
+      .optional(),
+    fatherName: zod.string().optional(),
+    bloodGroup: zod.string().optional(),
+    admissionDate: zod
+      .string()
+      .refine((date) => !date || !isNaN(Date.parse(date)), 'Invalid establish date')
+      .optional(),
+    courseId: zod.string().optional()
 });
 
 const EditSthudentSchm = zod.object({
