@@ -5,6 +5,7 @@ import StoreProvider from "@/components/admin/StoreProvider";
 import "primereact/resources/themes/bootstrap4-light-blue/theme.css";
 import "primereact/resources/primereact.min.css";
 import 'primeicons/primeicons.css';
+import { PrimeReactProvider } from "primereact/api";
 
 
 const geistSans = Geist({
@@ -33,7 +34,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <StoreProvider>
+          <PrimeReactProvider
+          value={{
+            hideOverlaysOnDocumentScrolling: true,
+          }}
+        >
           {children}
+        </PrimeReactProvider>
         </StoreProvider>
         
       </body>

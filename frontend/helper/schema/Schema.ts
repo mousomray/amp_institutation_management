@@ -10,31 +10,27 @@ export const AdminLoginSchema = zod.object({
   password: zod.string().min(6, 'Password must be at least 6 characters'),
 })
 
+
+
+
 export const InstitutionSchema = zod.object({
-  name: zod.string().min(2, 'Institution name must be at least 2 characters'),
-
+ name: zod.string().min(2, 'Institution name must be at least 2 characters'),
   email: zod.string().email('Invalid institution email'),
-
   phone: zod
     .string()
     .min(10, "Phone must be at least 10 digits")
     .max(10, "Phone number too long"),
 
-  website: zod
-    .string().min(4, 'Invalid website URL')
-    .optional()
-    .or(zod.literal('')),
-
-  registrationNo: zod
+  // Optional fields
+  website: zod.string().optional(),
+  registrationNo: zod.string().optional(),
+  establishDate: zod
     .string()
-    .min(3, 'Registration number is required'),
-
-  establishDate: zod.string().refine(
-    (date) => !isNaN(Date.parse(date)),
-    'Invalid establish date'
-  ),
-
-  address: zod.string().min(5, 'Address must be at least 5 characters'),
+    .refine((date) => !date || !isNaN(Date.parse(date)), 'Invalid establish date')
+    .optional(),
+  address: zod
+    .string()
+    .optional(),
 })
 
 export const CourseSchema = zod.object({
@@ -53,22 +49,35 @@ export const CourseSchema = zod.object({
     .min(5, "description is required"),
 });
 
-export const StudentSchema = zod.object({
-  studentId: zod.string().min(1, "Student ID is required"),
-  name: zod.string().min(1, "Name is required"),
+ export const StudentSchema = zod.object({
+  studentId: zod.string().optional(), 
+  name: zod.string().min(1, "Name is required"), 
   email: zod.string().email("Invalid email address"),
   phone: zod
     .string()
     .min(10, "Phone must be at least 10 digits")
     .max(10, "Phone number too long"),
-  dob: zod.date().refine((val) => val instanceof Date && !isNaN(val.getTime()), {
-    message: "Date of birth is required",
-  }),
-  fatherName: zod.string().min(1, "Father name is required"),
-  bloodGroup: zod.string().min(1, "Blood group is required"),
-  admissionDate: zod.date().refine((val) => val instanceof Date && !isNaN(val.getTime()), {
-    message: "Admission date is required",
-  }),
+  dob: zod
+    .date()
+    .refine((val) => val instanceof Date && !isNaN(val.getTime()), {
+      message: "Date of birth is required",
+    })
+    .optional(), // optional
+  fatherName: zod.string().optional(),
+  bloodGroup: zod.string().optional(),
+  admissionDate: zod
+    .date()
+    .refine((val) => val instanceof Date && !isNaN(val.getTime()), {
+      message: "Admission date is required",
+    })
+    .optional(),
+  course: zod.object({
+    _id: zod.string(),
+    name: zod.string(),
+    fee: zod.number(),
+    image: zod.string().optional(),
+  }).optional(),
+
 });
 
 export const BookSchema = zod.object({
