@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { bookSetting } from "@/helper/schema/Schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { InputNumber } from "primereact/inputnumber";
 import { ToastContainer, toast } from "react-toastify";
-import axiosInstance from "@/service/axios.service";
+import microInstance from "@/service/micro.service";
 import axios from "axios";
 
 type BookSettingForm = z.infer<typeof bookSetting>;
@@ -23,6 +23,9 @@ export default function EditBookSetting({
   refetch,
   onClose,
 }: EditBookSettingProps) {
+  const [token, setToken] = useState<string | null>(null);
+  const [loadingSingle, setLoadingSingle] = useState(false);
+
   const {
     control,
     handleSubmit,
@@ -32,28 +35,77 @@ export default function EditBookSetting({
     resolver: zodResolver(bookSetting as any),
   });
 
-  /* ================= PREFILL ================= */
   useEffect(() => {
-    if (!setting) return;
+    const storedToken = localStorage.getItem("institution-token");
+    if (storedToken) setToken(storedToken);
+  }, []);
 
-    reset({
-      bookFee: setting.bookFee,
-      lateFee: setting.lateFee,
-    });
-  }, [setting, reset]);
+  /* ================= FETCH SINGLE SETTING ================= */
+  useEffect(() => {
+    if (!setting?._id || !token) return;
 
-  /* ================= SUBMIT ================= */
+    const fetchSingle = async () => {
+      setLoadingSingle(true);
+      try {
+        const res = await microInstance.get(`/api/book/settings/${setting._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        });
+
+        const data = res.data?.data;
+        if (data) {
+          reset({
+            bookFee: data.book_fee || 0,
+            lateFee: data.late_fine || 0,
+          });
+        }
+      } catch (error: any) {
+        console.error(error);
+        if (axios.isAxiosError(error)) {
+          toast.error(error.response?.data?.message || "Failed to fetch setting");
+        } else {
+          toast.error("Unexpected error occurred");
+        }
+      } finally {
+        setLoadingSingle(false);
+      }
+    };
+
+    fetchSingle();
+  }, [setting?._id, token, reset]);
+
+  /* ================= SUBMIT UPDATE ================= */
   const onSubmit = async (data: BookSettingForm) => {
+    if (!token) {
+      toast.error("Authentication token not found. Please login.");
+      return;
+    }
+
+    if (!setting?._id) {
+      toast.error("Setting ID is missing");
+      return;
+    }
+
     try {
-      const res = await axiosInstance.put(
-        `/institution/update-book-setting/${setting._id}`,
-        data
+      const payload = {
+        book_fee: data.bookFee,
+        late_fine: data.lateFee,
+      };
+
+      const res = await microInstance.put(
+        `/api/book/updatesettings/${setting._id}`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
       );
 
-      toast.success(res.data.message || "Book setting updated");
+      toast.success(res.data?.message || "Book setting updated successfully");
       refetch();
       onClose();
     } catch (error: any) {
+      console.error(error);
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Update failed");
       } else {
@@ -65,85 +117,91 @@ export default function EditBookSetting({
   if (!setting) return null;
 
   return (
-    <div className="w-full bg-white rounded-xl p-4">
+    <div className="w-full bg-white rounded-xl shadow p-8">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Book Setting</h2>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {loadingSingle ? (
+        <p className="text-gray-500">Loading setting...</p>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* BOOK FEE */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Book Fee <span className="text-red-500">*</span>
+            </label>
 
-        {/* BOOK FEE */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Book Fee <span className="text-red-500">*</span>
-          </label>
-
-          <Controller
-            name="bookFee"
-            control={control}
-            render={({ field }) => (
-              <InputNumber
-                value={field.value}
-                onValueChange={(e) => field.onChange(e.value)}
-                mode="currency"
-                currency="INR"
-                locale="en-IN"
-                minFractionDigits={2}
-                className="w-full mt-1"
+            <Controller
+              name="bookFee"
+              control={control}
+              render={({ field }) => (
+                <InputNumber
+                  value={field.value}
+                  onValueChange={(e) => field.onChange(e.value)}
+                  mode="currency"
+                  currency="INR"
+                  locale="en-IN"
+                  minFractionDigits={2}
+                  className="w-full"
                   placeholder="₹0.00"
-              />
+                />
+              )}
+            />
+
+            {errors.bookFee && (
+              <p className="text-red-500 text-xs mt-1">{errors.bookFee.message}</p>
             )}
-          />
+          </div>
 
-          {errors.bookFee && (
-            <p className="text-red-500 text-xs">{errors.bookFee.message}</p>
-          )}
-        </div>
+          {/* LATE FEE */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Late Fee <span className="text-red-500">*</span>
+            </label>
 
-        {/* LATE FEE */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Late Fee <span className="text-red-500">*</span>
-          </label>
-
-          <Controller
-            name="lateFee"
-            control={control}
-            render={({ field }) => (
-              <InputNumber
-                value={field.value}
-                onValueChange={(e) => field.onChange(e.value)}
-                mode="currency"
-                currency="INR"
-                locale="en-IN"
-                minFractionDigits={2}
-                className="w-full mt-1"
+            <Controller
+              name="lateFee"
+              control={control}
+              render={({ field }) => (
+                <InputNumber
+                  value={field.value}
+                  onValueChange={(e) => field.onChange(e.value)}
+                  mode="currency"
+                  currency="INR"
+                  locale="en-IN"
+                  minFractionDigits={2}
+                  className="w-full"
                   placeholder="₹0.00"
-              />
+                />
+              )}
+            />
+
+            {errors.lateFee && (
+              <p className="text-red-500 text-xs mt-1">{errors.lateFee.message}</p>
             )}
-          />
+          </div>
 
-          {errors.lateFee && (
-            <p className="text-red-500 text-xs">{errors.lateFee.message}</p>
-          )}
-        </div>
+          {/* ACTIONS */}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
 
-        {/* ACTIONS */}
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border rounded-lg"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50"
-          >
-            {isSubmitting ? "Saving..." : "Update Setting"}
-          </button>
-        </div>
-      </form>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`px-6 py-2 bg-primary text-white rounded-lg ${
+                isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
+              }`}
+            >
+              {isSubmitting ? "Saving..." : "Update Setting"}
+            </button>
+          </div>
+        </form>
+      )}
 
       <ToastContainer />
     </div>

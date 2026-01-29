@@ -188,43 +188,6 @@ class IssueController {
                 },
 
                 {
-                    $addFields: {
-                        issue_duration_days: {
-                            $dateDiff: {
-                                startDate: '$issue_date',
-                                endDate: {
-                                    $cond: [
-                                        { $ifNull: ['$actual_return_date', false] },
-                                        '$actual_return_date',
-                                        '$$NOW'
-                                    ]
-                                },
-                                unit: 'day'
-                            }
-                        },
-
-                        delay_days: {
-                            $cond: [
-                                {
-                                    $and: [
-                                        { $ne: ['$actual_return_date', null] },
-                                        { $gt: ['$actual_return_date', '$return_date'] }
-                                    ]
-                                },
-                                {
-                                    $dateDiff: {
-                                        startDate: '$return_date',
-                                        endDate: '$actual_return_date',
-                                        unit: 'day'
-                                    }
-                                },
-                                0
-                            ]
-                        }
-                    }
-                },
-
-                {
                     $project: {
                         book_id: 1,
                         student_id: 1,
@@ -235,14 +198,13 @@ class IssueController {
                         late_fine: 1,
                         total_amount: 1,
                         status: 1,
-                        issue_duration_days: 1,
-                        delay_days: 1,
 
                         book: {
                             _id: 1,
                             name: 1,
                             authorName: 1,
-                            language: 1
+                            language: 1,
+                            image: 1
                         }
                     }
                 },

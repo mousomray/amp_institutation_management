@@ -13,7 +13,8 @@ import { Menu } from "primereact/menu";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import EditBookSetting from "@/components/institution/EditBookSetting";
-
+import microInstance from "@/service/micro.service";
+import axios from "axios";
 
 type BookFormData = z.infer<typeof bookSetting>;
 
@@ -21,6 +22,9 @@ export default function AddBookForm() {
     const [token, setToken] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [visible, setVisible] = useState<boolean>(false);
+    const [tableData, setTableData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedSetting, setSelectedSetting] = useState<any>(null);
 
     const {
         control,
@@ -37,27 +41,120 @@ export default function AddBookForm() {
 
     useEffect(() => {
         const storedToken = localStorage.getItem("institution-token");
-        if (storedToken) setToken(storedToken);
+        if (storedToken) {
+            setToken(storedToken);
+        }
     }, []);
 
+    /* ================= FETCH ALL SETTINGS ================= */
+    const fetchSettings = async () => {
+        if (!token) return;
+        
+        setLoading(true);
+        try {
+            const res = await microInstance.get("/api/book/settings", {
+                headers: { Authorization: `Bearer ${token}` },
+                withCredentials: true,
+            });
+
+            if (res.data?.success) {
+                // Handle both array and single object response
+                const data = Array.isArray(res.data.data) 
+                    ? res.data.data 
+                    : [res.data.data];
+                
+                setTableData(data.map((item: any) => ({
+                    _id: item._id,
+                    bookFee: item.book_fee,
+                    lateFee: item.late_fine,
+                    isActive: item.isActive,
+                    createdAt: item.createdAt,
+                })));
+            }
+        } catch (error: any) {
+            console.error(error);
+            if (axios.isAxiosError(error)) {
+                toast.error(error.response?.data?.message || "Failed to fetch settings");
+            } else {
+                toast.error("Unexpected error occurred");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (token) {
+            fetchSettings();
+        }
+    }, [token]);
+
+    /* ================= CREATE NEW SETTING ================= */
     const onSubmit = async (data: BookFormData) => {
+        if (!token) {
+            toast.error("Authentication token not found. Please login.");
+            return;
+        }
+
         try {
             setIsSubmitting(true);
-            console.log("FORM DATA 👉", data);
-            toast.success("Book setting saved successfully");
+            
+            const payload = {
+                book_fee: data.bookFee,
+                late_fine: data.lateFee,
+            };
+
+            const res = await microInstance.post("/api/book/createsetting", payload, {
+                headers: { Authorization: `Bearer ${token}` },
+                withCredentials: true,
+            });
+
+            toast.success(res.data?.message || "Book setting saved successfully");
             reset();
+            fetchSettings(); // Refresh the list
         } catch (error: any) {
-            toast.error(error?.message || "Something went wrong");
+            console.error(error);
+            if (axios.isAxiosError(error)) {
+                toast.error(error.response?.data?.message || "Failed to save setting");
+            } else {
+                toast.error(error?.message || "Something went wrong");
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const tableData = [
-        { bookFee: 2323.4, lateFee: 3434.3, isActive: true },
-        { bookFee: 1500, lateFee: 500, isActive: false },
-        { bookFee: 3000, lateFee: 1000, isActive: true },
-    ];
+    /* ================= TOGGLE ACTIVE/INACTIVE ================= */
+    const toggleSettingStatus = async (settingId: string, currentStatus: boolean) => {
+        if (!token) {
+            toast.error("Authentication token not found");
+            return;
+        }
+
+        try {
+            const res = await microInstance.put(
+                `/api/book/togglesettings/${settingId}`,
+                {},
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    withCredentials: true,
+                }
+            );
+
+            toast.success(
+                res.data?.message || 
+                `Marked ${!currentStatus ? "active" : "inactive"} successfully`
+            );
+            fetchSettings(); // Refresh the list
+        } catch (error: any) {
+            console.error(error);
+            if (axios.isAxiosError(error)) {
+                toast.error(error.response?.data?.message || "Failed to update status");
+            } else {
+                toast.error("Unexpected error occurred");
+            }
+        }
+    };
 
     const statusTemplate = (rowData: any) => (
         <span
@@ -78,22 +175,16 @@ export default function AddBookForm() {
                 label: "Edit",
                 icon: "pi pi-pencil",
                 command: () => {
-                    setVisible(true)
+                    setSelectedSetting(rowData);
+                    setVisible(true);
                 },
             },
             {
-                label: "Mark Active",
-                icon: "pi pi-check",
+                label: rowData.isActive ? "Mark Inactive" : "Mark Active",
+                icon: rowData.isActive ? "pi pi-times" : "pi pi-check",
+                className: rowData.isActive ? "p-menuitem-danger" : "",
                 command: () => {
-                    toast.success(`Marked active`);
-                },
-            },
-            {
-                label: "Mark Inactive",
-                icon: "pi pi-times",
-                className: "p-menuitem-danger",
-                command: () => {
-                    toast.warn(`Marked inactive`);
+                    toggleSettingStatus(rowData._id, rowData.isActive);
                 },
             },
         ];
@@ -111,7 +202,6 @@ export default function AddBookForm() {
             </>
         );
     };
-
 
     const FromHeader = (
         <div className="mb-6">
@@ -139,6 +229,8 @@ export default function AddBookForm() {
                         rows={5}
                         responsiveLayout="scroll"
                         className="text-sm"
+                        loading={loading}
+                        emptyMessage="No settings found"
                     >
                         <Column field="bookFee" header="Book Fee (₹)" />
                         <Column field="lateFee" header="Late Fee (₹)" />
@@ -175,7 +267,6 @@ export default function AddBookForm() {
                                         mode="currency"
                                         currency="INR"
                                         locale="en-IN"
-                                
                                         minFractionDigits={2}
                                     />
                                 )}
@@ -229,16 +320,26 @@ export default function AddBookForm() {
                     <ToastContainer position="top-right" autoClose={3000} />
                 </div>
             </div>
+            
             <div className="card flex justify-content-center">
-                <Dialog header={FromHeader} visible={visible} style={{ width: '30vw' }} onHide={() => { if (!visible) return; setVisible(false); }}>
+                <Dialog 
+                    header={FromHeader} 
+                    visible={visible} 
+                    style={{ width: '30vw' }} 
+                    onHide={() => { 
+                        setVisible(false);
+                        setSelectedSetting(null);
+                    }}
+                >
                     <EditBookSetting
-                        setting={[]}
-                        refetch={() =>{}}
-                        onClose={() => setVisible(false)}
+                        setting={selectedSetting}
+                        refetch={fetchSettings}
+                        onClose={() => {
+                            setVisible(false);
+                            setSelectedSetting(null);
+                        }}
                     />
-
                 </Dialog>
-
             </div>
         </div>
     );

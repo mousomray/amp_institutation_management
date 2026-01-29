@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -38,6 +37,7 @@ export default function AddBookForm() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(false);
 
   const {
     register,
@@ -48,14 +48,52 @@ export default function AddBookForm() {
     reset,
   } = useForm<BookFormData>({
     resolver: zodResolver(BookSchema) as Resolver<BookFormData>,
+    defaultValues: {
+      bookFee: 0,
+      lateFee: 0,
+    },
   });
 
   const selectedLanguage = watch("language");
+  const bookFee = watch("bookFee");
+  const lateFee = watch("lateFee");
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
   }, []);
+
+  /* ================= FETCH ACTIVE SETTINGS ================= */
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchActiveSettings = async () => {
+      setLoadingSettings(true);
+      try {
+        const res = await microInstance.get("/api/book/settings", {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        });
+
+        if (res.data?.success && res.data?.data) {
+          const settingsData = res.data.data;
+          
+          // Check if settings is active and prefill
+          if (settingsData.isActive) {
+            setValue("bookFee", settingsData.book_fee || 0);
+            setValue("lateFee", settingsData.late_fine || 0);
+          }
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch settings:", error);
+        // Don't show error toast, just use default values
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    fetchActiveSettings();
+  }, [token, setValue]);
 
   const handleImagePreview = (file: File) => {
     if (preview) URL.revokeObjectURL(preview);
@@ -79,12 +117,12 @@ export default function AddBookForm() {
       formData.append("authorName", data.authorName);
       formData.append("language", data.language);
       formData.append("description", data.description);
-       if(data.bookFee){
-        formData.append("bookFee", data.bookFee.toString());
-       }
-       if(data.lateFee){
-         formData.append("bookFee", data.lateFee.toString());
-       }
+      if (data.bookFee !== undefined && data.bookFee !== null) {
+        formData.append("book_fee", data.bookFee.toString());
+      }
+      if (data.lateFee !== undefined && data.lateFee !== null) {
+        formData.append("late_fine", data.lateFee.toString());
+      }
       formData.append("image", imageFile);
 
       const res = await microInstance.post("/book/createbook", formData, {
@@ -118,6 +156,13 @@ export default function AddBookForm() {
           <h2 className="text-3xl font-bold text-gray-800">Add New Book</h2>
           <p className="text-gray-500 mt-2">Fill in the details to add a book to your library</p>
         </div>
+
+        {loadingSettings && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+            <i className="pi pi-spin pi-spinner mr-2"></i>
+            Loading default fee settings...
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
@@ -222,6 +267,7 @@ export default function AddBookForm() {
                 locale="en-IN"
                 placeholder="₹0.00"
                 minFractionDigits={2}
+                value={bookFee}
                 onValueChange={(e) => setValue("bookFee", e.value ?? 0, { shouldValidate: true })}
               />
               {errors.bookFee && <small className="text-red-500">{errors.bookFee.message}</small>}
@@ -236,8 +282,9 @@ export default function AddBookForm() {
                 mode="currency"
                 currency="INR"
                 locale="en-IN"
-                 placeholder="₹0.00"
+                placeholder="₹0.00"
                 minFractionDigits={2}
+                value={lateFee}
                 onValueChange={(e) => setValue("lateFee", e.value ?? 0, { shouldValidate: true })}
               />
               {errors.lateFee && <small className="text-red-500">{errors.lateFee.message}</small>}
