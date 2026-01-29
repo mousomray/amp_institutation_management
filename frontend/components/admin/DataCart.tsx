@@ -22,19 +22,15 @@ const data = [
 ];
 
 type StatsProps = {
-
   totalInstitutions: number;
-  totalStudents: number;
-  totalCourses: number;
-
 };
 
-function DataCart({ totalCourses, totalInstitutions, totalStudents }: StatsProps) {
+function DataCart({ totalInstitutions }: StatsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
       <div
-      
+
         className="
             bg-[var(--color-surface)]
             border border-[var(--color-border)]
@@ -46,7 +42,7 @@ function DataCart({ totalCourses, totalInstitutions, totalStudents }: StatsProps
       >
         {/* Title */}
         <p className="text-sm text-[var(--color-text-secondary)]">
-         Institute
+          Institute
         </p>
 
         {/* Value */}
@@ -57,7 +53,7 @@ function DataCart({ totalCourses, totalInstitutions, totalStudents }: StatsProps
         {/* Footer */}
         <div className="mt-4 flex items-center justify-between">
           <span className="text-sm text-[var(--color-text-secondary)]">
-           Total Institutes
+            Total Institutes
           </span>
 
           <span
@@ -72,92 +68,6 @@ function DataCart({ totalCourses, totalInstitutions, totalStudents }: StatsProps
           </span>
         </div>
       </div>
-
-
-
-      <div
-       
-        className="
-            bg-[var(--color-surface)]
-            border border-[var(--color-border)]
-            rounded-xl
-            p-6
-            transition-all
-            hover:shadow-lg
-          "
-      >
-        {/* Title */}
-        <p className="text-sm text-[var(--color-text-secondary)]">
-         Students
-        </p>
-
-        {/* Value */}
-        <h2 className="mt-2 text-3xl font-bold text-[var(--color-text-primary)]">
-         {totalStudents}
-        </h2>
-
-        {/* Footer */}
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-[var(--color-text-secondary)]">
-            Total Students
-          </span>
-
-          <span
-            className="
-                px-3 py-1 text-xs font-medium
-                rounded-full
-                bg-[var(--color-primary)]
-                text-white
-              "
-          >
-            Active
-          </span>
-        </div>
-      </div>
-
-
-
-      <div
-        
-        className="
-            bg-[var(--color-surface)]
-            border border-[var(--color-border)]
-            rounded-xl
-            p-6
-            transition-all
-            hover:shadow-lg
-          "
-      >
-        {/* Title */}
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Courses
-        </p>
-
-        {/* Value */}
-        <h2 className="mt-2 text-3xl font-bold text-[var(--color-text-primary)]">
-          {totalCourses}
-        </h2>
-
-        {/* Footer */}
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-[var(--color-text-secondary)]">
-           Total Courses
-          </span>
-
-          <span
-            className="
-                px-3 py-1 text-xs font-medium
-                rounded-full
-                bg-[var(--color-primary)]
-                text-white
-              "
-          >
-            Active
-          </span>
-        </div>
-      </div>
-
-
     </div>
   );
 }

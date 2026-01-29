@@ -14,13 +14,13 @@ function page() {
 
   const [loading, setLoading] = useState(false)
   const [row, setRow] = useState(10)
-    const [recntStudents, setRecntStudents] = useState([])
-      const [allStudents,setAllStudents] = useState(0)
-      const [allCourse,setAllCourse] = useState(0)
-      const [allInstitution,setAllInstitution] = useState(0)
-      const [recntInstitution, setRecntInstitution] = useState([])
-   const [token, setToken] = useState<string | null>(null);
- useEffect(() => {
+  const [recntStudents, setRecntStudents] = useState([])
+  const [allStudents, setAllStudents] = useState(0)
+  const [allCourse, setAllCourse] = useState(0)
+  const [allInstitution, setAllInstitution] = useState(0)
+  const [recntInstitution, setRecntInstitution] = useState([])
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
     const storedToken = localStorage.getItem("admin-token");
     if (storedToken) setToken(storedToken);
   }, []);
@@ -32,9 +32,9 @@ function page() {
     }
   }, [token]);
 
- 
-  const  dashBoardData = async () => {
-     try {
+
+  const dashBoardData = async () => {
+    try {
       setLoading(true);
 
       const res = await axiosInstance.get("/admin/dashboard", {
@@ -43,7 +43,7 @@ function page() {
         },
         withCredentials: true,
       });
-      
+
       console.log("data", res.data)
       setRecntInstitution(res.data.recent.institutions)
       setRecntStudents(res.data.recent.students)
@@ -64,13 +64,12 @@ function page() {
     <
       >
       <div className=' sm:px-6 px-2 sm:py-3 py-1'>
-        <DataCart totalCourses={allCourse} totalInstitutions={allInstitution} totalStudents={allStudents} />
+        <DataCart totalInstitutions={allInstitution} />
       </div>
-      <div className=' sm:px-6 px-2 sm:py-3 py-1 flex flex-row gap-4 '>
-        <InstutionTable institutions={recntInstitution}  rows={row}/>
-        <RecntStudentTable students={recntStudents}/>
-        <ToastContainer />
-      </div>
+
+      <InstutionTable institutions={recntInstitution} rows={row} />
+      <ToastContainer />
+
     </>
   )
 }

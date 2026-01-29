@@ -5,68 +5,47 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
-//import { Toast } from "primereact/toast";
-import { InputIcon } from 'primereact/inputicon';
-import { IconField } from 'primereact/iconfield';
-import { Dialog } from 'primereact/dialog';
-import AdminInstutionEdit from "../../../../components/admin/AdminInstutionEdit";
+import { InputIcon } from "primereact/inputicon";
+import { IconField } from "primereact/iconfield";
+import { Dialog } from "primereact/dialog";
+import { Menu } from "primereact/menu";
+import { ConfirmDialog } from "primereact/confirmdialog";
+import { ToastContainer, toast } from "react-toastify";
 import axios from "axios";
-import { ToastContainer, toast } from 'react-toastify';
-import axiosInstance from "@/service/axios.service";
-import { useAppSelector } from "@/lib/store/hooks"
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
-import { Menu } from 'primereact/menu';
-import { MoreVertical } from 'lucide-react';
-import { useRef } from 'react';
+import { formatDate } from "@/helper/DateTime";
 
+import AdminInstutionEdit from "../../../../components/admin/AdminInstutionEdit";
+import axiosInstance from "@/service/axios.service";
 
 export default function InstitutionTable() {
   const [institutes, setInstitutes] = useState<any[]>([]);
-  const [globalFilter, setGlobalFilter] = useState<string>("");
-  //const toast = useRef<Toast>(null);
-  const [visible, setVisible] = useState<boolean>(false);
-  const [deleteVisible, setDeleteVisible] = useState(false)
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [visible, setVisible] = useState(false);
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState(5);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const menuRef = React.useRef<Menu>(null);
-  const [remarksDialog, setRemarksDialog] = useState(false);
-
-  const [actionInstitution, setActionInstitution] = useState<any | null>(null)
-
-
-
-
-
   const [selectedInstitution, setSelectedInstitution] = useState<any | null>(null);
+
 
   useEffect(() => {
     const storedToken = localStorage.getItem("admin-token");
-    setToken(storedToken)
+    setToken(storedToken);
   }, []);
 
+
   useEffect(() => {
-    if (token !== null) {
-      institutionDataGet();
-    }
+    if (token) institutionDataGet();
   }, [token, page, rows]);
-
-
 
   const institutionDataGet = async () => {
     try {
       setLoading(true);
 
       const res = await axiosInstance.get("/admin/all-institutions", {
-        params: {
-          page,
-          limit: rows,
-        },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        params: { page, limit: rows },
+        headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
 
@@ -81,35 +60,35 @@ export default function InstitutionTable() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handelSendPassword = async (id: any) => {
+    try {
+      const res = await axiosInstance.post(`/admin/send-password/${id}`)
+      toast.success(res.data.message);
+      institutionDataGet();
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Something went wrong");
+      } else {
+        toast.error("Unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
 
 
-  const copyPassword = (password: string) => {
-    navigator.clipboard.writeText(password);
-
-  };
-
-  const handleUpdate = (rowData: any) => {
-    setVisible(true);
-    setSelectedInstitution(rowData);
-  };
-
-
-
-
-  console.log("edit data", selectedInstitution)
-
 
   const passwordTemplate = (rowData: any) => (
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-sm">{rowData.password}</span>
+    <div className="flex justify-center">
       <Button
-        icon="pi pi-copy"
-        text
-        rounded
-        onClick={() => copyPassword(rowData.password)}
-        tooltip="Copy Password"
+        label="Send"
+        icon="pi pi-envelope"
+        size="small"
+        className="p-button-outlined p-button-info"
+        onClick={() => handelSendPassword(rowData._id)}
       />
     </div>
   );
@@ -117,65 +96,52 @@ export default function InstitutionTable() {
 
 
 
-
-
-  const updateStatus = async (status: "ACTIVE" | "INACTIVE",rowData :any) => {
+  const updateStatus = async (status: "ACTIVE" | "INACTIVE", rowData: any) => {
     try {
-         const res =  await axiosInstance.post(`/admin/update-status/${rowData._id}`,{status}, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          toast.success(res.data.message);
-          institutionDataGet();
-        } catch (error: any) {
-          if (axios.isAxiosError(error)) {
-            toast.error(error.response?.data?.message || "Delete failed");
-          } else {
-            toast.error("Unexpected error occurred");
-          }
-        
-      }
+      const res = await axiosInstance.post(
+        `/admin/update-status/${rowData._id}`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(res.data.message);
+      institutionDataGet();
+    } catch {
+      toast.error("Status update failed");
+    }
   };
-
-
-
   const actionTemplate = (rowData: any) => {
     const menuRef = React.useRef<Menu>(null);
 
-    const menuItems = [
+    const items = [
       {
-      label: "Edit",
-      icon: "pi pi-pencil",
-      command: () => handleUpdate(rowData),
-    },
-    {
-      label: "Mark Active",
-      icon: "pi pi-check",
-      command: () => updateStatus("ACTIVE", rowData),
-    },
-    {
-      label: "Mark Inactive",
-      icon: "pi pi-times",
-      className: "p-menuitem-danger",
-      command: () => {
-        setActionInstitution(rowData);
-        updateStatus("INACTIVE", rowData);
-        setRemarksDialog(true);
+        label: "Edit",
+        icon: "pi pi-pencil",
+        command: () => {
+          setSelectedInstitution(rowData);
+          setVisible(true);
+        },
       },
-    },
-    
+      {
+        label: "Mark Active",
+        icon: "pi pi-check",
+        command: () => updateStatus("ACTIVE", rowData),
+      },
+      {
+        label: "Mark Inactive",
+        icon: "pi pi-times",
+        className: "p-menuitem-danger",
+        command: () => updateStatus("INACTIVE", rowData),
+      },
     ];
 
     return (
       <>
-        <Menu model={menuItems} popup ref={menuRef} />
+        <Menu model={items} popup ref={menuRef} />
         <Button
           icon="pi pi-ellipsis-v"
           text
           rounded
           onClick={(e) => menuRef.current?.toggle(e)}
-          tooltip="Actions"
         />
       </>
     );
@@ -183,47 +149,37 @@ export default function InstitutionTable() {
 
 
   const header = (
-    <div className="flex justify-between items-center bg-primary p-3 rounded-lg">
+    <div className="flex flex-col md:flex-row justify-between gap-3 bg-primary p-4 rounded-lg">
       <div>
         <h2 className="text-lg font-semibold text-white">
           Institution Details
         </h2>
-        <p className="text-sm text-black">
+        <p className="text-sm text-white/80">
           Registered institutions list
         </p>
       </div>
 
-      <div className="flex justify-content-end">
-        <IconField iconPosition="left">
-          <InputIcon className="pi pi-search" />
-          <InputText value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder="Keyword Search" />
-        </IconField>
-      </div>
+      <IconField iconPosition="left">
+        <InputIcon className="pi pi-search text-gray-400" />
+        <InputText
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          placeholder="Search institution..."
+          className="w-full md:w-64"
+        />
+      </IconField>
     </div>
   );
 
-  const FromHeader = (
-    <div className="mb-6">
-      <h2 className="text-lg font-semibold text-gray-800">
-        Institution Form
-      </h2>
-      <p className="text-sm text-gray-500">
-        Edit institution details
-      </p>
-    </div>
-  )
-
-
-
   return (
-    <div className="card bg-white p-4 rounded-lg shadow">
-
-
+    <>
       <DataTable
+
         value={institutes}
         loading={loading}
         paginator
         lazy
+
         first={(page - 1) * rows}
         rows={rows}
         totalRecords={totalRecords}
@@ -234,8 +190,20 @@ export default function InstitutionTable() {
         }}
         globalFilter={globalFilter}
         stripedRows
+        rowHover
+        pt={{
+          thead: {
+            style: {
+              backgroundColor: "#ffffff",
+            },
+          },
+        }}
         responsiveLayout="scroll"
-        emptyMessage="No institutions found"
+        emptyMessage={
+          <div className="text-center py-6 text-gray-500">
+            No institutions found
+          </div>
+        }
       >
         <Column field="name" header="Institution Name" />
         <Column field="email" header="Email Address" />
@@ -247,48 +215,54 @@ export default function InstitutionTable() {
             <a
               href={row.website}
               target="_blank"
-              className="text-blue-600 underline"
               rel="noreferrer"
+              className="text-blue-600 underline"
             >
               {row.website}
             </a>
           )}
         />
-        <Column field="establishDate" header="Establish Date" />
+        <Column header="Establish Date" body={(roeData) => (
+          <span>{formatDate(roeData.establishDate)}</span>
+        )} />
         <Column field="registrationNo" header="Registration No" />
         <Column header="Password" body={passwordTemplate} />
         <Column
           header="Status"
           body={(row) => (
-            <span
-              className={`px-2 py-1 rounded text-xs font-semibold ${row.status === "ACTIVE"
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
-                }`}
-            >
-              {row.status?.toUpperCase() || "INACTIVE"}
-            </span>
+            <div className="flex justify-center">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${row.status === "ACTIVE"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+                  }`}
+              >
+                {row.status}
+              </span>
+            </div>
           )}
         />
         <Column header="Actions" body={actionTemplate} />
       </DataTable>
 
-      <div className="card flex justify-content-center">
-        <Dialog header={FromHeader} visible={visible} style={{ width: '50vw' }} onHide={() => { if (!visible) return; setVisible(false); }}>
-          <AdminInstutionEdit
-            institution={selectedInstitution}
-            onClose={() => setVisible(false)}
-            onSuccess={() => {
-              setVisible(false);
-              institutionDataGet();
-            }}
-          />
+      <Dialog
+        header="Edit Institution"
+        visible={visible}
+        style={{ width: "50vw" }}
+        onHide={() => setVisible(false)}
+      >
+        <AdminInstutionEdit
+          institution={selectedInstitution}
+          onClose={() => setVisible(false)}
+          onSuccess={() => {
+            setVisible(false);
+            institutionDataGet();
+          }}
+        />
+      </Dialog>
 
-        </Dialog>
-        <ConfirmDialog />
-      </div>
-
+      <ConfirmDialog />
       <ToastContainer />
-    </div>
+    </>
   );
 }

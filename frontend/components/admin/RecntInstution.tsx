@@ -18,7 +18,7 @@ type Props = {
 
 export default function RecentInstitution({ institutions, loading = false, rows = 5 }: Props) {
   return (
-    <div className="card w-[50%] bg-white p-4 rounded-lg shadow">
+    <div className="card w-full bg-white p-4 rounded-lg shadow">
       {/* TABLE TITLE */}
       <div className="mb-4 bg-primary p-3 rounded-lg">
         <h2 className="text-lg font-semibold text-white">
