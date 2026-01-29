@@ -66,9 +66,6 @@ export default function EditBookSetting({
 
   return (
     <div className="w-full bg-white rounded-xl p-4">
-      <h2 className="text-xl font-semibold text-gray-800 mb-5 text-center">
-        Edit Book Setting
-      </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 

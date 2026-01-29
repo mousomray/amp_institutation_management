@@ -7,6 +7,25 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import { Dialog } from "primereact/dialog";
 import EditCourseForm from "@/components/institution/EditCoures";
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center h-full text-center">
+    <div className="text-6xl mb-4">📚</div>
+    <h2 className="text-xl font-semibold text-gray-700">
+      No Courses Available
+    </h2>
+    <p className="text-gray-500 mt-2 max-w-md">
+      You haven’t added any courses yet. Once you create a course, it will appear
+      here for management.
+    </p>
+  </div>
+);
+
+
+
+
+
+
 function Page() {
   const [loading, setLoading] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
@@ -70,19 +89,32 @@ function Page() {
     }
   }
   const handleUpdate = (rowData: any) => {
-    console.log("==>",rowData)
+    console.log("==>", rowData)
     setSelectedCourse(rowData);
     setVisible(true);
   };
 
-  
-  
+
+
 
 
   return (
     <div className="w-full h-[calc(100vh-96px)] flex justify-center items-center">
-      <CourseCard  onDelete={handelDelete} courses={courseData} onEdit={handleUpdate} />
-      <ToastContainer />
+      {loading && (
+        <div className="flex justify-center items-center h-full text-gray-500">
+          Loading courses...
+        </div>
+      )}
+      {!loading && courseData.length === 0 && <EmptyState />}
+      {!loading && courseData.length > 0 && (
+
+        <CourseCard
+          courses={courseData}
+          onDelete={handelDelete}
+          onEdit={handleUpdate}
+        />
+
+      )}
       <Dialog
         header="Edit Couses"
         visible={visible}

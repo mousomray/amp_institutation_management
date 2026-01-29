@@ -220,7 +220,7 @@ export default function AddBookForm() {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold"
+                            className="w-full bg-primary text-white py-3 rounded-lg font-semibold"
                         >
                             {isSubmitting ? "Saving..." : "Save Settings"}
                         </button>
