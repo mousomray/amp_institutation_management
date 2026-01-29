@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -122,41 +123,25 @@ export default function AddBookForm() {
 
           {/* Image Upload */}
           <div>
-            <label className="block text-xl font-semibold text-gray-700 mb-2">
-              Book Cover Image <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Book Cover Image *
             </label>
 
-            <div className="relative h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer">
+            <div className="relative h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer">
               {preview ? (
                 <Image src={preview} alt="Book Cover Preview" fill className="object-contain p-2" />
               ) : (
                 <div className="text-center">
-                  <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                  >
-                    <path
-                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Click to upload book cover
-                  </p>
+                  <i className="pi pi-image text-5xl text-gray-400"></i>
+                  <p className="mt-2 text-gray-500">Click to upload book cover</p>
                 </div>
               )}
-            </label>
+            </div>
 
-            {/* hidden file input tied to the above label; required for intent */}
             <input
-              id="bookImage"
               type="file"
               accept="image/*"
-              className="mt-2 block"
+              className="mt-2"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
@@ -164,35 +149,31 @@ export default function AddBookForm() {
                   handleImagePreview(file);
                 }
               }}
-              aria-required="true"
-              required
             />
           </div>
 
           {/* Book Name & Author Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xl font-semibold text-gray-700 mb-1">
-                Book Name <span className="text-red-500">*</span>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Book Name *
               </label>
               <InputText
                 className="w-full"
                 placeholder="Enter book name"
                 {...register("name")}
-                aria-required="true"
               />
               {errors.name && <small className="text-red-500">{errors.name.message}</small>}
             </div>
 
             <div>
-              <label className="block text-xl font-semibold text-gray-700 mb-1">
-                Author Name <span className="text-red-500">*</span>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Author Name *
               </label>
               <InputText
                 className="w-full"
                 placeholder="Enter author name"
                 {...register("authorName")}
-                aria-required="true"
               />
               {errors.authorName && <small className="text-red-500">{errors.authorName.message}</small>}
             </div>
@@ -200,31 +181,23 @@ export default function AddBookForm() {
 
           {/* Language */}
           <div>
-            <label className="block text-xl font-semibold text-gray-700 mb-1">
-              Language <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Language *
             </label>
-            <select
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              {...register("language")}
-            >
-              <option value="">Select language</option>
-              {languageOptions.map((lang) => (
-                <option key={lang} value={lang}>
-                  {lang}
-                </option>
-              ))}
-            </select>
-            {errors.language && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.language.message}
-              </p>
-            )}
+            <Dropdown
+              className="w-full"
+              options={languageOptions}
+              value={selectedLanguage}
+              placeholder="Select language"
+              onChange={(e) => setValue("language", e.value, { shouldValidate: true })}
+            />
+            {errors.language && <small className="text-red-500">{errors.language.message}</small>}
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xl font-semibold text-gray-700 mb-1">
-              Description <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Description *
             </label>
             <InputTextarea
               className="w-full"
@@ -232,7 +205,6 @@ export default function AddBookForm() {
               autoResize
               placeholder="Describe the book content, genre, and key features..."
               {...register("description")}
-              aria-required="true"
             />
             {errors.description && <small className="text-red-500">{errors.description.message}</small>}
           </div>
