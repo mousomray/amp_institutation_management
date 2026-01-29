@@ -57,7 +57,7 @@ export default function BookIssuePage() {
       try {
         setLoadingBooks(true);
         const res = await microInstance.get("/book/allbooks");
-        console.log("Books fetched:", res.data);
+        console.log("Books fetched:", res);
         setBooks(res.data.books);
       } catch (err) {
         if (axios.isAxiosError(err)) {

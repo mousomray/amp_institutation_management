@@ -26,7 +26,7 @@ const BookSchema = new Schema({
         minlength: [3, 'Description must be at least 3 characters long']
     },
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: String,
     },
     isAvailable: {
         type: Boolean,

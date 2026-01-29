@@ -32,7 +32,8 @@ class BookController {
     // Get Book List
     async getall(req, res) {
         try {
-            const data = await BookModel.find({ isDeleted: false, userId: req.user.id })
+            const userId = req.user.id;
+            const data = await BookModel.find({ isDeleted: false, userId: userId });
             res.status(200).json({
                 message: "All Books are Fetched successfully",
                 total: data.length,
@@ -44,11 +45,11 @@ class BookController {
         }
     }
 
-    // Get Single Student 
+    // Get Single Book 
     async getsingle(req, res) {
         const id = req.params.id;
         try {
-            const data = await BookModel.findOne({ _id: id, userId: req.user.id });
+            const data = await BookModel.findById(id);
             res.status(200).json({ message: "Single data fetched", data });
         } catch (error) {
             console.log(error);

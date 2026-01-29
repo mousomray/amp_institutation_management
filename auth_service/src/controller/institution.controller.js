@@ -470,8 +470,23 @@ const getMyStudents = async (req, res) => {
 
 const StudentDropDown = async (req, res) => {
   try {
-    const data = await Student.find()
-    return res.status(200).json({ message: "All students fetched successfully", data })
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const institutionUser = await User.findById(userId);
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({ message: "Only institutions can access this resource" });
+    }
+
+    const institution = await Institution.findOne({ adminUser: institutionUser._id });
+    if (!institution) {
+      return res.status(404).json({ message: "Institution not found" });
+    }
+
+    const data = await Student.find({ institution: institution._id });
+    return res.status(200).json({ message: "All students fetched successfully", data });
   } catch (error) {
     console.error("Get all students error:", error);
     return res.status(500).json({ message: "Internal server error" });
