@@ -167,7 +167,7 @@ const getMyCourses = async (req, res) => {
       });
     }
 
-   
+
     const courses = await Course.aggregate([
       {
         $match: {
@@ -271,14 +271,14 @@ const createStudent = async (req, res) => {
       return res.status(409).json({ message: "Email already exists" });
     }
 
- 
+
     const photoUrl = await uploadSingleImage(req.files.image[0]);
     const signatureUrl = await uploadSingleImage(req.files.signature[0]);
 
-    
+
     const plainPassword = passwordGenerator();
 
-    
+
     const [user] = await User.create(
       [
         {
@@ -290,7 +290,7 @@ const createStudent = async (req, res) => {
       { session }
     );
 
-    
+
     const [student] = await Student.create(
       [
         {
@@ -311,7 +311,7 @@ const createStudent = async (req, res) => {
       { session }
     );
 
-   
+
     await User.findByIdAndUpdate(
       user._id,
       { student: student._id },
@@ -976,8 +976,19 @@ const buyCourse = async (req, res) => {
   }
 };
 
+const OnlyOneStudentAPI = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const data = await Student.findById(id);
+    return res.status(200).json({ message: "Single Student Fetched Successfully", data });
+  } catch (error) {
+    console.error("Get single student error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
 
 
 
 
-module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent };
+
+module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI };

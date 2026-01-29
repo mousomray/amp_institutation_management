@@ -1,6 +1,6 @@
 const router = require("express").Router();
 
-const {buyCourse,institutionLogOut,institutionDashboard,courseDetails,deleteCoures,updateCourse,studentDetails,loginInstitution,createCourse,getMyCourses,createStudent,getMyStudents,StudentDropDown,updateStudent,deleteStudent} = require("../controller/institution.controller.js");
+const {buyCourse,institutionLogOut,institutionDashboard,courseDetails,deleteCoures,updateCourse,studentDetails,loginInstitution,createCourse,getMyCourses,createStudent,getMyStudents,StudentDropDown,updateStudent,deleteStudent,OnlyOneStudentAPI} = require("../controller/institution.controller.js");
 const verifyJwt = require("../middleware/verifiyUser.js");
 const {upload} = require("../middleware/multer.js")
 const {uploadStudentImages} = require("../middleware/multiMulter.js")
@@ -20,4 +20,5 @@ router.get("/course-detail/:id",courseDetails)
 router.get("/dashboard",verifyJwt,institutionDashboard)
 router.post("/logout",verifyJwt,institutionLogOut)
 router.post("/buy",buyCourse)
+router.get("/onlyonestudentapi/:id",OnlyOneStudentAPI)
 module.exports = router;

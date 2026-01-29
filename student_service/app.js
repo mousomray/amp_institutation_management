@@ -36,6 +36,10 @@ app.use('/book', BookRouter);
 const IssueRouter = require('./app/router/issue.routes.js');
 app.use('/api', IssueRouter);
 
+// Student Router
+const SettingRouter = require('./app/router/setting.routes.js');
+app.use('/api', SettingRouter);
+
 const port = 3004
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

@@ -4,35 +4,35 @@ const Schema = mongoose.Schema
 /* ========= HELPER FUNCTION ========= */
 
 function calculateDuration(startDate, endDate) {
-  if (!startDate || !endDate) return 'N/A';
+  if (!startDate || !endDate) return 'N/A'
 
-  let start = new Date(startDate);
-  let end = new Date(endDate);
+  let start = new Date(startDate)
+  let end = new Date(endDate)
 
-  let years = end.getFullYear() - start.getFullYear();
-  let months = end.getMonth() - start.getMonth();
-  let days = end.getDate() - start.getDate();
+  let years = end.getFullYear() - start.getFullYear()
+  let months = end.getMonth() - start.getMonth()
+  let days = end.getDate() - start.getDate()
 
   if (days < 0) {
-    months--;
-    const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
-    days += prevMonth;
+    months--
+    const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0).getDate()
+    days += prevMonth
   }
 
   if (months < 0) {
-    years--;
-    months += 12;
+    years--
+    months += 12
   }
 
-  let result = [];
-  if (years > 0) result.push(`${years} year${years > 1 ? 's' : ''}`);
-  if (months > 0) result.push(`${months} month${months > 1 ? 's' : ''}`);
-  if (days > 0) result.push(`${days} day${days > 1 ? 's' : ''}`);
+  let result = []
+  if (years > 0) result.push(`${years} year`)
+  if (months > 0) result.push(`${months} month`)
+  if (days > 0) result.push(`${days} day`)
 
-  return result.length ? result.join(' ') : '0 days';
+  return result.length ? result.join(' ') : '0 days'
 }
 
-/* ========= SCHEMA ========= */
+/* ========= ISSUE SCHEMA ========= */
 
 const IssueSchema = new Schema({
 
@@ -46,8 +46,9 @@ const IssueSchema = new Schema({
     type: Schema.Types.ObjectId,
     required: true
   },
+
   userId: {
-    type: String,
+    type: String
   },
 
   issue_date: {
@@ -64,13 +65,23 @@ const IssueSchema = new Schema({
     type: Date
   },
 
-  base_rate: {
+  /* ===== SNAPSHOT VALUES ===== */
+
+  book_fee: {
     type: Number,
     required: true,
     min: 0
   },
 
-  fine: {
+  late_fine: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+
+  /* ===== CALCULATION RESULT ===== */
+
+  delay_days: {
     type: Number,
     default: 0,
     min: 0
@@ -96,16 +107,14 @@ const IssueSchema = new Schema({
 
 /* ========= VIRTUALS ========= */
 
-// Issue duration (issue ➜ expected return)
 IssueSchema.virtual('issue_duration').get(function () {
-  return calculateDuration(this.issue_date, this.return_date);
-});
+  return calculateDuration(this.issue_date, this.return_date)
+})
 
-// Delay duration (expected return ➜ actual return)
 IssueSchema.virtual('delay_duration').get(function () {
-  if (!this.actual_return_date) return 'No delay';
-  return calculateDuration(this.return_date, this.actual_return_date);
-});
+  if (!this.actual_return_date) return 'No delay'
+  return calculateDuration(this.return_date, this.actual_return_date)
+})
 
 const IssueModel = mongoose.model('issue', IssueSchema)
 module.exports = IssueModel

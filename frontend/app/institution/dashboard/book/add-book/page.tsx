@@ -112,11 +112,15 @@ export default function AddBookForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Image Upload */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Book Cover Image *
+            <label className="block text-xl font-semibold text-gray-700 mb-2">
+              Book Cover Image <span className="text-red-500">*</span>
             </label>
 
-            <div className="relative h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer">
+            {/* make preview area clickable by wrapping in a label tied to the file input */}
+            <label
+              htmlFor="bookImage"
+              className="relative h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer"
+            >
               {preview ? (
                 <Image 
                   src={preview} 
@@ -125,7 +129,7 @@ export default function AddBookForm() {
                   className="object-contain p-2" 
                 />
               ) : (
-                <div className="text-center">
+                <div className="text-center pointer-events-none">
                   <svg
                     className="mx-auto h-12 w-12 text-gray-400"
                     stroke="currentColor"
@@ -144,12 +148,14 @@ export default function AddBookForm() {
                   </p>
                 </div>
               )}
-            </div>
+            </label>
 
+            {/* hidden file input tied to the above label; required for intent */}
             <input
+              id="bookImage"
               type="file"
               accept="image/*"
-              className="mt-2"
+              className="mt-2 block"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
@@ -157,6 +163,8 @@ export default function AddBookForm() {
                   handleImagePreview(file);
                 }
               }}
+              aria-required="true"
+              required
             />
           </div>
 
@@ -164,14 +172,15 @@ export default function AddBookForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Book Name */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Book Name *
+              <label className="block text-xl font-semibold text-gray-700 mb-1">
+                Book Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 placeholder="Enter book name"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 {...register("name")}
+                aria-required="true"
               />
               {errors.name && (
                 <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>
@@ -180,14 +189,15 @@ export default function AddBookForm() {
 
             {/* Author Name */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Author Name *
+              <label className="block text-xl font-semibold text-gray-700 mb-1">
+                Author Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 placeholder="Enter author name"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 {...register("authorName")}
+                aria-required="true"
               />
               {errors.authorName && (
                 <p className="text-red-500 text-xs mt-1">
@@ -199,12 +209,13 @@ export default function AddBookForm() {
 
           {/* Language */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Language *
+            <label className="block text-xl font-semibold text-gray-700 mb-1">
+              Language <span className="text-red-500">*</span>
             </label>
             <select
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               {...register("language")}
+              aria-required="true"
             >
               <option value="">Select language</option>
               {languageOptions.map((lang) => (
@@ -222,14 +233,15 @@ export default function AddBookForm() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Description *
+            <label className="block text-xl font-semibold text-gray-700 mb-1">
+              Description <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={5}
               placeholder="Describe the book content, genre, and key features..."
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               {...register("description")}
+              aria-required="true"
             />
             {errors.description && (
               <p className="text-red-500 text-xs mt-1">

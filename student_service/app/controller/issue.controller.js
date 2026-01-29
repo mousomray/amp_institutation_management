@@ -1,208 +1,221 @@
 const IssueModel = require('../model/issue')
 const BookModel = require('../model/book')
 const StudentModel = require('../model/student')
+const SettingsModel = require('../model/setting')
 const mongoose = require('mongoose')
+const { getStudentFromStudentService } = require('../service/student.service')
 
 class IssueController {
 
     // Issue a Book
     async issueBook(req, res) {
         try {
-            const { book_id, student_id, base_rate, return_date } = req.body
+            const { book_id, student_id, return_date } = req.body
+            const userId = req.user.id
 
-            // 2 Validate book
+            /* ===== 1. Validate Book ===== */
             const book = await BookModel.findOne({
                 _id: book_id,
                 isDeleted: false
             })
+
             if (!book) {
-                return res.status(404).json({ message: "Book not found" })
+                return res.status(404).json({
+                    success: false,
+                    message: 'Book not found'
+                })
             }
 
-            // 3 Check availability
             if (!book.isAvailable) {
-                return res.status(400).json({ message: "Book is already issued" })
+                return res.status(400).json({
+                    success: false,
+                    message: 'Book already issued'
+                })
             }
 
-            // 4 Create issue record
-            const issue = new IssueModel({
-                book_id,
-                student_id,
-                base_rate,
-                return_date,
-                userId: req.user.id 
+            /* ===== 2. Get Active Settings ===== */
+            const settings = await SettingsModel.findOne({
+                userId,
+                isActive: true
             })
 
-            await issue.save()
+            if (!settings) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Library settings not configured'
+                })
+            }
 
-            // 5 Update book availability
+            /* ===== 3. Get Student Data from Student Service ===== */
+            const studentData = await getStudentFromStudentService(student_id, req)
+
+            console.log('Fetched student data:', studentData)
+
+            if (!studentData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Student not found'
+                })
+            }
+
+            /* ===== 4. Create Issue Record (Snapshot) ===== */
+            const issue = await IssueModel.create({
+                book_id,
+                student_id,
+                student_snapshot: {
+                    name: studentData.name,
+                    email: studentData.email,
+                    phone: studentData.phone,
+                    roll: studentData.roll
+                },
+                book_fee: book.book_fee || settings.book_fee,
+                late_fine: book.late_fine || settings.late_fine,
+                return_date,
+                userId
+            })
+
+            /* ===== 5. Update Book Availability ===== */
             book.isAvailable = false
             await book.save()
 
-            res.status(201).json({
-                message: "Book issued successfully",
+            return res.status(201).json({
+                success: true,
+                message: 'Book issued successfully',
                 data: issue
             })
 
         } catch (error) {
             console.error(error)
-            res.status(500).json({ message: "Error issuing book" })
+            return res.status(500).json({
+                success: false,
+                message: 'Error issuing book',
+                error: error.message
+            })
         }
     }
 
     // Return a Book
     async returnBook(req, res) {
-        const issueId = req.params.id;
-
         try {
-            const issue = await IssueModel.findById(issueId);
+            const issueId = req.params.id
+
+            const issue = await IssueModel.findById(issueId)
             if (!issue) {
-                return res.status(404).json({ message: "Issue record not found" });
+                return res.status(404).json({
+                    success: false,
+                    message: "Issue record not found"
+                })
             }
 
             if (issue.status === "returned") {
-                return res.status(400).json({ message: "Book already returned" });
+                return res.status(400).json({
+                    success: false,
+                    message: "Book already returned"
+                })
+            }
+            const actualReturnDate = new Date()
+            actualReturnDate.setHours(0, 0, 0, 0)
+
+            const returnDate = new Date(issue.return_date)
+            returnDate.setHours(0, 0, 0, 0)
+
+            let delayDays = 0
+
+            if (actualReturnDate > returnDate) {
+                const diffTime = actualReturnDate - returnDate
+                delayDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
             }
 
-            const actualReturnDate = new Date();
-            actualReturnDate.setHours(0, 0, 0, 0);
+            const fineAmount = delayDays * issue.late_fine
+            const totalAmount = issue.book_fee + fineAmount
 
-            const returnDate = new Date(issue.return_date);
-            returnDate.setHours(0, 0, 0, 0);
+            issue.actual_return_date = actualReturnDate
+            issue.delay_days = delayDays
+            issue.total_amount = totalAmount
+            issue.status = "returned"
 
-            issue.actual_return_date = actualReturnDate;
-            issue.status = "returned";
+            await issue.save()
 
-            // ❌ Fine calculation removed
-            issue.fine = 0;
-            issue.total_amount = issue.base_rate;
-
-            await issue.save();
-
-            // Book available again
             await BookModel.findByIdAndUpdate(issue.book_id, {
                 isAvailable: true
-            });
-
-            const isLate = actualReturnDate > returnDate;
+            })
 
             return res.status(200).json({
+                success: true,
                 message: "Book returned successfully",
-                isLate,
-                base_rate: issue.base_rate,
-                fine: issue.fine,
-                total_amount: issue.total_amount
-            });
+                delay_days: delayDays,
+                book_fee: issue.book_fee,
+                fine_per_day: issue.late_fine,
+                total_fine: fineAmount,
+                total_amount: totalAmount
+            })
 
         } catch (error) {
-            console.error(error);
-            return res.status(500).json({ message: "Error returning book" });
-        }
-    }
-
-    async setFineAmount(req, res) {
-        const issueId = req.params.id;
-        const { fine } = req.body; 
-
-        try {
-            const issue = await IssueModel.findById(issueId);
-            if (!issue) {
-                return res.status(404).json({ message: "Issue record not found" });
-            }
-
-            if (issue.status !== "returned") {
-                return res.status(400).json({
-                    message: "Book must be returned before applying fine"
-                });
-            }
-
-            issue.fine = Number(fine) || 0;
-            issue.total_amount = issue.base_rate + issue.fine;
-
-            await issue.save();
-
-            return res.status(200).json({
-                message: "Fine updated successfully",
-                base_rate: issue.base_rate,
-                fine: issue.fine,
-                total_amount: issue.total_amount
-            });
-
-        } catch (error) {
-            console.error("Set fine error:", error);
+            console.error("Return book error:", error)
             return res.status(500).json({
-                message: "Error updating fine"
-            });
+                success: false,
+                message: "Error returning book"
+            })
         }
     }
+
 
     // Get all issued books (with full details)
     async getAllIssues(req, res) {
         try {
-            const institutionId = req.user.id; 
-
-            console.log("Fetching issues for institution:", institutionId);
+            const userId = req.user.id   
 
             const issues = await IssueModel.aggregate([
-                // 🔹 Institution filter (important for microservice)
                 {
                     $match: {
-                        userId: institutionId
+                        userId: userId   
                     }
                 },
 
-                // 🔹 Book lookup
                 {
                     $lookup: {
-                        from: "books",
-                        localField: "book_id",
-                        foreignField: "_id",
-                        as: "book"
+                        from: 'books',
+                        localField: 'book_id',
+                        foreignField: '_id',
+                        as: 'book'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$book",
+                        path: '$book',
                         preserveNullAndEmptyArrays: true
                     }
                 },
 
-                // 🔹 Student lookup
-                {
-                    $lookup: {
-                        from: "students",
-                        localField: "student_id",
-                        foreignField: "_id",
-                        as: "student"
-                    }
-                },
-                {
-                    $unwind: {
-                        path: "$student",
-                        preserveNullAndEmptyArrays: true
-                    }
-                },
-
-                // 🔹 Duration calculation
                 {
                     $addFields: {
                         issue_duration_days: {
                             $dateDiff: {
-                                startDate: "$issue_date",
+                                startDate: '$issue_date',
                                 endDate: {
-                                    $ifNull: ["$actual_return_date", "$$NOW"]
+                                    $cond: [
+                                        { $ifNull: ['$actual_return_date', false] },
+                                        '$actual_return_date',
+                                        '$$NOW'
+                                    ]
                                 },
-                                unit: "day"
+                                unit: 'day'
                             }
                         },
+
                         delay_days: {
                             $cond: [
-                                { $gt: ["$actual_return_date", "$return_date"] },
+                                {
+                                    $and: [
+                                        { $ne: ['$actual_return_date', null] },
+                                        { $gt: ['$actual_return_date', '$return_date'] }
+                                    ]
+                                },
                                 {
                                     $dateDiff: {
-                                        startDate: "$return_date",
-                                        endDate: "$actual_return_date",
-                                        unit: "day"
+                                        startDate: '$return_date',
+                                        endDate: '$actual_return_date',
+                                        unit: 'day'
                                     }
                                 },
                                 0
@@ -211,47 +224,61 @@ class IssueController {
                     }
                 },
 
-                // 🔹 Final projection
                 {
                     $project: {
-                        _id: 1,
+                        book_id: 1,
+                        student_id: 1,
                         issue_date: 1,
                         return_date: 1,
                         actual_return_date: 1,
-                        base_rate: 1,
-                        fine: 1,
+                        book_fee: 1,
+                        late_fine: 1,
                         total_amount: 1,
                         status: 1,
-
                         issue_duration_days: 1,
                         delay_days: 1,
 
-                        "book._id": 1,
-                        "book.name": 1,
-                        "book.authorName": 1,
-                        "book.language": 1,
-
-                        "student._id": 1,
-                        "student.name": 1,
-                        "student.email": 1,
-                        "student.phone": 1
+                        book: {
+                            _id: 1,
+                            name: 1,
+                            authorName: 1,
+                            language: 1
+                        }
                     }
+                },
+
+                { $sort: { createdAt: -1 } }
+            ])
+
+            const finalResult = []
+
+            for (let issue of issues) {
+                let studentData = null
+
+                try {
+                    studentData = await getStudentFromStudentService(issue.student_id, req)
+                } catch (err) {
+                    console.log('Student service error:', err.message)
                 }
-            ]);
+
+                finalResult.push({
+                    ...issue,
+                    student: studentData || null
+                })
+            }
 
             return res.status(200).json({
                 success: true,
-                message: "Issued books fetched successfully",
-                total: issues.length,
-                data: issues
-            });
+                total: finalResult.length,
+                data: finalResult
+            })
 
         } catch (error) {
-            console.error("Get all issues error:", error);
+            console.error(error)
             return res.status(500).json({
                 success: false,
-                message: "Error fetching issue data"
-            });
+                message: 'Failed to fetch issued books'
+            })
         }
     }
 
