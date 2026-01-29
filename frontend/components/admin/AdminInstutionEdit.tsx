@@ -41,7 +41,7 @@ export default function AdminInstutionEdit({
         email: institution.email,
         phone: institution.phone,
         website: institution.website || "",
-        registrationNo: institution.registrationNo,
+        registrationNo: institution.registrationNo ? institution.registrationNo : '',
         establishDate: institution.establishDate
           ? institution.establishDate.split("T")[0]
           : "",

@@ -1,9 +1,10 @@
-const { User, Institution,Student,Course } = require("../model/model.js")
+const { User, Institution, Student, Course } = require("../model/model.js")
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const { AdminRegisterSchema, AdminLoginSchema, institutionSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js");
+const sendPasswordEmail = require("../helper/mail.service.js")
 
 const registerAdmin = async (req, res) => {
   try {
@@ -141,7 +142,7 @@ const GetAdminProfile = async (req, res) => {
 
 const addInstitution = async (req, res) => {
   try {
-      const { lat, lng, ...body } = req.body;
+    const { lat, lng, ...body } = req.body;
 
     const parsedData = institutionSchema.parse(body);
 
@@ -149,8 +150,8 @@ const addInstitution = async (req, res) => {
     if (!lat || !lng) {
       return res.status(400).json({ message: "Location is required" });
     }
-    
-    if(!req.files?.photo?.[0]){
+
+    if (!req.files?.photo?.[0]) {
       return res.status(400).json({ message: "Image is requrird is required" })
     }
 
@@ -163,7 +164,7 @@ const addInstitution = async (req, res) => {
     if (!isAdmin || isAdmin.role !== "admin") {
       return res.status(403).json({ message: "Only admins can add institutions" });
     }
-     
+
 
     const photoFile = req.files.photo[0];
     const bannerFile = req.files?.banner?.[0];
@@ -174,9 +175,11 @@ const addInstitution = async (req, res) => {
     if (bannerFile) {
       bannerUrl = await uploadSingleImage(bannerFile);
     }
-    
+
     const plainPassword = passwordGenerator();
 
+
+    
 
 
     const institutionUser = await User.create({
@@ -191,12 +194,12 @@ const addInstitution = async (req, res) => {
       email: parsedData.email,
       phone: parsedData.phone,
       website: parsedData.website,
-      registrationNo:  parsedData.registrationNo || null,
-      establishDate: parsedData.establishDate ?  new Date(parsedData.establishDate) : null,
+      registrationNo: parsedData.registrationNo || null,
+      establishDate: parsedData.establishDate ? new Date(parsedData.establishDate) : null,
       address: parsedData.address,
       geoLocation: {
-       lat: lat,
-       lng: lng   
+        lat: lat,
+        lng: lng
       },
       institutionBanner: bannerUrl | null,
       institutionImage: photoUrl,
@@ -206,6 +209,9 @@ const addInstitution = async (req, res) => {
 
     institutionUser.institution = institution._id;
     await institutionUser.save();
+
+
+    await sendPasswordEmail(institutionUser.email, plainPassword)
 
     return res.status(201).json({
       message: "Institution created successfully",
@@ -218,30 +224,30 @@ const addInstitution = async (req, res) => {
 
   } catch (error) {
     console.log(error)
-   if (error.code === 11000 && error.keyPattern?.email) {
-    return res.status(409).json({
-      message: "Email  already in use",
-    });
-  }
+    if (error.code === 11000 && error.keyPattern?.email) {
+      return res.status(409).json({
+        message: "Email  already in use",
+      });
+    }
 
-  if (error.name === "ZodError") {
-    return res.status(400).json({
-      message: "Validation failed",
-      errors: error.errors,
-    });
-  }
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: error.errors,
+      });
+    }
 
-  console.error("Create student error:", error);
-  return res.status(500).json({
-    message: "Internal server error",
-  });
-  
+    console.error("Create student error:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+
   }
 };
 
-const updateStatus  = async (req, res) => {
+const updateStatus = async (req, res) => {
   try {
-        const adminId = req.user?._id;
+    const adminId = req.user?._id;
     if (!adminId) {
       return res.status(403).json({ message: "Only admins can add institutions" });
     }
@@ -258,42 +264,42 @@ const updateStatus  = async (req, res) => {
     if (!institution) {
       return res.status(404).json({ message: "Institution not found" });
     }
-     
-       const {status} =  req.body
 
-       if(!status){
-        return res.status(404).json({
-          message: "Status is not found"
-        })
-       }
+    const { status } = req.body
 
-       await Institution.findByIdAndUpdate(institutionId,{
-        status: status
-       })
+    if (!status) {
+      return res.status(404).json({
+        message: "Status is not found"
+      })
+    }
 
-       return res.status(200).json({
-        message: "Status updated "
-       })
-       
+    await Institution.findByIdAndUpdate(institutionId, {
+      status: status
+    })
+
+    return res.status(200).json({
+      message: "Status updated "
+    })
+
   } catch (error) {
     if (error.code === 11000 && error.keyPattern?.email) {
-    return res.status(409).json({
-      message: "Email already in use",
-    });
-  }
+      return res.status(409).json({
+        message: "Email already in use",
+      });
+    }
 
-  if (error.name === "ZodError") {
-    return res.status(400).json({
-      message: "Validation failed",
-      errors: error.errors,
-    });
-  }
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: error.errors,
+      });
+    }
 
-  console.error("Create student error:", error);
-  return res.status(500).json({
-    message: "Internal server error",
-  });
-  
+    console.error("Create student error:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+
   }
 }
 
@@ -308,7 +314,7 @@ const updateInstitution = async (req, res) => {
       phone: parsedData.phone,
       website: parsedData.website,
       registrationNo: parsedData.registrationNo,
-      establishDate: new Date(parsedData.establishDate),
+      establishDate: parsedData.establishDate ? new Date(parsedData.establishDate) : null,
       address: parsedData.address,
     }, { new: true });
 
@@ -531,6 +537,58 @@ const adminDashboard = async (req, res) => {
 
 
 
+const sendPasswordToAdmin = async (req, res) => {
+  try {
+    const institutionId = req.params.id
+    if (!institutionId) {
+      return res.stats(404).json({
+        message: "institution id is not found"
+      })
+    }
 
-module.exports = {updateStatus,adminDashboard, adminLogOut, registerAdmin, loginAdmin, GetAdminProfile, addInstitution, getAllInstitutions, updateInstitution, deleteInstitution, findOneInstitution, recentInstitution };
+    const institution = await Institution.findById(institutionId)
+    if(!institution){
+        return res.stats(404).json({
+        message: "institution  not found"
+      })
+    }
+
+    const userId = await User.findById(institution.adminUser._id)
+    
+    if(!userId){
+      return res.json(404).json({
+        message: "user is not found"
+      })
+    }
+    if(userId.role !== "institution"){
+       return res.stats(404).json({
+        message: "it is not a instution"
+       })
+    }
+
+    await sendPasswordEmail("mousomray02@gmail.com",userId.password)
+    return res.status(200).json({
+      message: "Password send successfully"
+    })
+
+  } catch (error) {
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: error.errors,
+      });
+    }
+
+    console.error(error);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+
+}
+
+
+
+
+module.exports = { sendPasswordToAdmin, updateStatus, adminDashboard, adminLogOut, registerAdmin, loginAdmin, GetAdminProfile, addInstitution, getAllInstitutions, updateInstitution, deleteInstitution, findOneInstitution, recentInstitution };
 

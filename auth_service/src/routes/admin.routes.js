@@ -1,6 +1,6 @@
 const router = require("express").Router();
 
-const {updateStatus,adminDashboard,adminLogOut,recentInstitution, registerAdmin, loginAdmin, GetAdminProfile ,findOneInstitution, addInstitution, updateInstitution, deleteInstitution, getAllInstitutions} = require("../controller/admin.controller.js");
+const {sendPasswordToAdmin,updateStatus,adminDashboard,adminLogOut,recentInstitution, registerAdmin, loginAdmin, GetAdminProfile ,findOneInstitution, addInstitution, updateInstitution, deleteInstitution, getAllInstitutions} = require("../controller/admin.controller.js");
 const verifyJwt = require("../middleware/verifiyUser.js");
 const {uploadStudentImages} = require("../middleware/multiMulter.js")
 
@@ -16,5 +16,6 @@ router.get("/institution/:id", findOneInstitution);
 router.get("/recent-institutions", recentInstitution);
 router.post("/logout", verifyJwt, adminLogOut);
 router.get("/dashboard",verifyJwt,adminDashboard)
+router.post("/send-password/:id",sendPasswordToAdmin )
 
 module.exports = router;

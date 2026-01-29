@@ -28,6 +28,10 @@ const loginInstitution = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if(!compare){
+      return res.status(404).json({message: "password is not Valid"})
+    }
+
 
     const token = jwt.sign(
       {
