@@ -220,7 +220,7 @@ const createStudent = async (req, res) => {
   session.startTransaction();
 
   try {
-    // ✅ Validate body
+  
     const parsedData = StudentSchema.parse(req.body);
 
     const userId = req.user?._id;
@@ -230,7 +230,7 @@ const createStudent = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // ✅ Check institution user
+  
     const institutionUser = await User.findById(userId).session(session);
     if (!institutionUser || institutionUser.role !== "institution") {
       await session.abortTransaction();
@@ -239,8 +239,6 @@ const createStudent = async (req, res) => {
         .status(403)
         .json({ message: "Only institutions can create students" });
     }
-
-    // ✅ Find institution
     const institution = await Institution.findOne({
       adminUser: institutionUser._id,
     }).session(session);

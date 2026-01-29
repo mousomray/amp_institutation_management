@@ -10,16 +10,21 @@ import { ToastContainer, toast } from "react-toastify";
 import axiosInstance from "@/service/axios.service";
 import axios from "axios";
 
+// PrimeReact Components
+import { InputText } from "primereact/inputtext";
+import { Dropdown } from "primereact/dropdown";
+import { InputTextarea } from "primereact/inputtextarea";
+
 type CourseFormData = z.infer<typeof CourseSchema>;
 
 const durationOptions = [
-  "1 Month",
-  "2 Months",
-  "3 Months",
-  "4 Months",
-  "6 Months",
-  "8 Months",
-  "12 Months",
+  { label: "1 Month", value: "1 Month" },
+  { label: "2 Months", value: "2 Months" },
+  { label: "3 Months", value: "3 Months" },
+  { label: "4 Months", value: "4 Months" },
+  { label: "6 Months", value: "6 Months" },
+  { label: "8 Months", value: "8 Months" },
+  { label: "12 Months", value: "12 Months" },
 ];
 
 export default function AddCourseForm() {
@@ -30,19 +35,26 @@ export default function AddCourseForm() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
     reset,
   } = useForm<CourseFormData>({
     resolver: zodResolver(CourseSchema),
   });
 
-  // ✅ Read token once
+  // Watch duration for Dropdown
+  const selectedDuration = watch("duration");
+
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
   }, []);
 
-   console.log("imageFile.....:", imageFile);
+  const handleImagePreview = (file: File) => {
+    const imageUrl = URL.createObjectURL(file);
+    setPreview(imageUrl);
+  };
 
   const onSubmit = async (data: CourseFormData) => {
     try {
@@ -55,7 +67,7 @@ export default function AddCourseForm() {
       formData.append("name", data.name);
       formData.append("duration", data.duration);
       formData.append("fee", data.fee);
-      formData.append("description", data.description); // ✅ added
+      formData.append("description", data.description);
       formData.append("image", imageFile);
 
       const res = await axiosInstance.post(
@@ -83,14 +95,9 @@ export default function AddCourseForm() {
     }
   };
 
-  const handleImagePreview = (file: File) => {
-    const imageUrl = URL.createObjectURL(file);
-    setPreview(imageUrl);
-  };
-
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+    <div className="min-h-screen w-full flex items-center justify-center bg-white py-4 px-4">
+      <div className="w-full max-w-md bg-white rounded-xl shadow p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-5 text-center">
           Add New Course
         </h2>
@@ -100,19 +107,15 @@ export default function AddCourseForm() {
           {/* Image */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
-              Course Image
+              Course Image <span className="text-red-500">*</span>
             </label>
-
             <div className="relative h-40 w-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
               {preview ? (
                 <Image src={preview} alt="Preview" fill className="object-cover" />
               ) : (
-                <span className="text-gray-400 text-sm">
-                  Upload course image
-                </span>
+                <span className="text-gray-400 text-sm">Upload course image</span>
               )}
             </div>
-
             <input
               type="file"
               accept="image/*"
@@ -127,15 +130,15 @@ export default function AddCourseForm() {
             />
           </div>
 
-          {/* Name */}
+          {/* Course Name */}
           <div>
             <label className="block text-sm font-medium text-gray-600">
-              Course Name
+              Course Name <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              className="w-full mt-1 px-3 py-2 border rounded-lg"
+            <InputText
+              className="w-full"
               {...register("name")}
+              placeholder="Enter course name"
             />
             {errors.name && (
               <p className="text-red-500 text-xs">{errors.name.message}</p>
@@ -145,19 +148,15 @@ export default function AddCourseForm() {
           {/* Duration */}
           <div>
             <label className="block text-sm font-medium text-gray-600">
-              Duration
+              Duration <span className="text-red-500">*</span>
             </label>
-            <select
-              className="w-full mt-1 px-3 py-2 border rounded-lg bg-white"
-              {...register("duration")}
-            >
-              <option value="">Select duration</option>
-              {durationOptions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              className="w-full"
+              options={durationOptions}
+              placeholder="Select duration"
+              value={selectedDuration}
+              onChange={(e) => setValue("duration", e.value, { shouldValidate: true })}
+            />
             {errors.duration && (
               <p className="text-red-500 text-xs">{errors.duration.message}</p>
             )}
@@ -166,33 +165,33 @@ export default function AddCourseForm() {
           {/* Fee */}
           <div>
             <label className="block text-sm font-medium text-gray-600">
-              Fee
+              Fee <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              className="w-full mt-1 px-3 py-2 border rounded-lg"
+            <InputText
+              type="number"
+              className="w-full"
               {...register("fee")}
+              placeholder="Enter course fee"
             />
             {errors.fee && (
               <p className="text-red-500 text-xs">{errors.fee.message}</p>
             )}
           </div>
 
-          {/* ✅ Description */}
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-600">
-              Description
+              Description <span className="text-red-500">*</span>
             </label>
-            <textarea
+            <InputTextarea
+              className="w-full"
               rows={4}
-              placeholder="Describe the course..."
-              className="w-full mt-1 px-3 py-2 border rounded-lg resize-none"
+              autoResize
+              placeholder="Enter course description"
               {...register("description")}
             />
             {errors.description && (
-              <p className="text-red-500 text-xs">
-                {errors.description.message}
-              </p>
+              <p className="text-red-500 text-xs">{errors.description.message}</p>
             )}
           </div>
 
