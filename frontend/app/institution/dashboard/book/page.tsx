@@ -7,12 +7,36 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import { Dialog } from "primereact/dialog";
 import EditBookForm from "@/components/institution/EditBooks";
+
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center h-full text-center">
+    <div className="text-6xl mb-4">📚</div>
+    <h2 className="text-xl font-semibold text-gray-700">
+      No Books Available
+    </h2>
+    <p className="text-gray-500 mt-2 max-w-md">
+      You haven’t added any  Books yet. Once you create a  Books, it will appear
+      here for management.
+    </p>
+  </div>
+);
+
+
+
+
+
 function Page() {
   const [loading, setLoading] = useState(false);
   const [bookData, setBookData] = useState<any[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
+
+
+
+
+
 
   const [selectedBook, setSelectedBook] = useState<any | null>(null);
   /* ================= GET TOKEN ================= */
@@ -88,7 +112,19 @@ function Page() {
 
   return (
     <div className="w-full h-[calc(100vh-96px)] flex justify-center items-center">
-      <BookCard onDelete={handelDelete} books={bookData} onEdit={handleUpdate} />
+      {loading && (
+        <div className="flex justify-center items-center h-full text-gray-500">
+          Loading courses...
+        </div>
+      )}
+      {!loading && bookData.length === 0 && <EmptyState />}
+      {!loading && bookData.length > 0 && (
+
+        <BookCard onDelete={handelDelete} books={bookData} onEdit={handleUpdate} />
+
+      )}
+
+
       <ToastContainer />
       <Dialog
         header="Edit Books"

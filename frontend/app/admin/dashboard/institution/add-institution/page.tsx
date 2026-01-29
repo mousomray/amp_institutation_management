@@ -132,7 +132,7 @@ export default function InstitutionForm() {
   const onSubmit = async (data: InstitutionFormData) => {
 
     if (!photoFile) {
-      toast.error("Photo is required");
+      toast.error("Institution Image  is required");
       return;
     }
     if (!location) {
@@ -214,7 +214,7 @@ setBannerImageFile(null)
           </p>
         </div>
 
-        {/* FORM */}
+        
         <form onSubmit={handleSubmit(onSubmit, onError)} className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Institution Name */}
 
@@ -228,7 +228,7 @@ setBannerImageFile(null)
                 <Image src={bannerPreview} alt="Preview" fill className="object-cover" />
               ) : (
                 <span className="text-gray-400 text-sm">
-                  Institution image
+                  Institution image 
                 </span>
               )}
             </div>
@@ -273,7 +273,7 @@ setBannerImageFile(null)
           </div>
 
           <div>
-            <label className="text-sm font-medium">Institution Name</label>
+            <label className="text-sm font-medium">Institution Name <span className=" text-red-500 text-xl">*</span></label>
             <InputText
               className="w-full mt-1"
               {...register("name", { required: "Institution name is required" })}
@@ -283,7 +283,7 @@ setBannerImageFile(null)
 
           {/* Email */}
           <div>
-            <label className="text-sm font-medium">Email Address</label>
+            <label className="text-sm font-medium">Email Address <span className=" text-red-500 text-xl">*</span></label>
             <InputText
               className="w-full mt-1"
               {...register("email", { required: "Email is required" })}
@@ -293,7 +293,7 @@ setBannerImageFile(null)
 
           {/* Phone */}
           <div>
-            <label className="text-sm font-medium">Phone No</label>
+            <label className="text-sm font-medium">Phone No <span className=" text-red-500 text-xl">*</span></label>
             <InputText
               className="w-full mt-1"
               {...register("phone", { required: "Phone number is required" })}
@@ -345,7 +345,7 @@ setBannerImageFile(null)
           </div>
 
            <div className="md:col-span-2">
-            <label className="text-sm font-medium">Institution Location (Required)</label>
+            <label className="text-sm font-medium">Institution Location <span className=" text-red-500 text-xl">*</span></label>
             <div className="h-64 w-full mt-2 rounded-lg overflow-hidden border">
               <MapWithNoSSR center={[22.5726, 88.3639]} zoom={13}>
                 <LocationPicker onPick={(lat, lng) => setLocation({ lat, lng })} />

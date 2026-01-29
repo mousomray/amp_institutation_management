@@ -95,12 +95,7 @@ export default function InstitutionTable() {
     setSelectedInstitution(rowData);
   };
 
-  const handleDelete = (rowData: any) => {
-    setInstitutes((prev) =>
-      prev.filter((item) => item.registrationNo !== rowData.registrationNo)
-    );
 
-  };
 
 
   console.log("edit data", selectedInstitution)
@@ -121,36 +116,7 @@ export default function InstitutionTable() {
 
 
 
-  const confirmDeleteInstitution = (rowData: any) => {
-    confirmDialog({
-      message: `Are you sure you want to delete "${rowData.name}"?`,
-      header: "Delete Confirmation",
-      icon: "pi pi-exclamation-triangle",
-      acceptClassName: "p-button-danger",
 
-      accept: async () => {
-        try {
-          await axiosInstance.delete(`/admin/delete-institution/${rowData._id}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          toast.success("Institution deleted successfully");
-          institutionDataGet();
-        } catch (error: any) {
-          if (axios.isAxiosError(error)) {
-            toast.error(error.response?.data?.message || "Delete failed");
-          } else {
-            toast.error("Unexpected error occurred");
-          }
-        }
-      },
-
-      reject: () => {
-        toast.info("Delete cancelled");
-      },
-    });
-  };
 
 
   const updateStatus = async (status: "ACTIVE" | "INACTIVE",rowData :any) => {
@@ -198,12 +164,7 @@ export default function InstitutionTable() {
         setRemarksDialog(true);
       },
     },
-    {
-      label: "Delete",
-      icon: "pi pi-trash",
-      className: "p-menuitem-danger",
-      command: () => confirmDeleteInstitution(rowData),
-    },
+    
     ];
 
     return (

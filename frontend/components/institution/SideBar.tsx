@@ -19,6 +19,7 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import ImportContactsIcon from '@mui/icons-material/ImportContacts';
 import SupervisedUserCircleIcon from '@mui/icons-material/SupervisedUserCircle';
 import MenuBookIcon from '@mui/icons-material/MenuBook'; // added for Books section
+;
 
 const sidebarItems = [
   {
@@ -97,6 +98,13 @@ const sidebarItems = [
         path: "/institution/dashboard/book/issued-books",
         icon: <ViewListIcon />,
       },
+      {
+         id: "4-5",
+        label: "Book Setting",
+        path: "/institution/dashboard/book/setting",
+        icon: <SettingsIcon/>,
+      
+      }
     ],
   },
 ];
@@ -115,7 +123,7 @@ export default function SideBar() {
     <Stack
      justifyContent="space-between"
   sx={{
-    height: "100%",   // fill drawer space
+    height: "100%",   
     width: "100%",
     backgroundColor: "#fff",
     padding: 2,

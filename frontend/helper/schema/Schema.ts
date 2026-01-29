@@ -14,7 +14,7 @@ export const AdminLoginSchema = zod.object({
 
 
 export const InstitutionSchema = zod.object({
- name: zod.string().min(2, 'Institution name must be at least 2 characters'),
+  name: zod.string().min(2, 'Institution name must be at least 2 characters'),
   email: zod.string().email('Invalid institution email'),
   phone: zod
     .string()
@@ -49,9 +49,9 @@ export const CourseSchema = zod.object({
     .min(5, "description is required"),
 });
 
- export const StudentSchema = zod.object({
-  studentId: zod.string().optional(), 
-  name: zod.string().min(1, "Name is required"), 
+export const StudentSchema = zod.object({
+  studentId: zod.string().optional(),
+  name: zod.string().min(1, "Name is required"),
   email: zod.string().email("Invalid email address"),
   phone: zod
     .string()
@@ -106,6 +106,8 @@ export const BookSchema = zod.object({
     .boolean()
     .optional()
     .default(false),
+  bookFee: zod.coerce.number().optional(),
+  lateFee: zod.coerce.number().optional(),
 });
 
 // Add IssueSchema for book issuing
@@ -118,4 +120,9 @@ export const IssueSchema = zod.object({
   return_date: zod
     .string()
     .refine((d) => !isNaN(Date.parse(d)), "Invalid return date"),
+});
+
+export const bookSetting = zod.object({
+  bookFee: zod.coerce.number(),
+  lateFee: zod.coerce.number(),
 });

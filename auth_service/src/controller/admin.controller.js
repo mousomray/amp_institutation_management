@@ -191,7 +191,7 @@ const addInstitution = async (req, res) => {
       email: parsedData.email,
       phone: parsedData.phone,
       website: parsedData.website,
-      registrationNo: parsedData.registrationNo,
+      registrationNo:  parsedData.registrationNo || null,
       establishDate: parsedData.establishDate ?  new Date(parsedData.establishDate) : null,
       address: parsedData.address,
       geoLocation: {
@@ -217,9 +217,10 @@ const addInstitution = async (req, res) => {
     });
 
   } catch (error) {
+    console.log(error)
    if (error.code === 11000 && error.keyPattern?.email) {
     return res.status(409).json({
-      message: "Email or phone  already in use",
+      message: "Email  already in use",
     });
   }
 

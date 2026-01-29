@@ -35,7 +35,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
-  // ✅ Read token ONCE
+  
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
@@ -133,7 +133,7 @@ export default function Page() {
   console.log("=>", courseData)
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-6">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4 py-6">
       <div className="w-full max-w-xl bg-white rounded-xl shadow p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-2">
           Student Registration
@@ -156,7 +156,7 @@ export default function Page() {
 
           {/* PHOTO */}
           <div>
-            <label className="text-sm font-medium">Photo</label>
+            <label className="text-sm font-medium">Photo <span className=" text-xl text-red-500">*</span></label>
             <div className="flex items-center gap-4 mt-1">
               <div className="w-16 h-16 rounded-full border flex items-center justify-center overflow-hidden">
                 {photoPreview ? (
@@ -181,14 +181,14 @@ export default function Page() {
 
           {/* NAME */}
           <div>
-            <label className="text-sm font-medium">Name</label>
+            <label className="text-sm font-medium">Name  <span className=" text-xl text-red-500">*</span> </label>
             <InputText className="w-full mt-1" {...register("name")} />
             {errors.name && <small className="text-red-500">{errors.name.message}</small>}
           </div>
 
           {/* EMAIL */}
           <div>
-            <label className="text-sm font-medium">Email</label>
+            <label className="text-sm font-medium">Email  <span className=" text-xl text-red-500">*</span></label>
             <InputText className="w-full mt-1" {...register("email")} />
             {errors.email && (
               <small className="text-red-500">
@@ -199,7 +199,7 @@ export default function Page() {
 
           {/* PHONE */}
           <div>
-            <label className="text-sm font-medium">Phone</label>
+            <label className="text-sm font-medium">Phone number  <span className=" text-xl text-red-500">*</span></label>
             <InputText className="w-full mt-1" {...register("phone")} />
             {errors.phone && (
               <small className="text-red-500">
@@ -332,7 +332,7 @@ export default function Page() {
 
           {/* SIGNATURE */}
           <div>
-            <label className="text-sm font-medium">Signature</label>
+            <label className="text-sm font-medium">Signature  <span className=" text-xl text-red-500">*</span></label>
             <div className="flex items-center gap-4 mt-1">
               {signPreview && (
                 <img src={signPreview} className="h-10 border rounded" />
