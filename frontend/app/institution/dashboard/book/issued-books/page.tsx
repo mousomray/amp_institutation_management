@@ -228,7 +228,6 @@ export default function IssuedBooksTable() {
         responsiveLayout="scroll"
         header={header}
         emptyMessage="No issued books found"
-        onRowClick={(e) => router.push(`/institution/dashboard/book/issued-books/${e.data._id}`)}
         selectionMode="single"
       >
         <Column header="Book" body={bookTemplate} />

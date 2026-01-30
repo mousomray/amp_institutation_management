@@ -63,9 +63,8 @@ function page() {
     <
       >
       <div className=' sm:px-6 px-2 sm:py-3 py-1'>
-        {
-          allCourse !== 0 ? <InstutionDataCart Courses={allCourse} student={allStudents}/> : null
-        }
+         <InstutionDataCart Courses={allCourse} student={allStudents}/> 
+        
       </div>
       <div className=' sm:px-6 px-2 sm:py-3 py-1 flex flex-row gap-4 '>
         <RecentCourse courses={recntCourse}  />

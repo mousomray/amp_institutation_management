@@ -28,6 +28,8 @@ const loginInstitution = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+
+
     const token = jwt.sign(
       {
         userId: institution._id,
