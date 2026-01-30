@@ -8,11 +8,6 @@ import { redirect } from "next/navigation"
 
 export default function page() {
 
-
-
-  
-
-
   useEffect(() => {
     redirect("/institution")
   },[])
@@ -46,11 +41,11 @@ export default function page() {
                 Get Started
               </button>
             </Link>
-            <Link href="/about">
+            
               <button className="bg-white text-primary px-6 py-3 rounded-md font-semibold hover:bg-gray-100 transition">
                 Learn More
               </button>
-            </Link>
+            
           </div>
         </div>
       </section>
