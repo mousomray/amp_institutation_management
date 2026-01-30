@@ -12,7 +12,7 @@ connectDB()
 app.use(express.json()); // use Express
 app.use(cors(
     {
-        origin : [process.env.FRONREND_URL],
+        origin : [process.env.FRONTEND_URL],
         methods: ["GET", "POST", "PUT", "PUTCH", "DELETE"],
         credentials: true
     }
