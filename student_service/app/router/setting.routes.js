@@ -1,7 +1,7 @@
 const express = require('express');
+const router = express.Router()
 const settingController = require('../controller/setting.controller')
 const { Auth } = require('../middleware/Auth')
-const router = express.Router()
 
 router.post('/book/createsetting', Auth, settingController.addSettings)
 router.get('/book/settings', Auth, settingController.getSettings)

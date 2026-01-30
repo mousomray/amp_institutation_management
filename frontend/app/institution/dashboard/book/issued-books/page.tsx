@@ -13,7 +13,6 @@ import { toast , ToastContainer } from "react-toastify";
 import { formatDate } from "@/helper/DateTime";
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { useRouter } from "next/navigation";
-import { Dialog } from "primereact/dialog";
 import { Menu } from "primereact/menu"; // added
 
 export default function IssuedBooksTable() {
@@ -24,10 +23,43 @@ export default function IssuedBooksTable() {
 
   const [token, setToken] = useState<string | null>(null);
 
-  // fine modal state
-  const [fineModalVisible, setFineModalVisible] = useState(false);
-  const [currentIssueForFine, setCurrentIssueForFine] = useState<any | null>(null);
-  const [fineValue, setFineValue] = useState<number>(0);
+  // helper: calculate per-day late fine only after due date
+  const calcLateFine = (row: any) => {
+    const toDateOnly = (d: Date) => {
+      const nd = new Date(d);
+      nd.setHours(0, 0, 0, 0);
+      return nd;
+    };
+    const dayMs = 1000 * 60 * 60 * 24;
+
+    const bookFee = Number(row.book_fee || 0);
+    const perDayFine = Number(row.late_fine || 0);
+
+    // if already returned, fine = total - base
+    if (row.status === "returned") {
+      const total = Number(row.total_amount || 0);
+      const fine = total - bookFee;
+      return fine > 0 ? fine : 0;
+    }
+
+    // not returned: compute late days from today vs return_date
+    const today = toDateOnly(new Date());
+    const due = toDateOnly(new Date(row.return_date));
+    if (today <= due) return 0;
+
+    const diffDays = Math.ceil((today.getTime() - due.getTime()) / dayMs);
+    return Math.max(0, diffDays) * perDayFine;
+  };
+
+  const currency = (n: number) =>
+    (typeof n === "number" ? n : 0).toLocaleString("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 });
+
+  const bookFeeBody = (row: any) => <span>{currency(Number(row.book_fee || 0))}</span>;
+  const lateFineBody = (row: any) => <span>{currency(calcLateFine(row))}</span>;
+  const totalBody = (row: any) => {
+    const total = Number(row.book_fee || 0) + calcLateFine(row);
+    return <span className="font-semibold">{currency(total)}</span>;
+  };
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -86,14 +118,11 @@ export default function IssuedBooksTable() {
 
           const payload = res.data || {};
           if (payload.isLate) {
-            setCurrentIssueForFine(issue);
-            setFineValue(typeof payload.fine === "number" ? payload.fine : 0);
-            setFineModalVisible(true);
-            toast.info("Book is returned late. Please set fine.");
+            toast.info(payload.message || "Book returned late.");
           } else {
             toast.success(payload.message || "Book returned successfully");
-            fetchAllIssues();
           }
+          fetchAllIssues();
         } catch (err: any) {
           if (axios.isAxiosError(err)) {
             toast.error(err.response?.data?.message || "Return failed");
@@ -108,27 +137,6 @@ export default function IssuedBooksTable() {
     });
   };
 
-  const submitFine = async () => {
-    if (!currentIssueForFine) return;
-    try {
-      const id = currentIssueForFine._id;
-      const res = await microInstance.put(`/api/issues/set-fine/${id}`, { fine: Number(fineValue) }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      toast.success(res.data?.message || "Fine set successfully");
-      setFineModalVisible(false);
-      setCurrentIssueForFine(null);
-      setFineValue(0);
-      fetchAllIssues();
-    } catch (err: any) {
-      if (axios.isAxiosError(err)) {
-        toast.error(err.response?.data?.message || "Set fine failed");
-      } else {
-        toast.error("Unexpected error occurred");
-      }
-    }
-  };
-
   const openRowMenu = (row: any, event: any) => {
     const items = [
       {
@@ -136,15 +144,6 @@ export default function IssuedBooksTable() {
         icon: "pi pi-check",
         disabled: row.status === "returned",
         command: () => handleReturn(row),
-      },
-      {
-        label: "Set Fine",
-        icon: "pi pi-money-bill",
-        command: () => {
-          setCurrentIssueForFine(row);
-          setFineValue(0);
-          setFineModalVisible(true);
-        },
       },
     ];
     setMenuModel(items);
@@ -234,35 +233,19 @@ export default function IssuedBooksTable() {
       >
         <Column header="Book" body={bookTemplate} />
         <Column header="Student" body={studentTemplate} />
-        <Column field="base_rate" header="Base Rate" />
-        <Column field="fine" header="Fine" />
-        <Column field="total_amount" header="Total" />
-        <Column field="issue_duration_days" header="Issue Days" />
-        <Column field="delay_days" header="Delay Days" />
+        {/* Base Rate, Late Fine (calculated), Total */}
+        <Column header="Base Rate" body={bookFeeBody} />
+        <Column header="Late Fine" body={lateFineBody} />
+        <Column header="Total" body={totalBody} />
+        {/* Dates */}
         <Column field="return_date" header="Return Date" body={(r) => formatDate(r.return_date)} />
         <Column header="Actual Return" body={actualReturnTemplate} />
-        <Column field="issue_date" header="Issued At" body={(r) => formatDate(r.issue_date || r.createdAt)} />
+        {/* Status + actions */}
         <Column field="status" header="Status" />
         <Column header="Actions" body={actionTemplate} style={{ width: "4rem" }} />
       </DataTable>
 
       <ConfirmDialog />
-      <Dialog header="Set Fine" visible={fineModalVisible} style={{ width: "400px" }} onHide={() => setFineModalVisible(false)}>
-        <div className="space-y-3">
-          <p className="text-sm">Enter fine amount for returned late book:</p>
-          <input
-            type="number"
-            value={fineValue}
-            onChange={(e) => setFineValue(Number(e.target.value))}
-            className="w-full px-3 py-2 border rounded"
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <button onClick={() => setFineModalVisible(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={submitFine} className="px-4 py-2 bg-primary text-white rounded">Save Fine</button>
-          </div>
-        </div>
-      </Dialog>
-
       <ToastContainer />
     </div>
   );

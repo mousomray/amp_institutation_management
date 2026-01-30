@@ -42,7 +42,6 @@ class SettingsController {
 
             const settings = await Settings.findOne({
                 userId,
-                isActive: true
             })
 
             if (!settings) {

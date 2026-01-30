@@ -9,15 +9,16 @@ import { IssueSchema } from "@/helper/schema/Schema";
 import microInstance from "@/service/micro.service";
 import axiosInstance from "@/service/axios.service";
 import axios from "axios";
-import z from "zod";
+import { z } from "zod";
 
 // PrimeReact
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
 import { Calendar } from "primereact/calendar";
 
-
-type IssueForm = z.infer<typeof IssueSchema>;
+// Derive page-local schema without base_rate to match UI
+const IssueFormSchema = IssueSchema.omit({ base_rate: true });
+type IssueForm = z.infer<typeof IssueFormSchema>;
 
 export default function BookIssuePage() {
   const [students, setStudents] = useState<any[]>([]);
@@ -25,6 +26,7 @@ export default function BookIssuePage() {
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [loadingBooks, setLoadingBooks] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   const {
     register,
@@ -34,19 +36,22 @@ export default function BookIssuePage() {
     setValue,
     watch,
   } = useForm<IssueForm>({
-    resolver: zodResolver(IssueSchema) as Resolver<IssueForm>,
+    resolver: zodResolver(IssueFormSchema) as Resolver<IssueForm>,
     defaultValues: {
       student_id: "",
       book_id: "",
-      base_rate: 0,
       return_date: "",
     },
   });
 
+  useEffect(() => {
+    const storedToken = localStorage.getItem("institution-token");
+    if (storedToken) setToken(storedToken);
+  }, []);
+
   const selectedStudent = watch("student_id");
   const selectedBook = watch("book_id");
   const selectedDate = watch("return_date");
-  const baseRate = watch("base_rate");
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -77,20 +82,74 @@ export default function BookIssuePage() {
     fetchBooks();
   }, []);
 
+  // prepare options with image url
+  const bookOptions = books.map((b: any) => {
+    const raw = b.image || "";
+    const imageUrl =
+      raw.startsWith("http") || raw.startsWith("https")
+        ? raw
+        : `${process.env.NEXT_PUBLIC_API_URL || ""}${raw}`;
+
+    return {
+      label: `${b.name}${b.authorName ? ` - ${b.authorName}` : ""}`,
+      value: b._id || b.id,
+      image: imageUrl,
+    };
+  });
+
+  const bookItemTemplate = (option: any) => {
+    if (!option) return null;
+    return (
+      <div className="flex items-center gap-3">
+        <img
+          src={option.image}
+          alt={option.label}
+          className="w-8 h-8 rounded-md object-cover"
+          onError={(e: any) => (e.currentTarget.style.display = "none")}
+        />
+        <div className="text-sm">{option.label}</div>
+      </div>
+    );
+  };
+
+  const bookValueTemplate = (selected: any) => {
+    if (!selected) return <span>{loadingBooks ? "Loading books..." : "Select book"}</span>;
+    return (
+      <div className="flex items-center gap-3">
+        <img
+          src={selected.image}
+          alt={selected.label}
+          className="w-6 h-6 rounded-md object-cover"
+          onError={(e: any) => (e.currentTarget.style.display = "none")}
+        />
+        <span className="text-sm">{selected.label}</span>
+      </div>
+    );
+  };
+
   const onSubmit = async (values: IssueForm) => {
     setSubmitting(true);
     try {
       const payload = {
         student_id: values.student_id,
         book_id: values.book_id,
-        base_rate: values.base_rate,
         return_date: values.return_date,
       };
-      const res = await microInstance.post("/api/issue", payload);
+
+      const res = await microInstance.post("/api/issue", payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        withCredentials: true,
+      });
+
       toast.success(res.data?.message || "Book issued successfully");
       reset();
     } catch (err: any) {
-      toast.error(axios.isAxiosError(err) ? err.response?.data?.message || "Issue failed" : "Unexpected error occurred");
+      console.error("Issue error:", err);
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Issue failed");
+      } else {
+        toast.error("Unexpected error occurred");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +160,7 @@ export default function BookIssuePage() {
       <div className="w-full max-w-2xl bg-white rounded-xl shadow p-8">
         <div className="mb-6 text-center">
           <h2 className="text-2xl font-bold text-gray-800">Issue Book</h2>
-          <p className="text-gray-500 mt-2">Select student and book, set base rate and return date</p>
+          <p className="text-gray-500 mt-2">Select student and book, set return date</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -129,10 +188,11 @@ export default function BookIssuePage() {
             <Dropdown
               className="w-full"
               value={selectedBook}
-              options={books.map((b: any) => ({
-                label: `${b.name}${b.authorName ? ` - ${b.authorName}` : ""}`,
-                value: b._id || b.id,
-              }))}
+              options={bookOptions}
+              optionLabel="label"
+              optionValue="value"
+              itemTemplate={bookItemTemplate}
+              valueTemplate={bookValueTemplate}
               onChange={(e) => setValue("book_id", e.value, { shouldValidate: true })}
               placeholder={loadingBooks ? "Loading books..." : "Select book"}
               disabled={loadingBooks}
@@ -140,38 +200,21 @@ export default function BookIssuePage() {
             {errors.book_id && <p className="text-red-500 text-xs mt-1">{errors.book_id.message}</p>}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            {/* Base Rate */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Base Rate *</label>
-              <InputNumber
-                className="w-full"
-                value={baseRate}
-                mode="currency"
-                currency="INR"
-                locale="en-IN"
-                onValueChange={(e) => setValue("base_rate", e.value ?? 0, { shouldValidate: true })}
-              />
-              {errors.base_rate && <p className="text-red-500 text-xs mt-1">{errors.base_rate.message}</p>}
-            </div>
-
-            {/* Return Date */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Return Date *</label>
-              <Calendar
-                className="w-full"
-                value={selectedDate ? new Date(selectedDate) : null}
-                onChange={(e) => {
-                  const dateValue = e.value as Date | null;
-                  const isoString = dateValue ? dateValue.toISOString().split("T")[0] : "";
-                  setValue("return_date", isoString, { shouldValidate: true });
-                }}
-                dateFormat="yy-mm-dd"
-                showIcon
-              />
-              {errors.return_date && <p className="text-red-500 text-xs mt-1">{errors.return_date.message}</p>}
-            </div>
+          {/* Return Date */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Return Date *</label>
+            <Calendar
+              className="w-full"
+              value={selectedDate ? new Date(selectedDate) : null}
+              onChange={(e) => {
+                const dateValue = e.value as Date | null;
+                const isoString = dateValue ? dateValue.toISOString().split("T")[0] : "";
+                setValue("return_date", isoString, { shouldValidate: true });
+              }}
+              dateFormat="yy-mm-dd"
+              showIcon
+            />
+            {errors.return_date && <p className="text-red-500 text-xs mt-1">{errors.return_date.message}</p>}
           </div>
 
           <button

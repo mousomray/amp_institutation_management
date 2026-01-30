@@ -71,7 +71,7 @@ const sidebarItems = [
   // New Books section
   {
     id: "4",
-    label: "Books",
+    label: "Library",
     icon: <MenuBookIcon />,
     children: [
       {

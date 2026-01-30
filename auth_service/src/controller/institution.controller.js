@@ -28,7 +28,9 @@ const loginInstitution = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    
+    if(!compare){
+      return res.status(404).json({message: "password is not Valid"})
+    }
 
 
     const token = jwt.sign(
@@ -222,7 +224,7 @@ const createStudent = async (req, res) => {
   session.startTransaction();
 
   try {
-  
+
     const parsedData = StudentSchema.parse(req.body);
 
     const userId = req.user?._id;
@@ -232,7 +234,7 @@ const createStudent = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-  
+
     const institutionUser = await User.findById(userId).session(session);
     if (!institutionUser || institutionUser.role !== "institution") {
       await session.abortTransaction();
