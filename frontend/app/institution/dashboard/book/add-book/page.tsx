@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import Image from "next/image";
@@ -16,7 +16,8 @@ import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
 import { InputNumber } from "primereact/inputnumber";
 import { Dropdown } from "primereact/dropdown";
-
+import { Card } from "primereact/card";
+import { Button } from "primereact/button";
 
 type BookFormData = z.infer<typeof BookSchema>;
 
@@ -38,6 +39,7 @@ export default function AddBookForm() {
   const [preview, setPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -98,6 +100,7 @@ export default function AddBookForm() {
   }, [token, setValue]);
 
   const handleImagePreview = (file: File) => {
+    // This already revokes the previous URL and sets a new one
     if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
   };
@@ -151,160 +154,215 @@ export default function AddBookForm() {
     }
   };
 
+  console.log("Preview URL:", preview);
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center px-4 py-8 pt-24">
-      <div className="w-full max-w-2xl bg-white rounded-xl shadow p-8">
-        <div className="mb-6 text-center">
-          <h2 className="text-3xl font-bold text-gray-800">Add New Book</h2>
-          <p className="text-gray-500 mt-2">Fill in the details to add a book to your library</p>
+    <div className="min-h-screen w-full flex items-start justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8 pt-24">
+      <Card className="w-full max-w-4xl shadow-2xl border-0">
+        {/* Header */}
+        <div className="text-center mb-8 pb-6 border-b border-gray-200">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+            <i className="pi pi-book text-3xl text-white"></i>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Add New Book</h2>
+          <p className="text-gray-500">Add a book to your library collection</p>
         </div>
 
         {loadingSettings && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
-            <i className="pi pi-spin pi-spinner mr-2"></i>
-            Loading default fee settings...
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center gap-3">
+            <i className="pi pi-spin pi-spinner text-blue-600 text-xl"></i>
+            <span className="text-blue-700 font-medium">Loading default fee settings...</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Book Cover Image <span className="text-red-500">*</span>
-            </label>
+          {/* Image Upload Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <i className="pi pi-image text-blue-600"></i>
+              Book Cover
+            </h3>
+            
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Book Cover Image <span className="text-red-500">*</span>
+              </label>
+              <div
+                className="relative h-64 w-full border-2 border-dashed border-blue-300 rounded-2xl flex items-center justify-center overflow-hidden bg-white hover:border-blue-500 cursor-pointer transition-all duration-300"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                {preview ? (
+                  // Use native img like the student page to avoid next/image + blob URL issues
+                  <img
+                    src={preview}
+                    alt="Book Cover Preview"
+                    className="w-full h-full object-contain p-4"
+                  />
+                ) : (
+                  <div className="text-center p-6">
+                    <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i className="pi pi-cloud-upload text-5xl text-blue-500"></i>
+                    </div>
+                    <p className="text-blue-600 font-semibold text-lg mb-2">
+                      Click to upload book cover
+                    </p>
+                    <p className="text-sm text-gray-500">PNG, JPG or GIF up to 10MB</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImageFile(file);
+                    handleImagePreview(file);
+                  }
+                }}
+              />
+            </div>
+          </div>
 
-            <div className="relative z-0 h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer">
-              {preview ? (
-                <Image src={preview} alt="Book Cover Preview" fill className="object-contain p-2" />
-              ) : (
-                <div className="text-center">
-                  <i className="pi pi-image text-5xl text-gray-400"></i>
-                  <p className="mt-2 text-gray-500">Click to upload book cover</p>
+          {/* Book Information */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <i className="pi pi-info-circle text-blue-600"></i>
+              Book Information
+            </h3>
+
+            {/* Book Name & Author Name */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Book Name <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-book text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" placeholder="Enter book title" {...register("name")} />
                 </div>
-              )}
+                {errors.name && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.name.message}</small>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Author Name <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-user text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" placeholder="Enter author name" {...register("authorName")} />
+                </div>
+                {errors.authorName && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.authorName.message}</small>}
+              </div>
             </div>
 
-            <input
-              type="file"
-              accept="image/*"
-              className="mt-2"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setImageFile(file);
-                  handleImagePreview(file);
-                }
-              }}
-            />
-          </div>
-
-          {/* Book Name & Author Name */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Book Name <span className="text-red-500">*</span>
+            {/* Language */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Language <span className="text-red-500">*</span>
               </label>
-              <InputText
-                className="w-full"
-                placeholder="Enter book name"
-                {...register("name")}
-              />
-              {errors.name && <small className="text-red-500">{errors.name.message}</small>}
+              <div className="p-inputgroup">
+                <span className="p-inputgroup-addon bg-blue-50">
+                  <i className="pi pi-globe text-blue-600"></i>
+                </span>
+                <Dropdown
+                  className="w-full"
+                  options={languageOptions}
+                  value={selectedLanguage}
+                  placeholder="Select language"
+                  onChange={(e) => setValue("language", e.value, { shouldValidate: true })}
+                />
+              </div>
+              {errors.language && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.language.message}</small>}
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Author Name <span className="text-red-500">*</span>
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Description <span className="text-red-500">*</span>
               </label>
-              <InputText
+              <InputTextarea
                 className="w-full"
-                placeholder="Enter author name"
-                {...register("authorName")}
+                rows={5}
+                autoResize
+                placeholder="Describe the book content, genre, and key features..."
+                {...register("description")}
               />
-              {errors.authorName && <small className="text-red-500">{errors.authorName.message}</small>}
+              {errors.description && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.description.message}</small>}
             </div>
           </div>
 
-          {/* Language */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Language <span className="text-red-500">*</span>
-            </label>
-            <Dropdown
-              className="w-full"
-              options={languageOptions}
-              value={selectedLanguage}
-              placeholder="Select language"
-              onChange={(e) => setValue("language", e.value, { shouldValidate: true })}
-            />
-            {errors.language && <small className="text-red-500">{errors.language.message}</small>}
-          </div>
+          {/* Fee Information */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <i className="pi pi-wallet text-blue-600"></i>
+              Fee Information
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Book Fee <span className="text-red-500">*</span>
+                </label>
+                <InputNumber
+                  className="w-full"
+                  mode="currency"
+                  currency="INR"
+                  locale="en-IN"
+                  placeholder="₹0.00"
+                  minFractionDigits={2}
+                  value={bookFee}
+                  onValueChange={(e) => setValue("bookFee", e.value ?? 0, { shouldValidate: true })}
+                />
+                {errors.bookFee && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.bookFee.message}</small>}
+              </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Description <span className="text-red-500">*</span>
-            </label>
-            <InputTextarea
-              className="w-full"
-              rows={5}
-              autoResize
-              placeholder="Describe the book content, genre, and key features..."
-              {...register("description")}
-            />
-            {errors.description && <small className="text-red-500">{errors.description.message}</small>}
-          </div>
-
-          {/* Book Fee & Late Fee */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Book Fee <span className="text-red-500">*</span>
-              </label>
-              <InputNumber
-                className="w-full"
-                mode="currency"
-                currency="INR"
-                locale="en-IN"
-                placeholder="₹0.00"
-                minFractionDigits={2}
-                value={bookFee}
-                onValueChange={(e) => setValue("bookFee", e.value ?? 0, { shouldValidate: true })}
-              />
-              {errors.bookFee && <small className="text-red-500">{errors.bookFee.message}</small>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Late Fee <span className="text-red-500">*</span>
-              </label>
-              <InputNumber
-                className="w-full"
-                mode="currency"
-                currency="INR"
-                locale="en-IN"
-                placeholder="₹0.00"
-                minFractionDigits={2}
-                value={lateFee}
-                onValueChange={(e) => setValue("lateFee", e.value ?? 0, { shouldValidate: true })}
-              />
-              {errors.lateFee && <small className="text-red-500">{errors.lateFee.message}</small>}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Late Fee (per day) <span className="text-red-500">*</span>
+                </label>
+                <InputNumber
+                  className="w-full"
+                  mode="currency"
+                  currency="INR"
+                  locale="en-IN"
+                  placeholder="₹0.00"
+                  minFractionDigits={2}
+                  value={lateFee}
+                  onValueChange={(e) => setValue("lateFee", e.value ?? 0, { shouldValidate: true })}
+                />
+                {errors.lateFee && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.lateFee.message}</small>}
+              </div>
             </div>
           </div>
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`w-full  bg-primary text-white py-3 rounded-lg font-semibold text-lg transition-all shadow-lg ${isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:from-indigo-700 hover:to-blue-700 transform hover:scale-[1.02]"}`}
-          >
-            {isSubmitting ? "Adding Book..." : "Add Book to Library"}
-          </button>
+          <div className="pt-4">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              label={isSubmitting ? "Adding Book..." : "Add Book to Library"}
+              icon={isSubmitting ? "pi pi-spin pi-spinner" : "pi pi-plus-circle"}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-0 text-white py-3 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300"
+            />
+          </div>
         </form>
 
         <ToastContainer position="top-right" autoClose={3000} />
-      </div>
+      </Card>
     </div>
   );
 }

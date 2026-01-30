@@ -14,16 +14,18 @@ type RecentCourseProps = {
 };
 
 export default function RecentCourse({courses}: RecentCourseProps) {
- 
+  const feeTemplate = (rowData: CourseType) => (
+    <span className="font-semibold text-gray-800">₹{rowData.fee}</span>
+  );
 
   return (
-    <div className="card w-[70%] bg-white p-4 rounded-lg shadow">
+    <div className="card w-[70%] bg-white p-5 rounded-xl shadow-md border border-gray-100">
       {/* TABLE HEADER */}
-      <div className="mb-4 bg-primary p-3 rounded-lg">
-        <h2 className="text-lg font-semibold text-white">
+      <div className="mb-4 bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg">
+        <h2 className="text-xl font-bold text-white">
           Recent Courses
         </h2>
-        <p className="text-sm text-black">
+        <p className="text-sm text-purple-50 mt-1">
           Available courses overview
         </p>
       </div>
@@ -35,9 +37,11 @@ export default function RecentCourse({courses}: RecentCourseProps) {
         rows={5}
         responsiveLayout="scroll"
         stripedRows
+        emptyMessage="No courses available"
+        className="text-sm"
       >
-        <Column field="name" header="Course Name" />
-        <Column field="fee" header="Course Fee" />
+        <Column field="name" header="Course Name" style={{ minWidth: '200px' }} />
+        <Column header="Course Fee" body={feeTemplate} />
         <Column field="duration" header="Duration" />
       </DataTable>
     </div>

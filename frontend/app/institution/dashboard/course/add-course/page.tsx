@@ -14,6 +14,8 @@ import axios from "axios";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { InputTextarea } from "primereact/inputtextarea";
+import { Button } from "primereact/button";
+import { Card } from "primereact/card";
 
 type CourseFormData = z.infer<typeof CourseSchema>;
 
@@ -53,6 +55,12 @@ export default function AddCourseForm() {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   const handleImagePreview = (file: File) => {
     if (preview) URL.revokeObjectURL(preview);
@@ -103,126 +111,185 @@ export default function AddCourseForm() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-white py-4 px-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-5 text-center">
-          Add New Course
-        </h2>
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8 px-4">
+      <Card className="w-full max-w-3xl shadow-2xl border-0">
+        {/* Header */}
+        <div className="text-center mb-8 pb-6 border-b border-gray-200">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+            <i className="pi pi-graduation-cap text-3xl text-white"></i>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Add New Course</h2>
+          <p className="text-gray-500">Create a new course with details and image</p>
+        </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
-          {/* Image */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Course Image <span className="text-red-500">*</span>
-            </label>
-            <div 
-              className="relative h-40 w-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer transition-colors"
-              onClick={() => imageInputRef.current?.click()}
-            >
-              {preview ? (
-                <Image src={preview} alt="Preview" fill className="object-cover" />
-              ) : (
-                <div className="text-center">
-                  <i className="pi pi-image text-4xl text-gray-400"></i>
-                  <p className="mt-2 text-gray-500 text-sm">Click to upload course image</p>
-                  <p className="text-xs text-gray-400 mt-1">JPG, PNG or GIF</p>
+          {/* Image Upload Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <i className="pi pi-image text-blue-600"></i>
+              Course Image
+            </h3>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Course Image <span className="text-red-500">*</span>
+              </label>
+              <div
+                className="relative h-52 w-full border-2 border-dashed border-blue-300 rounded-2xl flex items-center justify-center overflow-hidden bg-white hover:border-blue-500 cursor-pointer transition-all duration-300"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt="Course Image Preview"
+                    className="w-full h-full object-contain p-4"
+                  />
+                ) : (
+                  <div className="text-center p-6">
+                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i className="pi pi-cloud-upload text-4xl text-blue-500"></i>
+                    </div>
+                    <p className="text-blue-600 font-semibold text-lg mb-1">
+                      Click to upload course image
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      PNG, JPG or GIF up to 10MB
+                    </p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImageFile(file);
+                    handleImagePreview(file);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Course Details */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <i className="pi pi-info-circle text-blue-600"></i>
+              Course Details
+            </h3>
+
+            {/* Course Name & Duration */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Course Name <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-book text-blue-600"></i>
+                  </span>
+                  <InputText
+                    className="w-full"
+                    {...register("name")}
+                    placeholder="e.g., Web Development Bootcamp"
+                  />
                 </div>
+                {errors.name && (
+                  <p className="text-red-500 text-xs flex items-center gap-1">
+                    <i className="pi pi-exclamation-circle"></i>
+                    {errors.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Duration <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-clock text-blue-600"></i>
+                  </span>
+                  <Dropdown
+                    className="w-full"
+                    options={durationOptions}
+                    placeholder="Select duration"
+                    value={selectedDuration}
+                    onChange={(e) => setValue("duration", e.value, { shouldValidate: true })}
+                  />
+                </div>
+                {errors.duration && (
+                  <p className="text-red-500 text-xs flex items-center gap-1">
+                    <i className="pi pi-exclamation-circle"></i>
+                    {errors.duration.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Fee */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Course Fee <span className="text-red-500">*</span>
+              </label>
+              <div className="p-inputgroup">
+                <span className="p-inputgroup-addon bg-blue-50">
+                  <i className="pi pi-indian-rupee text-blue-600"></i>
+                </span>
+                <InputText
+                  type="number"
+                  className="w-full"
+                  {...register("fee")}
+                  placeholder="Enter course fee"
+                />
+              </div>
+              {errors.fee && (
+                <p className="text-red-500 text-xs flex items-center gap-1">
+                  <i className="pi pi-exclamation-circle"></i>
+                  {errors.fee.message}
+                </p>
               )}
             </div>
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setImageFile(file);
-                  handleImagePreview(file);
-                }
-              }}
-            />
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <InputTextarea
+                className="w-full"
+                rows={5}
+                autoResize
+                placeholder="Describe the course content, objectives, and key features..."
+                {...register("description")}
+              />
+              {errors.description && (
+                <p className="text-red-500 text-xs flex items-center gap-1">
+                  <i className="pi pi-exclamation-circle"></i>
+                  {errors.description.message}
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* Course Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Course Name <span className="text-red-500">*</span>
-            </label>
-            <InputText
-              className="w-full"
-              {...register("name")}
-              placeholder="Enter course name"
+          {/* Submit Button */}
+          <div className="pt-4">
+            <Button
+              type="submit"
+              label={isSubmitting ? "Creating Course..." : "Create Course"}
+              icon={isSubmitting ? "pi pi-spin pi-spinner" : "pi pi-plus-circle"}
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-0 text-white py-3 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300"
             />
-            {errors.name && (
-              <p className="text-red-500 text-xs">{errors.name.message}</p>
-            )}
           </div>
-
-          {/* Duration */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Duration <span className="text-red-500">*</span>
-            </label>
-            <Dropdown
-              className="w-full"
-              options={durationOptions}
-              placeholder="Select duration"
-              value={selectedDuration}
-              onChange={(e) => setValue("duration", e.value, { shouldValidate: true })}
-            />
-            {errors.duration && (
-              <p className="text-red-500 text-xs">{errors.duration.message}</p>
-            )}
-          </div>
-
-          {/* Fee */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Fee <span className="text-red-500">*</span>
-            </label>
-            <InputText
-              type="number"
-              className="w-full"
-              {...register("fee")}
-              placeholder="Enter course fee"
-            />
-            {errors.fee && (
-              <p className="text-red-500 text-xs">{errors.fee.message}</p>
-            )}
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Description <span className="text-red-500">*</span>
-            </label>
-            <InputTextarea
-              className="w-full"
-              rows={4}
-              autoResize
-              placeholder="Enter course description"
-              {...register("description")}
-            />
-            {errors.description && (
-              <p className="text-red-500 text-xs">{errors.description.message}</p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`w-full bg-primary text-white py-2 rounded-lg font-medium transition-all shadow-lg ${
-              isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:from-indigo-700 hover:to-blue-700 transform hover:scale-[1.02]"
-            }`}
-          >
-            {isSubmitting ? "Adding Course..." : "Add Course"}
-          </button>
         </form>
 
-        <ToastContainer />
-      </div>
+        <ToastContainer position="top-right" />
+      </Card>
     </div>
   );
 }

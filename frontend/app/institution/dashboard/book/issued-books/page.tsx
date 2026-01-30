@@ -192,18 +192,22 @@ export default function IssuedBooksTable() {
   );
 
   const header = (
-    <div className="flex justify-between items-center bg-primary p-3 rounded-lg">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-blue-500 to-blue-600 p-5 rounded-xl shadow-lg">
       <div>
-        <h2 className="text-lg font-semibold text-white">Issued Books</h2>
-        <p className="text-sm text-black">List of issued books</p>
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <i className="pi pi-list"></i>
+          Issued Books
+        </h2>
+        <p className="text-sm text-blue-50 mt-1">Manage and track issued books</p>
       </div>
 
-      <IconField iconPosition="left">
+      <IconField iconPosition="left" className="w-full md:w-auto">
         <InputIcon className="pi pi-search" />
         <InputText
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
-          placeholder="Search by book title or student name..."
+          placeholder="Search by book or student..."
+          className="w-full md:w-80"
         />
       </IconField>
     </div>
@@ -216,7 +220,7 @@ export default function IssuedBooksTable() {
     row.actual_return_date ? formatDate(row.actual_return_date) : <span className="text-gray-400">null</span>;
 
   return (
-    <div className="card bg-white p-4 rounded-lg shadow">
+    <div className="card bg-white p-6 rounded-xl shadow-md border border-gray-100">
       <Menu model={menuModel} popup ref={menu} />
       <DataTable
         value={filtered}
@@ -229,6 +233,7 @@ export default function IssuedBooksTable() {
         header={header}
         emptyMessage="No issued books found"
         selectionMode="single"
+        className="text-sm"
       >
         <Column header="Book" body={bookTemplate} />
         <Column header="Student" body={studentTemplate} />

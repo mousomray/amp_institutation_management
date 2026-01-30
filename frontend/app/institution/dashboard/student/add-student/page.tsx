@@ -6,6 +6,7 @@ import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
+import { Card } from "primereact/card";
 import { StudentSchema } from "@/helper/schema/Schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ToastContainer, toast } from "react-toastify";
@@ -140,256 +141,265 @@ export default function Page() {
   console.log("=>", courseData)
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4 py-6">
-      <div className="w-full max-w-xl bg-white rounded-xl shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">
-          Student Registration
-        </h2>
-        <p className="text-sm text-gray-500 mb-6">
-          Add student information
-        </p>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* STUDENT ID */}
-          <div>
-            <label className="text-sm font-medium">Student ID</label>
-            <InputText className="w-full mt-1" {...register("studentId")} />
-            {errors.studentId && (
-              <small className="text-red-500">
-                {errors.studentId.message}
-              </small>
-            )}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8">
+      <Card className="w-full max-w-4xl shadow-2xl border-0">
+        {/* Header */}
+        <div className="text-center mb-8 pb-6 border-b border-gray-200">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+            <i className="pi pi-user-plus text-3xl text-white"></i>
           </div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Student Registration</h2>
+          <p className="text-gray-500">Add new student with complete information</p>
+        </div>
 
-          {/* PHOTO */}
-          <div>
-            <label className="text-sm font-medium">Photo <span className="text-xl text-red-500">*</span></label>
-            <div 
-              className="flex items-center gap-4 mt-1 cursor-pointer"
-              onClick={() => photoInputRef.current?.click()}
-            >
-              <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-colors">
-                {photoPreview ? (
-                  <img src={photoPreview} className="w-full h-full object-cover" alt="Photo preview" />
-                ) : (
-                  <i className="pi pi-user text-gray-400 text-2xl"></i>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          
+          {/* Photo & Student ID Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <i className="pi pi-id-card text-blue-600"></i>
+              Identity Information
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Student ID */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Student ID</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-white">
+                    <i className="pi pi-hashtag text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" {...register("studentId")} placeholder="Auto-generated or custom" />
+                </div>
+                {errors.studentId && (
+                  <small className="text-red-500 flex items-center gap-1">
+                    <i className="pi pi-exclamation-circle"></i>
+                    {errors.studentId.message}
+                  </small>
                 )}
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-600">Click to upload photo</p>
-                <p className="text-xs text-gray-400">JPG, PNG or GIF (Max 5MB)</p>
+
+              {/* PHOTO */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Student Photo <span className="text-red-500">*</span>
+                </label>
+                <div 
+                  className="flex items-center gap-4 cursor-pointer group"
+                  onClick={() => photoInputRef.current?.click()}
+                >
+                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-blue-300 flex items-center justify-center overflow-hidden hover:border-blue-500 transition-all bg-white shadow-sm group-hover:shadow-md">
+                    {photoPreview ? (
+                      <img src={photoPreview} className="w-full h-full object-cover" alt="Photo preview" />
+                    ) : (
+                      <i className="pi pi-camera text-blue-400 text-3xl"></i>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-700 font-medium mb-1">Click to upload student photo</p>
+                    <p className="text-xs text-gray-500">JPG, PNG (Max 5MB)</p>
+                  </div>
+                </div>
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setPhotoFile(file);
+                    setPhotoPreview(URL.createObjectURL(file));
+                  }
+                }} />
               </div>
             </div>
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setPhotoFile(file);
-                  setPhotoPreview(URL.createObjectURL(file));
-                }
-              }}
-            />
           </div>
 
-          {/* NAME */}
-          <div>
-            <label className="text-sm font-medium">Name  <span className=" text-xl text-red-500">*</span> </label>
-            <InputText className="w-full mt-1" {...register("name")} />
-            {errors.name && <small className="text-red-500">{errors.name.message}</small>}
-          </div>
+          {/* Personal Information */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <i className="pi pi-user text-blue-600"></i>
+              Personal Information
+            </h3>
 
-          {/* EMAIL */}
-          <div>
-            <label className="text-sm font-medium">Email  <span className=" text-xl text-red-500">*</span></label>
-            <InputText className="w-full mt-1" {...register("email")} />
-            {errors.email && (
-              <small className="text-red-500">
-                {errors.email.message}
-              </small>
-            )}
-          </div>
+            {/* NAME, EMAIL, PHONE - Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-user text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" {...register("name")} placeholder="Enter full name" />
+                </div>
+                {errors.name && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.name.message}</small>}
+              </div>
 
-          {/* PHONE */}
-          <div>
-            <label className="text-sm font-medium">Phone number  <span className=" text-xl text-red-500">*</span></label>
-            <InputText className="w-full mt-1" {...register("phone")} />
-            {errors.phone && (
-              <small className="text-red-500">
-                {errors.phone.message}
-              </small>
-            )}
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-envelope text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" {...register("email")} placeholder="student@example.com" />
+                </div>
+                {errors.email && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.email.message}</small>}
+              </div>
 
-          {/* DOB */}
-          <div>
-            <label className="text-sm font-medium">Date of Birth</label>
-            <Controller
-              name="dob"
-              control={control}
-              render={({ field }) => (
-                <Calendar
-                  className="w-full mt-1"
-                  showIcon
-                  value={field.value}
-                  onChange={(e) => field.onChange(e.value)}
-                />
-              )}
-            />
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-phone text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" {...register("phone")} placeholder="+91 9876543210" />
+                </div>
+                {errors.phone && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.phone.message}</small>}
+              </div>
 
-          {/* FATHER NAME */}
-          <div>
-            <label className="text-sm font-medium">Father Name</label>
-            <InputText className="w-full mt-1" {...register("fatherName")} />
-            {errors.fatherName && (
-              <small className="text-red-500">
-                {errors.fatherName.message}
-              </small>
-            )}
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Father Name</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon bg-blue-50">
+                    <i className="pi pi-users text-blue-600"></i>
+                  </span>
+                  <InputText className="w-full" {...register("fatherName")} placeholder="Enter father's name" />
+                </div>
+                {errors.fatherName && <small className="text-red-500">{errors.fatherName.message}</small>}
+              </div>
 
-          {/* BLOOD GROUP ✅ FIXED */}
-          <div>
-            <label className="text-sm font-medium">Blood Group</label>
-            <Controller
-              name="bloodGroup"
-              control={control}
-              render={({ field }) => (
-                <Dropdown
-                  {...field}
-                  options={bloodGroups}
-                  optionLabel="label"
-                  optionValue="value"
-                  placeholder="Select blood group"
-                  className="w-full mt-1"
-                  value={field.value}
-                  onChange={(e) => field.onChange(e.value)}
-                />
-              )}
-            />
-            {errors.bloodGroup && (
-              <small className="text-red-500">
-                {errors.bloodGroup.message}
-              </small>
-            )}
-          </div>
-
-
-          <div>
-            <label className="text-sm font-medium">Add Course</label>
-            <Controller
-              name="course"
-              control={control}
-              render={({ field }) => (
-                <Dropdown
-                  {...field}
-                  value={selectedCourse}
-                  options={courseData}
-                  optionLabel="name"
-                  placeholder="Select Course"
-                  className="w-full mt-1"
-                  onChange={(e) => {
-                    setSelectedCourse(e.value);
-                    field.onChange(e.value);
-                  }}
-                  itemTemplate={(course) => (
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={course.image}
-                        alt={course.name}
-                        className="w-10 h-10 object-cover rounded"
-                      />
-                      <div>
-                        <div className="font-medium">{course.name}</div>
-                        <div className="text-sm text-gray-500">${course.fee}</div>
-                      </div>
-                    </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Date of Birth</label>
+                <Controller
+                  name="dob"
+                  control={control}
+                  render={({ field }) => (
+                    <Calendar className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
                   )}
-                  valueTemplate={(course) =>
-                    course ? (
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={course.image}
-                          alt={course.name}
-                          className="w-6 h-6 object-cover rounded"
-                        />
-                        <span>{course.name}</span>
-                      </div>
-                    ) : (
-                      <span>Select course</span>
-                    )
-                  }
                 />
-              )}
-            />
+              </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Blood Group</label>
+                <Controller
+                  name="bloodGroup"
+                  control={control}
+                  render={({ field }) => (
+                    <Dropdown {...field} options={bloodGroups} optionLabel="label" optionValue="value" placeholder="Select blood group" className="w-full" value={field.value} onChange={(e) => field.onChange(e.value)} />
+                  )}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* ADMISSION DATE */}
-          <div>
-            <label className="text-sm font-medium">Admission Date</label>
-            <Controller
-              name="admissionDate"
-              control={control}
-              render={({ field }) => (
-                <Calendar
-                  className="w-full mt-1"
-                  showIcon
-                  value={field.value}
-                  onChange={(e) => field.onChange(e.value)}
+          {/* Academic Information */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <i className="pi pi-book text-blue-600"></i>
+              Academic Information
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Select Course</label>
+                <Controller
+                  name="course"
+                  control={control}
+                  render={({ field }) => (
+                    <Dropdown
+                      {...field}
+                      value={selectedCourse}
+                      options={courseData}
+                      optionLabel="name"
+                      placeholder="Choose a course"
+                      className="w-full"
+                      onChange={(e) => {
+                        setSelectedCourse(e.value);
+                        field.onChange(e.value);
+                      }}
+                      itemTemplate={(course) => (
+                        <div className="flex items-center gap-3 p-2">
+                          <img src={course.image} alt={course.name} className="w-10 h-10 object-cover rounded-lg" />
+                          <div>
+                            <div className="font-semibold text-gray-800">{course.name}</div>
+                            <div className="text-sm text-gray-500">₹{course.fee}</div>
+                          </div>
+                        </div>
+                      )}
+                      valueTemplate={(course) =>
+                        course ? (
+                          <div className="flex items-center gap-3">
+                            <img src={course.image} alt={course.name} className="w-8 h-8 object-cover rounded-lg" />
+                            <span className="font-medium">{course.name}</span>
+                          </div>
+                        ) : (
+                          <span>Select course</span>
+                        )
+                      }
+                    />
+                  )}
                 />
-              )}
-            />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Admission Date</label>
+                <Controller
+                  name="admissionDate"
+                  control={control}
+                  render={({ field }) => (
+                    <Calendar className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
+                  )}
+                />
+              </div>
+            </div>
           </div>
 
           {/* SIGNATURE */}
-          <div>
-            <label className="text-sm font-medium">Signature <span className="text-xl text-red-500">*</span></label>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">
+              Signature <span className="text-red-500">*</span>
+            </label>
             <div 
-              className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-4 flex items-center justify-center cursor-pointer hover:border-indigo-400 transition-colors"
+              className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all bg-gradient-to-br from-blue-50 to-indigo-50 group"
               onClick={() => signatureInputRef.current?.click()}
             >
               {signPreview ? (
-                <img src={signPreview} className="h-16 max-w-full object-contain" alt="Signature preview" />
+                <img src={signPreview} className="h-20 max-w-full object-contain" alt="Signature preview" />
               ) : (
                 <div className="text-center">
-                  <i className="pi pi-file-edit text-3xl text-gray-400"></i>
-                  <p className="text-sm text-gray-600 mt-2">Click to upload signature</p>
-                  <p className="text-xs text-gray-400">JPG, PNG (Max 2MB)</p>
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i className="pi pi-pencil text-3xl text-blue-600"></i>
+                  </div>
+                  <p className="text-blue-600 font-semibold mb-1">Click to upload signature</p>
+                  <p className="text-xs text-gray-500">PNG, JPG (Max 2MB)</p>
                 </div>
               )}
             </div>
-            <input
-              ref={signatureInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setSignatureFile(file);
-                  setSignPreview(URL.createObjectURL(file));
-                }
-              }}
-            />
+            <input ref={signatureInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setSignatureFile(file);
+                setSignPreview(URL.createObjectURL(file));
+              }
+            }} />
           </div>
 
           {/* SUBMIT */}
-          <Button
-            type="submit"
-            label={isSubmitting ? "Saving Student..." : "Save Student"}
-            icon={isSubmitting ? "pi pi-spin pi-spinner" : "pi pi-check"}
-            className="w-full mt-3"
-            disabled={isSubmitting}
-          />
+          <div className="pt-4">
+            <Button
+              type="submit"
+              label={isSubmitting ? "Saving Student..." : "Register Student"}
+              icon={isSubmitting ? "pi pi-spin pi-spinner" : "pi pi-user-plus"}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-0 text-white py-3 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300"
+              disabled={isSubmitting}
+            />
+          </div>
         </form>
 
         <ToastContainer />
-      </div>
+      </Card>
     </div>
   );
 }

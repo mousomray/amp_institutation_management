@@ -163,12 +163,12 @@ class IssueController {
     // Get all issued books (with full details)
     async getAllIssues(req, res) {
         try {
-            const userId = req.user.id   
+            const userId = req.user.id
 
             const issues = await IssueModel.aggregate([
                 {
                     $match: {
-                        userId: userId   
+                        userId: userId
                     }
                 },
 
@@ -300,50 +300,59 @@ class IssueController {
     // Dashboard Stats
     async getDashboardStats(req, res) {
         try {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            const userId = req.user.id
 
-            // Total books
-            const totalBooks = await BookModel.countDocuments({ isDeleted: false });
-            const availableBooks = await BookModel.countDocuments({ isDeleted: false, isAvailable: true });
-            const issuedBooks = await BookModel.countDocuments({ isDeleted: false, isAvailable: false });
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
 
-            // Total students
-            const totalStudents = await StudentModel.countDocuments({ isDeleted: false });
+            const tomorrow = new Date(today)
+            tomorrow.setDate(tomorrow.getDate() + 1)
 
-            // Today issued
+            /* ================= SUMMARY ================= */
+
+            const totalBooks = await BookModel.countDocuments({
+                userId,
+                isDeleted: false
+            })
+
+            const availableBooks = await BookModel.countDocuments({
+                userId,
+                isDeleted: false,
+                isAvailable: true
+            })
+
+            const issuedBooks = await BookModel.countDocuments({
+                userId,
+                isDeleted: false,
+                isAvailable: false
+            })
+
             const todayIssued = await IssueModel.countDocuments({
+                userId,
                 issue_date: { $gte: today, $lt: tomorrow }
-            });
+            })
 
-            // Today returned
             const todayReturned = await IssueModel.countDocuments({
+                userId,
                 actual_return_date: { $gte: today, $lt: tomorrow },
                 status: 'returned'
-            });
+            })
 
-            // Total fine collected
             const fineResult = await IssueModel.aggregate([
-                { $match: { status: 'returned' } },
-                { $group: { _id: null, totalFine: { $sum: '$fine' } } }
-            ]);
-            const totalFineCollected = fineResult.length > 0 ? fineResult[0].totalFine : 0;
+                { $match: { userId, status: 'returned' } },
+                { $group: { _id: null, totalFine: { $sum: '$total_amount' } } }
+            ])
 
-            // Recent activities (last 10)
-            const recentActivities = await IssueModel.aggregate([
-                { $sort: { issue_date: -1 } },
+            const totalFineCollected =
+                fineResult.length > 0 ? fineResult[0].totalFine : 0
+
+            /* ================= RECENT ACTIVITIES ================= */
+
+            const recentIssues = await IssueModel.aggregate([
+                { $match: { userId } },
+                { $sort: { createdAt: -1 } },
                 { $limit: 10 },
-                {
-                    $lookup: {
-                        from: 'students',
-                        localField: 'student_id',
-                        foreignField: '_id',
-                        as: 'student'
-                    }
-                },
-                { $unwind: '$student' },
+
                 {
                     $lookup: {
                         from: 'books',
@@ -353,36 +362,57 @@ class IssueController {
                     }
                 },
                 { $unwind: '$book' },
+
                 {
                     $project: {
-                        student_name: '$student.name',
-                        book_name: '$book.name',
+                        student_id: 1,
                         issue_date: 1,
                         return_date: 1,
                         actual_return_date: 1,
-                        fine: 1,
-                        status: 1
+                        total_amount: 1,
+                        status: 1,
+                        'book.name': 1,
+                        'book.image': 1
                     }
                 }
-            ]);
+            ])
 
-            // Overdue books
-            const overdueBooks = await IssueModel.aggregate([
+            const recentActivities = []
+
+            for (let issue of recentIssues) {
+                const student = await getStudentFromStudentService(issue.student_id, req)
+
+                recentActivities.push({
+                    issue_date: issue.issue_date,
+                    return_date: issue.return_date,
+                    actual_return_date: issue.actual_return_date,
+                    status: issue.status,
+                    total_amount: issue.total_amount,
+                    book: {
+                        name: issue.book.name,
+                        image: issue.book.image
+                    },
+                    student: student
+                        ? {
+                            name: student.name,
+                            email: student.email,
+                            phone: student.phone
+                        }
+                        : null
+                })
+            }
+
+            /* ================= OVERDUE BOOKS ================= */
+
+            const overdueIssues = await IssueModel.aggregate([
                 {
                     $match: {
+                        userId,
                         status: 'issued',
                         return_date: { $lt: today }
                     }
                 },
-                {
-                    $lookup: {
-                        from: 'students',
-                        localField: 'student_id',
-                        foreignField: '_id',
-                        as: 'student'
-                    }
-                },
-                { $unwind: '$student' },
+
                 {
                     $lookup: {
                         from: 'books',
@@ -392,37 +422,62 @@ class IssueController {
                     }
                 },
                 { $unwind: '$book' },
+
                 {
-                    $project: {
-                        student_name: '$student.name',
-                        book_name: '$book.name',
-                        return_date: 1,
-                        base_rate: 1,
+                    $addFields: {
                         lateDays: {
-                            $ceil: {
-                                $divide: [
-                                    { $subtract: [today, '$return_date'] },
-                                    1000 * 60 * 60 * 24
-                                ]
+                            $dateDiff: {
+                                startDate: '$return_date',
+                                endDate: today,
+                                unit: 'day'
                             }
                         }
                     }
                 },
+
                 {
-                    $addFields: {
-                        estimatedFine: { $multiply: ['$lateDays', '$base_rate'] }
+                    $project: {
+                        student_id: 1,
+                        return_date: 1,
+                        lateDays: 1,
+                        book_fee: 1,
+                        'book.name': 1,
+                        'book.image': 1
                     }
                 }
-            ]);
+            ])
 
-            res.status(200).json({
-                message: 'Dashboard stats fetched successfully',
+            const overdueBooks = []
+
+            for (let issue of overdueIssues) {
+                const student = await getStudentFromStudentService(issue.student_id, req)
+
+                overdueBooks.push({
+                    book: {
+                        name: issue.book.name,
+                        image: issue.book.image
+                    },
+                    return_date: issue.return_date,
+                    lateDays: issue.lateDays,
+                    estimatedFine: issue.lateDays * issue.book_fee,
+                    student: student
+                        ? {
+                            name: student.name,
+                            phone: student.phone
+                        }
+                        : null
+                })
+            }
+
+            /* ================= FINAL RESPONSE ================= */
+
+            return res.status(200).json({
+                success: true,
                 data: {
                     summary: {
                         totalBooks,
                         availableBooks,
                         issuedBooks,
-                        totalStudents,
                         todayIssued,
                         todayReturned,
                         totalFineCollected
@@ -430,11 +485,14 @@ class IssueController {
                     recentActivities,
                     overdueBooks
                 }
-            });
+            })
 
         } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Error fetching dashboard stats' });
+            console.error('Dashboard error:', error)
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to load dashboard'
+            })
         }
     }
 }

@@ -2,36 +2,48 @@
 
 import React, { useEffect, useState } from 'react'
 
-
-import InstutionTable from '@/components/admin/RecntInstution';
 import RecntStudentTable from '@/components/admin/RecntStudent';
 import InstutionDataCart from '@/components/institution/InstutionDataCart';
 import RecentCourse from '@/components/institution/RecentCourse';
+import BookSummaryCards from '@/components/institution/BookSummaryCards';
+import RecentActivities from '@/components/institution/RecentActivities';
+import OverdueBooks from '@/components/institution/OverdueBooks';
 import axiosInstance from "@/service/axios.service";
+import microInstance from "@/service/micro.service";
 import { ToastContainer, toast } from "react-toastify";
 import axios from "axios";
-
 
 function page() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [allStudents,setAllStudents] = useState(0)
-  const [allCourse,setAllCourse] = useState(0)
+  const [allStudents, setAllStudents] = useState(0)
+  const [allCourse, setAllCourse] = useState(0)
   const [recntStudents, setRecntStudents] = useState([])
   const [recntCourse, setRecntCourse] = useState([])
+  
+  // Book library dashboard data
+  const [bookSummary, setBookSummary] = useState({
+    totalBooks: 0,
+    availableBooks: 0,
+    issuedBooks: 0,
+    todayIssued: 0,
+    todayReturned: 0,
+    totalFineCollected: 0,
+  });
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [overdueBooks, setOverdueBooks] = useState([]);
+
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
   }, []);
 
-  /* ================= FETCH STUDENTS ================= */
   useEffect(() => {
     if (token) {
-      dashBoardData()
+      dashBoardData();
+      fetchBookDashboardData();
     }
   }, [token]);
-
-
 
   const dashBoardData = async () => {
     try {
@@ -47,7 +59,6 @@ function page() {
       setAllStudents(res.data.data.totalStudents)
       setRecntStudents(res.data.data.recentStudents)
       setRecntCourse(res.data.data.recentCourses)
-      console.log("data", res.data)
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Something went wrong");
@@ -59,18 +70,54 @@ function page() {
     }
   };
 
+  const fetchBookDashboardData = async () => {
+    try {
+      const res = await microInstance.get("/api/dashboard", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true,
+      });
+
+      if (res.data?.success && res.data?.data) {
+        const { summary, recentActivities, overdueBooks } = res.data.data;
+        setBookSummary(summary);
+        setRecentActivities(recentActivities);
+        setOverdueBooks(overdueBooks);
+      }
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to load book dashboard");
+      } else {
+        toast.error("Unexpected error occurred");
+      }
+    }
+  };
+
   return (
-    <
-      >
-      <div className=' sm:px-6 px-2 sm:py-3 py-1'>
-         <InstutionDataCart Courses={allCourse} student={allStudents}/> 
-        
+    <>
+      <div className='sm:px-6 px-2 sm:py-3 py-1'>
+        <InstutionDataCart Courses={allCourse} student={allStudents} />
       </div>
-      <div className=' sm:px-6 px-2 sm:py-3 py-1 flex flex-row gap-4 '>
-        <RecentCourse courses={recntCourse}  />
+
+      {/* Book Library Summary */}
+      <div className='sm:px-6 px-2 sm:py-3 py-1'>
+        <BookSummaryCards summary={bookSummary} />
+      </div>
+
+      {/* Recent Activities and Overdue Books */}
+      <div className='sm:px-6 px-2 sm:py-3 py-1 space-y-4'>
+        <RecentActivities activities={recentActivities} />
+        <OverdueBooks overdueBooks={overdueBooks} />
+      </div>
+
+      {/* Courses and Students */}
+      <div className='sm:px-6 px-2 sm:py-3 py-1 flex flex-row gap-4'>
+        <RecentCourse courses={recntCourse} />
         <RecntStudentTable students={recntStudents} />
-        <ToastContainer />
       </div>
+
+      <ToastContainer />
     </>
   )
 }
