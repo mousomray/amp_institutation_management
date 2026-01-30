@@ -47,7 +47,7 @@ class SettingsController {
             if (!settings) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Settings not found'
+                    message: 'Currently You not set base rate and late fine in settings'
                 })
             }
 

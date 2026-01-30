@@ -70,7 +70,7 @@ export default function AdminAppBar() {
   };
 
   return (
-    <header className="fixed w-full top-0 left-0  bg-background backdrop-blur-md shadow-sm">
+    <header className="fixed top-0 left-0 w-full z-50 bg-background backdrop-blur-md shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-24">
           {/* Left side: Menu + Logo */}

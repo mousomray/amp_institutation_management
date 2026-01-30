@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
@@ -33,8 +33,12 @@ export default function Page() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signPreview, setSignPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
+  
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -61,6 +65,7 @@ export default function Page() {
   });
 
   const onSubmit = async (data: StudentFormData) => {
+    setIsSubmitting(true);
     try {
       if (!photoFile) return toast.error("Photo is required");
       if (!signatureFile) return toast.error("Signature is required");
@@ -103,6 +108,8 @@ export default function Page() {
         setSignatureFile(null);
         setPhotoPreview(null);
         setSignPreview(null);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -156,27 +163,36 @@ export default function Page() {
 
           {/* PHOTO */}
           <div>
-            <label className="text-sm font-medium">Photo <span className=" text-xl text-red-500">*</span></label>
-            <div className="flex items-center gap-4 mt-1">
-              <div className="w-16 h-16 rounded-full border flex items-center justify-center overflow-hidden">
+            <label className="text-sm font-medium">Photo <span className="text-xl text-red-500">*</span></label>
+            <div 
+              className="flex items-center gap-4 mt-1 cursor-pointer"
+              onClick={() => photoInputRef.current?.click()}
+            >
+              <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-colors">
                 {photoPreview ? (
-                  <img src={photoPreview} className="w-full h-full object-cover" />
+                  <img src={photoPreview} className="w-full h-full object-cover" alt="Photo preview" />
                 ) : (
                   <i className="pi pi-user text-gray-400 text-2xl"></i>
                 )}
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setPhotoFile(file);
-                    setPhotoPreview(URL.createObjectURL(file));
-                  }
-                }}
-              />
+              <div className="flex-1">
+                <p className="text-sm text-gray-600">Click to upload photo</p>
+                <p className="text-xs text-gray-400">JPG, PNG or GIF (Max 5MB)</p>
+              </div>
             </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setPhotoFile(file);
+                  setPhotoPreview(URL.createObjectURL(file));
+                }
+              }}
+            />
           </div>
 
           {/* NAME */}
@@ -332,30 +348,43 @@ export default function Page() {
 
           {/* SIGNATURE */}
           <div>
-            <label className="text-sm font-medium">Signature  <span className=" text-xl text-red-500">*</span></label>
-            <div className="flex items-center gap-4 mt-1">
-              {signPreview && (
-                <img src={signPreview} className="h-10 border rounded" />
+            <label className="text-sm font-medium">Signature <span className="text-xl text-red-500">*</span></label>
+            <div 
+              className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-4 flex items-center justify-center cursor-pointer hover:border-indigo-400 transition-colors"
+              onClick={() => signatureInputRef.current?.click()}
+            >
+              {signPreview ? (
+                <img src={signPreview} className="h-16 max-w-full object-contain" alt="Signature preview" />
+              ) : (
+                <div className="text-center">
+                  <i className="pi pi-file-edit text-3xl text-gray-400"></i>
+                  <p className="text-sm text-gray-600 mt-2">Click to upload signature</p>
+                  <p className="text-xs text-gray-400">JPG, PNG (Max 2MB)</p>
+                </div>
               )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setSignatureFile(file);
-                    setSignPreview(URL.createObjectURL(file));
-                  }
-                }}
-              />
             </div>
+            <input
+              ref={signatureInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setSignatureFile(file);
+                  setSignPreview(URL.createObjectURL(file));
+                }
+              }}
+            />
           </div>
 
           {/* SUBMIT */}
           <Button
-            label="Save Student"
-            icon="pi pi-check"
+            type="submit"
+            label={isSubmitting ? "Saving Student..." : "Save Student"}
+            icon={isSubmitting ? "pi pi-spin pi-spinner" : "pi pi-check"}
             className="w-full mt-3"
+            disabled={isSubmitting}
           />
         </form>
 

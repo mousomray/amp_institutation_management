@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import Image from "next/image";
 import { z } from "zod";
@@ -31,6 +31,9 @@ export default function AddCourseForm() {
   const [token, setToken] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -52,11 +55,13 @@ export default function AddCourseForm() {
   }, []);
 
   const handleImagePreview = (file: File) => {
+    if (preview) URL.revokeObjectURL(preview);
     const imageUrl = URL.createObjectURL(file);
     setPreview(imageUrl);
   };
 
   const onSubmit = async (data: CourseFormData) => {
+    setIsSubmitting(true);
     try {
       if (!imageFile) {
         toast.error("Image is required");
@@ -92,6 +97,8 @@ export default function AddCourseForm() {
       } else {
         toast.error("Unexpected error occurred");
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -109,17 +116,25 @@ export default function AddCourseForm() {
             <label className="block text-sm font-medium text-gray-600 mb-1">
               Course Image <span className="text-red-500">*</span>
             </label>
-            <div className="relative h-40 w-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+            <div 
+              className="relative h-40 w-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer transition-colors"
+              onClick={() => imageInputRef.current?.click()}
+            >
               {preview ? (
                 <Image src={preview} alt="Preview" fill className="object-cover" />
               ) : (
-                <span className="text-gray-400 text-sm">Upload course image</span>
+                <div className="text-center">
+                  <i className="pi pi-image text-4xl text-gray-400"></i>
+                  <p className="mt-2 text-gray-500 text-sm">Click to upload course image</p>
+                  <p className="text-xs text-gray-400 mt-1">JPG, PNG or GIF</p>
+                </div>
               )}
             </div>
             <input
+              ref={imageInputRef}
               type="file"
               accept="image/*"
-              className="mt-2"
+              className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
@@ -197,9 +212,12 @@ export default function AddCourseForm() {
 
           <button
             type="submit"
-            className="w-full bg-primary text-white py-2 rounded-lg font-medium"
+            disabled={isSubmitting}
+            className={`w-full bg-primary text-white py-2 rounded-lg font-medium transition-all shadow-lg ${
+              isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:from-indigo-700 hover:to-blue-700 transform hover:scale-[1.02]"
+            }`}
           >
-            Add Course
+            {isSubmitting ? "Adding Course..." : "Add Course"}
           </button>
         </form>
 

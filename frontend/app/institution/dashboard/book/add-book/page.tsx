@@ -75,9 +75,11 @@ export default function AddBookForm() {
           withCredentials: true,
         });
 
+        console.log("Settings fetch response:", res);
+
         if (res.data?.success && res.data?.data) {
           const settingsData = res.data.data;
-          
+
           // Check if settings is active and prefill
           if (settingsData.isActive) {
             setValue("bookFee", settingsData.book_fee || 0);
@@ -86,7 +88,7 @@ export default function AddBookForm() {
         }
       } catch (error: any) {
         console.error("Failed to fetch settings:", error);
-        // Don't show error toast, just use default values
+        toast.error(error?.response?.data?.message);
       } finally {
         setLoadingSettings(false);
       }
@@ -150,7 +152,7 @@ export default function AddBookForm() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center  px-4 py-8">
+    <div className="min-h-screen w-full flex items-center justify-center px-4 py-8 pt-24">
       <div className="w-full max-w-2xl bg-white rounded-xl shadow p-8">
         <div className="mb-6 text-center">
           <h2 className="text-3xl font-bold text-gray-800">Add New Book</h2>
@@ -169,10 +171,10 @@ export default function AddBookForm() {
           {/* Image Upload */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Book Cover Image *
+              Book Cover Image <span className="text-red-500">*</span>
             </label>
 
-            <div className="relative h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer">
+            <div className="relative z-0 h-48 w-full border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer">
               {preview ? (
                 <Image src={preview} alt="Book Cover Preview" fill className="object-contain p-2" />
               ) : (
@@ -201,7 +203,7 @@ export default function AddBookForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Book Name *
+                Book Name <span className="text-red-500">*</span>
               </label>
               <InputText
                 className="w-full"
@@ -213,7 +215,7 @@ export default function AddBookForm() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Author Name *
+                Author Name <span className="text-red-500">*</span>
               </label>
               <InputText
                 className="w-full"
@@ -227,7 +229,7 @@ export default function AddBookForm() {
           {/* Language */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Language *
+              Language <span className="text-red-500">*</span>
             </label>
             <Dropdown
               className="w-full"
@@ -242,7 +244,7 @@ export default function AddBookForm() {
           {/* Description */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Description *
+              Description <span className="text-red-500">*</span>
             </label>
             <InputTextarea
               className="w-full"
@@ -258,7 +260,7 @@ export default function AddBookForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Book Fee *
+                Book Fee <span className="text-red-500">*</span>
               </label>
               <InputNumber
                 className="w-full"
@@ -275,7 +277,7 @@ export default function AddBookForm() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Late Fee *
+                Late Fee <span className="text-red-500">*</span>
               </label>
               <InputNumber
                 className="w-full"

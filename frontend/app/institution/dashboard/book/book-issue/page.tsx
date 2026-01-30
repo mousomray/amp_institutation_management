@@ -167,7 +167,9 @@ export default function BookIssuePage() {
 
           {/* Student Dropdown */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Select Student *</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Select Student <span className="text-red-500">*</span>
+            </label>
             <Dropdown
               className="w-full"
               value={selectedStudent}
@@ -184,7 +186,9 @@ export default function BookIssuePage() {
 
           {/* Book Dropdown */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Select Book *</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Select Book <span className="text-red-500">*</span>
+            </label>
             <Dropdown
               className="w-full"
               value={selectedBook}
@@ -202,7 +206,9 @@ export default function BookIssuePage() {
 
           {/* Return Date */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Return Date *</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Return Date <span className="text-red-500">*</span>
+            </label>
             <Calendar
               className="w-full"
               value={selectedDate ? new Date(selectedDate) : null}

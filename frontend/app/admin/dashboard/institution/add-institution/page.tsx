@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 
@@ -83,10 +83,14 @@ export default function InstitutionForm() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signPreview, setSignPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [location, setLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
+
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("admin-token");
@@ -140,7 +144,7 @@ export default function InstitutionForm() {
       return;
     }
 
-
+    setIsSubmitting(true);
 
     try {
 
@@ -181,13 +185,15 @@ export default function InstitutionForm() {
       } else {
         toast.error('Unexpected error occurred')
       }
-    }
-    reset()
-setBannerImageFile(null)
+      reset()
+      setBannerImageFile(null)
       setPhotoFile(null)
       setBannerPreview(null)
       setPhotoPreview(null)
       setLocation(null)
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onError = (errors: any) => {
@@ -195,10 +201,10 @@ setBannerImageFile(null)
   }
 
   const handleImageBannerPreview = (file: File) => {
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
     const imageUrl = URL.createObjectURL(file);
     setBannerPreview(imageUrl);
   };
-
 
   console.log("==>", location)
   return (
@@ -216,27 +222,32 @@ setBannerImageFile(null)
 
         
         <form onSubmit={handleSubmit(onSubmit, onError)} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Institution Name */}
-
+          {/* Institution Banner Image */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-600 mb-1">
-              Institution banner iamge Image
+              Institution banner iamge Image <span className="text-red-500">*</span>
             </label>
 
-            <div className="relative h-40 w-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+            <div 
+              className="relative h-40 w-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 hover:border-indigo-400 cursor-pointer transition-colors"
+              onClick={() => bannerInputRef.current?.click()}
+            >
               {bannerPreview ? (
-                <Image src={bannerPreview} alt="Preview" fill className="object-cover" />
+                <Image src={bannerPreview} alt="Banner Preview" fill className="object-cover" />
               ) : (
-                <span className="text-gray-400 text-sm">
-                  Institution image 
-                </span>
+                <div className="text-center">
+                  <i className="pi pi-image text-4xl text-gray-400"></i>
+                  <p className="mt-2 text-gray-500 text-sm">Click to upload institution banner</p>
+                  <p className="text-xs text-gray-400 mt-1">JPG, PNG or GIF</p>
+                </div>
               )}
             </div>
 
             <input
+              ref={bannerInputRef}
               type="file"
               accept="image/*"
-              className="mt-2"
+              className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
@@ -247,31 +258,41 @@ setBannerImageFile(null)
             />
           </div>
 
-
+          {/* Photo */}
           <div className="md:col-span-2">
-            <label className="text-sm font-medium">Photo</label>
-            <div className="flex items-center gap-4 mt-1">
-              <div className="w-16 h-16 rounded-full border flex items-center justify-center overflow-hidden">
+            <label className="text-sm font-medium">Photo <span className="text-red-500 text-xl">*</span></label>
+            <div 
+              className="flex items-center gap-4 mt-1 cursor-pointer"
+              onClick={() => photoInputRef.current?.click()}
+            >
+              <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-colors">
                 {photoPreview ? (
-                  <img src={photoPreview} className="w-full h-full object-cover" />
+                  <img src={photoPreview} className="w-full h-full object-cover" alt="Photo preview" />
                 ) : (
                   <i className="pi pi-user text-gray-400 text-2xl"></i>
                 )}
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setPhotoFile(file);
-                    setPhotoPreview(URL.createObjectURL(file));
-                  }
-                }}
-              />
+              <div className="flex-1">
+                <p className="text-sm text-gray-600">Click to upload institution photo</p>
+                <p className="text-xs text-gray-400">JPG, PNG or GIF (Max 5MB)</p>
+              </div>
             </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setPhotoFile(file);
+                  setPhotoPreview(URL.createObjectURL(file));
+                }
+              }}
+            />
           </div>
 
+          {/* Institution Name */}
           <div>
             <label className="text-sm font-medium">Institution Name <span className=" text-red-500 text-xl">*</span></label>
             <InputText
@@ -363,8 +384,15 @@ setBannerImageFile(null)
               label="Reset"
               severity="secondary"
               onClick={() => reset()}
+              disabled={isSubmitting}
             />
-            <Button type="submit" label="Save Institution" />
+            <Button 
+              type="submit" 
+              label={isSubmitting ? "Saving Institution..." : "Save Institution"}
+              icon={isSubmitting ? "pi pi-spin pi-spinner" : "pi pi-check"}
+              disabled={isSubmitting}
+              className={isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+            />
           </div>
         </form>
       </div>
