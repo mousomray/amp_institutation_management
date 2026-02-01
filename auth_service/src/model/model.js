@@ -27,7 +27,7 @@ const institutionSchema = new Schema(
     phone: String,
     website: String,
     registrationNo: {
-     type: String,
+      type: String,
       default: null,
     },
     establishDate: Date,
@@ -135,14 +135,197 @@ const studentSchema = new Schema(
   { timestamps: true }
 );
 
+// Fees Master Schema 
+const feesMasterSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true
+    },
+
+    amount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+
+    description: {
+      type: String
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    }
+  },
+  { timestamps: true }
+);
+
+// Student Fees Schema 
+const studentFeesSchema = new Schema(
+  {
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
+      required: true
+    },
+
+    courseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      required: true
+    },
+
+    totalAmount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+
+    dueAmount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+
+    status: {
+      type: String,
+      enum: ["DUE", "PARTIAL", "PAID"],
+      default: "DUE"
+    },
+
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    }
+  },
+  { timestamps: true }
+);
+
+const studentFeeItemsSchema = new Schema({
+  studentFeesId: {
+    type: Schema.Types.ObjectId,
+    ref: "StudentFees",
+    required: true
+  },
+
+  feeType: {
+    type: String,
+    enum: ["COURSE", "MASTER"],
+    required: true
+  },
+
+  courseId: {
+    type: Schema.Types.ObjectId,
+    ref: "Course"
+  },
+
+  feeMasterId: {
+    type: Schema.Types.ObjectId,
+    ref: "FeesMaster"
+  },
+
+  amount: {
+    type: Number,
+    required: true
+  }
+
+}, { timestamps: true });
+
+const studentFeePaymentSchema = new Schema({
+  studentFeesId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "StudentFees",
+    required: true
+  },
+
+  studentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Student",
+    required: true
+  },
+
+  amount: {
+    type: Number,
+    required: true
+  },
+
+  paymentMode: {
+    type: String,
+    enum: ["CASH", "UPI", "BANK", "CARD"],
+    required: true
+  },
+
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
+
+  paymentDate: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const installmentPlanSchema = new Schema({
+  name: { type: String, required: true },
+  description: String,
+  userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // institution admin
+  items: [
+    {
+      name: { type: String, required: true },
+      dueDate: { type: Date, required: true },
+      amount: { type: Number, required: true, min: 0 }
+    }
+  ],
+  totalAmount: { type: Number, required: true, min: 0 }
+}, { timestamps: true });
+
+// Per-student installment items (linked to StudentFees)
+const studentInstallmentItemSchema = new Schema({
+  studentFeesId: { type: Schema.Types.ObjectId, ref: "StudentFees", required: true },
+  name: { type: String, required: true },
+  dueDate: { type: Date, required: true },
+  amount: { type: Number, required: true, min: 0 },
+  paidAmount: { type: Number, default: 0, min: 0 },
+  status: { type: String, enum: ["DUE", "PARTIAL", "PAID"], default: "DUE" },
+  sequence: { type: Number } // optional ordering
+}, { timestamps: true });
+
+
+
 const User = model("User", userSchema);
 const Institution = model("Institution", institutionSchema);
 const Course = model("Course", courseSchema);
 const Student = model("Student", studentSchema);
+const FeesMaster = model("FeesMaster", feesMasterSchema);
+const StudentFees = model("StudentFees", studentFeesSchema);
+const StudentFeeItems = model("StudentFeeItems", studentFeeItemsSchema);
+const StudentFeePayment = model("StudentFeePayment", studentFeePaymentSchema);
+const InstallmentPlan = model("InstallmentPlan", installmentPlanSchema);
+const StudentInstallmentItem = model("StudentInstallmentItem", studentInstallmentItemSchema);
 
 module.exports = {
   User,
   Institution,
   Course,
   Student,
+  FeesMaster,
+  StudentFees,
+  StudentFeeItems,
+  StudentFeePayment,
+  InstallmentPlan,
+  StudentInstallmentItem
 };

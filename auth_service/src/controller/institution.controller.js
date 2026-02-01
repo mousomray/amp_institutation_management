@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { User, Course, Institution, Student } = require("../model/model.js");
-const { AdminLoginSchema, CourseSchema, StudentSchema, EditSthudentSchm } = require("../schema/Schema.js");
+const { User, Course, Institution, Student, FeesMaster, StudentFees, StudentFeeItems, StudentFeePayment, InstallmentPlan, StudentInstallmentItem } = require("../model/model.js");
+const { AdminLoginSchema, CourseSchema, StudentSchema, EditSthudentSchma, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const mongoose = require("mongoose");
@@ -986,8 +986,712 @@ const OnlyOneStudentAPI = async (req, res) => {
   }
 }
 
+// Handle Fees Master related operations here
+
+const AddFeesMasterAPI = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const fees = await FeesMaster.create({
+      ...req.body,
+      userId
+    });
+
+    return res.status(201).json({
+      message: "Fees master created successfully",
+      data: fees
+    });
+  } catch (error) {
+    console.error("Add fees master error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const GetAllFeesMasterAPI = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const feesList = await FeesMaster.find({ userId })
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      message: "Fees master list fetched successfully",
+      data: feesList
+    });
+  } catch (error) {
+    console.error("Get fees master list error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const GetSingleFeesMasterAPI = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const fee = await FeesMaster.findOne({
+      _id: id,
+      userId
+    });
+
+    if (!fee) {
+      return res.status(404).json({
+        message: "Fees master not found or unauthorized"
+      });
+    }
+
+    return res.status(200).json({
+      message: "Fees master fetched successfully",
+      data: fee
+    });
+  } catch (error) {
+    console.error("Get single fees master error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const UpdateFeesMasterAPI = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const updatedFee = await FeesMaster.findOneAndUpdate(
+      { _id: id, userId },
+      req.body,
+      { new: true }
+    );
+
+    if (!updatedFee) {
+      return res.status(404).json({
+        message: "Fees master not found or unauthorized"
+      });
+    }
+
+    return res.status(200).json({
+      message: "Fees master updated successfully",
+      data: updatedFee
+    });
+  } catch (error) {
+    console.error("Update fees master error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const DeleteFeesMasterAPI = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const deletedFee = await FeesMaster.findOneAndDelete({
+      _id: id,
+      userId
+    });
+
+    if (!deletedFee) {
+      return res.status(404).json({
+        message: "Fees master not found or unauthorized"
+      });
+    }
+
+    return res.status(200).json({
+      message: "Fees master deleted successfully"
+    });
+  } catch (error) {
+    console.error("Delete fees master error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Student Fees API Implimentation area 
+const assignStudentFees = async (req, res) => {
+  try {
+    const { studentId, courseId } = req.body;
+    const userId = req.user.id;
+
+    // 1. Course fee
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    // 2. Active master fees
+    const masterFees = await FeesMaster.find({
+      isActive: true,
+      userId
+    });
+
+    // 3. Calculate total
+    let totalAmount = course.fee;
+
+    masterFees.forEach(fee => {
+      totalAmount += fee.amount;
+    });
+
+    // 4. Create StudentFees (summary)
+    const studentFees = await StudentFees.create({
+      studentId,
+      courseId,
+      totalAmount,
+      paidAmount: 0,
+      dueAmount: totalAmount,
+      status: "DUE",
+      userId
+    });
+
+    // 5. Create fee items (IMPORTANT PART)
+    const feeItems = [];
+
+    // 👉 Course fee item (NEW & REQUIRED)
+    feeItems.push({
+      studentFeesId: studentFees._id,
+      feeType: "COURSE",
+      courseId: course._id,
+      amount: course.fee
+    });
+
+    // 👉 Master fee items
+    masterFees.forEach(fee => {
+      feeItems.push({
+        studentFeesId: studentFees._id,
+        feeType: "MASTER",
+        feeMasterId: fee._id,
+        amount: fee.amount
+      });
+    });
+
+    await StudentFeeItems.insertMany(feeItems);
+
+    return res.status(201).json({
+      message: "Student fees assigned successfully",
+      data: studentFees
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+const listStudentFees = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const data = await StudentFees.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId)
+        }
+      },
+
+      /* ---------- pick latest fees per student + course ---------- */
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $group: {
+          _id: {
+            studentId: "$studentId",
+            courseId: "$courseId"
+          },
+          studentFeesId: { $first: "$_id" },
+          totalAmount: { $first: "$totalAmount" },
+          paidAmount: { $first: "$paidAmount" },
+          dueAmount: { $first: "$dueAmount" },
+          status: { $first: "$status" },
+          userId: { $first: "$userId" }
+        }
+      },
+
+      /* ---------- Student ---------- */
+      {
+        $lookup: {
+          from: "students",
+          localField: "_id.studentId",
+          foreignField: "_id",
+          as: "student"
+        }
+      },
+      { $unwind: "$student" },
+
+      /* ---------- Course ---------- */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "_id.courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      { $unwind: "$course" },
+
+      /* ---------- Fee Items ---------- */
+      {
+        $lookup: {
+          from: "studentfeeitems",
+          localField: "studentFeesId",
+          foreignField: "studentFeesId",
+          as: "feeItems"
+        }
+      },
+
+      /* ---------- Fees Master ---------- */
+      {
+        $lookup: {
+          from: "feesmasters",
+          localField: "feeItems.feeMasterId",
+          foreignField: "_id",
+          as: "masterFeesData"
+        }
+      },
+
+      /* ---------- Calculate Fees ---------- */
+      {
+        $addFields: {
+          courseFee: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: "$feeItems",
+                    as: "item",
+                    cond: { $eq: ["$$item.feeType", "COURSE"] }
+                  }
+                },
+                as: "cf",
+                in: "$$cf.amount"
+              }
+            }
+          },
+
+          masterFees: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$feeItems",
+                  as: "item",
+                  cond: { $eq: ["$$item.feeType", "MASTER"] }
+                }
+              },
+              as: "mf",
+              in: {
+                amount: "$$mf.amount",
+                fee: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: "$masterFeesData",
+                        as: "mfd",
+                        cond: { $eq: ["$$mfd._id", "$$mf.feeMasterId"] }
+                      }
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      /* ---------- Final Response ---------- */
+      {
+        $project: {
+          _id: "$studentFeesId",
+          totalAmount: 1,
+          paidAmount: 1,
+          dueAmount: 1,
+          status: 1,
+
+          student: {
+            name: "$student.name"
+          },
+          course: {
+            name: "$course.name"
+          },
+
+          courseFee: 1,
+          masterFees: {
+            amount: 1,
+            "fee.name": 1
+          }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      message: "Student fees list fetched",
+      data
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 
 
+const getSingleStudentFees = async (req, res) => {
+  try {
+    const { studentFeesId } = req.params;
+    const userId = req.user.id;
 
-module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI };
+    const data = await StudentFees.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(studentFeesId),
+          userId: new mongoose.Types.ObjectId(userId)
+        }
+      },
+
+      /* ---------- Student ---------- */
+      {
+        $lookup: {
+          from: "students",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "student"
+        }
+      },
+      { $unwind: "$student" },
+
+      /* ---------- Course ---------- */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      { $unwind: "$course" },
+
+      /* ---------- Fee Items ---------- */
+      {
+        $lookup: {
+          from: "studentfeeitems",
+          localField: "_id",
+          foreignField: "studentFeesId",
+          as: "feeItems"
+        }
+      },
+
+      /* ---------- Master Fees ---------- */
+      {
+        $lookup: {
+          from: "feesmasters",
+          localField: "feeItems.feeMasterId",
+          foreignField: "_id",
+          as: "masterFees"
+        }
+      },
+
+      /* ---------- Calculations ---------- */
+      {
+        $addFields: {
+          masterFeeBreakdown: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$feeItems",
+                  as: "item",
+                  cond: { $eq: ["$$item.feeType", "MASTER"] }
+                }
+              },
+              as: "mfItem",
+              in: {
+                name: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$masterFees",
+                            as: "mf",
+                            cond: { $eq: ["$$mf._id", "$$mfItem.feeMasterId"] }
+                          }
+                        },
+                        as: "f",
+                        in: "$$f.name"
+                      }
+                    },
+                    0
+                  ]
+                },
+                amount: "$$mfItem.amount",
+                type: "MASTER"
+              }
+            }
+          },
+
+          courseFee: {
+            name: "$course.name",
+            amount: "$course.fee",
+            type: "COURSE"
+          }
+        }
+      },
+
+      /* ---------- Final Response ---------- */
+      {
+        $project: {
+          student: {
+            name: "$student.name"
+          },
+          course: {
+            name: "$course.name",
+            fee: "$course.fee"
+          },
+          fees: {
+            $concatArrays: [
+              "$masterFeeBreakdown",
+              ["$courseFee"]
+            ]
+          },
+          summary: {
+            totalAmount: "$totalAmount",
+            paidAmount: "$paidAmount",
+            dueAmount: "$dueAmount",
+            status: "$status"
+          }
+        }
+      }
+    ]);
+
+    if (!data.length) {
+      return res.status(404).json({ message: "Student fees not found" });
+    }
+
+    res.status(200).json({
+      message: "Student fees fetched successfully",
+      data: data[0]
+    });
+
+  } catch (error) {
+    console.error("getSingleStudentFeesByFeesId error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Pay Student Fees
+const payStudentFees = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { studentFeesId } = req.params;
+    const { amount, paymentMode } = req.body;
+    const userId = req.user.id;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: "Invalid payment amount" });
+    }
+
+    // 1️⃣ Get student fees
+    const fees = await StudentFees.findById(studentFeesId).session(session);
+
+    if (!fees) {
+      return res.status(404).json({ message: "Fees record not found" });
+    }
+
+    // 2️⃣ Over payment check
+    if (amount > fees.dueAmount) {
+      return res.status(400).json({
+        message: "Payment amount cannot be greater than due amount"
+      });
+    }
+
+    // 3️⃣ Create payment record
+    const payment = await StudentFeePayment.create(
+      [
+        {
+          studentFeesId: fees._id,
+          studentId: fees.studentId,
+          amount,
+          paymentMode,
+          userId: userId
+        }
+      ],
+      { session }
+    );
+
+    // 4️⃣ Update fees summary
+    fees.paidAmount += amount;
+    fees.dueAmount -= amount;
+
+    if (fees.dueAmount === 0) {
+      fees.status = "PAID";
+    } else {
+      fees.status = "PARTIAL";
+    }
+
+    await fees.save({ session });
+
+    // 5️⃣ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      message: "Payment recorded successfully",
+      data: {
+        paymentId: payment[0]._id,
+        studentFeesId: fees._id,
+        paidAmount: amount,
+        paymentMode,
+        updatedSummary: {
+          totalAmount: fees.totalAmount,
+          paidAmount: fees.paidAmount,
+          dueAmount: fees.dueAmount,
+          status: fees.status
+        }
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Installments Handle Area 
+
+// Admin: create installment plan (Master Settings)
+const createInstallmentPlan = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, description, items } = req.body;
+
+    if (!items?.length) return res.status(400).json({ message: "Installment items required" });
+
+    const totalAmount = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+
+    const plan = await InstallmentPlan.create({ name, description, items, totalAmount, userId });
+
+    return res.status(201).json({ message: "Installment plan created", data: plan });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Admin: list installment plans
+const listInstallmentPlans = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const plans = await InstallmentPlan.find({ userId }).sort({ createdAt: -1 });
+    return res.status(200).json({ message: "Installment plans fetched", data: plans });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Assign installments to a StudentFees (after assignStudentFees or along with it)
+const assignInstallmentsToStudentFees = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { studentFeesId, installmentPlanId } = req.body;
+
+    const fees = await StudentFees.findOne({ _id: studentFeesId, userId });
+    if (!fees) return res.status(404).json({ message: "Student fees not found" });
+
+    const plan = await InstallmentPlan.findOne({ _id: installmentPlanId, userId });
+    if (!plan) return res.status(404).json({ message: "Installment plan not found" });
+
+    // create per-student installment items
+    const items = plan.items.map((it, idx) => ({
+      studentFeesId: fees._id,
+      name: it.name,
+      dueDate: it.dueDate,
+      amount: it.amount,
+      sequence: idx + 1
+    }));
+
+    await StudentInstallmentItem.insertMany(items);
+
+    return res.status(201).json({ message: "Installments assigned", data: { studentFeesId: fees._id, count: items.length } });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Pay against a specific installment item
+const payInstallment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const userId = req.user.id;
+    const { installmentItemId } = req.params;
+    const { amount, paymentMode } = req.body;
+
+    const item = await StudentInstallmentItem.findById(installmentItemId).session(session);
+    if (!item) return res.status(404).json({ message: "Installment item not found" });
+    if (!amount || amount <= 0) return res.status(400).json({ message: "Invalid amount" });
+
+    // fetch fees summary
+    const fees = await StudentFees.findById(item.studentFeesId).session(session);
+    if (!fees || String(fees.userId) !== String(userId)) return res.status(403).json({ message: "Unauthorized" });
+
+    // cap payment to remaining on item
+    const remainingItem = item.amount - item.paidAmount;
+    const payNow = Math.min(amount, remainingItem);
+
+    // record payment (reuse StudentFeePayment)
+    const payment = await StudentFeePayment.create([{
+      studentFeesId: fees._id,
+      studentId: fees.studentId,
+      amount: payNow,
+      paymentMode,
+      userId
+    }], { session });
+
+    // update installment item
+    item.paidAmount += payNow;
+    item.status = item.paidAmount >= item.amount ? "PAID" : "PARTIAL";
+    await item.save({ session });
+
+    // update fees summary
+    fees.paidAmount += payNow;
+    fees.dueAmount = Math.max(0, fees.totalAmount - fees.paidAmount);
+    fees.status = fees.dueAmount === 0 ? "PAID" : (fees.paidAmount > 0 ? "PARTIAL" : "DUE");
+    await fees.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      message: "Installment payment recorded",
+      data: {
+        paymentId: payment[0]._id,
+        installmentItemId: item._id,
+        studentFeesId: fees._id,
+        paidAmount: payNow,
+        updatedItemStatus: item.status,
+        updatedFeesStatus: fees.status
+      }
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// List installment items + status for a StudentFees
+const listInstallmentItems = async (req, res) => {
+  try {
+    const { studentFeesId } = req.params;
+    const items = await StudentInstallmentItem.find({ studentFeesId }).sort({ sequence: 1, dueDate: 1 });
+    return res.status(200).json({ message: "Installment items fetched", data: items });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, createInstallmentPlan, listInstallmentPlans, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems };
