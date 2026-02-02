@@ -61,6 +61,19 @@ const sidebarItems = [
         path: "/institution/dashboard/student",
         icon: <ViewListIcon />,
       },
+      {
+        id: "3-3",
+        label: "Fee Settings",
+        path: "/institution/dashboard/student/fee-master",
+        icon: <SettingsIcon />,
+
+      },
+      {
+        id: "3-4",
+        label: "Installment Settings",
+        path: "/institution/dashboard/student/installment-master",
+        icon: <SettingsIcon />,
+      }
     ],
   },
   {
@@ -204,8 +217,16 @@ export default function SideBar() {
                           },
                         }}
                       >
-                        {child.icon}
-                        <span>{child.label}</span>
+                        <span style={{ minWidth: 24 }}>{child.icon}</span>
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {child.label}
+                        </span>
                       </Stack>
                     </Link>
                   ))}
@@ -235,8 +256,16 @@ export default function SideBar() {
                   },
                 }}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <span style={{ minWidth: 24 }}>{item.icon}</span>
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {item.label}
+                </span>
               </Stack>
             </Link>
           )

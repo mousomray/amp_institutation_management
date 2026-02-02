@@ -21,7 +21,7 @@ export default function RootLayout({
            <InstAppBar/>
             <div className=" flex flex-row"> <DrawerBar type={true} />
                 <div
-                    className={`transition-all  duration-300 mt-24 ${drawerState ? "w-[calc(100vw-240px)] " : "w-full"
+                    className={`transition-all  duration-300 mt-24 ${drawerState ? "w-[calc(100vw-250px)] " : "w-full"
                         }`}
                 >
                     {children}
