@@ -80,6 +80,14 @@ export const StudentSchema = zod.object({
 
 });
 
+// Add FeesSchema here
+export const FeesSchema = zod.object({
+  name: zod.string().min(1, "Name is required"),
+  // coerce to number to handle values from inputs reliably
+  amount: zod.coerce.number().nonnegative("Amount must be >= 0"),
+  isActive: zod.boolean().optional().default(true),
+});
+
 export const BookSchema = zod.object({
   name: zod
     .string()
