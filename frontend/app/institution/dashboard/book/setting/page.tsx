@@ -25,6 +25,7 @@ export default function AddBookForm() {
     const [tableData, setTableData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedSetting, setSelectedSetting] = useState<any>(null);
+    const [fromVisible, setFromVisible] = useState(false)
 
     const {
         control,
@@ -46,30 +47,40 @@ export default function AddBookForm() {
         }
     }, []);
 
+    useEffect(() => {
+        if (token) {
+            fetchSettings();
+        }
+    }, [token]);
+
     /* ================= FETCH ALL SETTINGS ================= */
     const fetchSettings = async () => {
         if (!token) return;
-        
+
         setLoading(true);
         try {
             const res = await microInstance.get("/api/book/settings", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
                 withCredentials: true,
             });
 
             if (res.data?.success) {
-                // Handle both array and single object response
-                const data = Array.isArray(res.data.data) 
-                    ? res.data.data 
+                const data = Array.isArray(res.data.data)
+                    ? res.data.data
                     : [res.data.data];
-                
-                setTableData(data.map((item: any) => ({
-                    _id: item._id,
-                    bookFee: item.book_fee,
-                    lateFee: item.late_fine,
-                    isActive: item.isActive,
-                    createdAt: item.createdAt,
-                })));
+
+                setTableData(
+                    data.map((item: any) => ({
+                        _id: item._id,
+                        bookFee: item.book_fee,
+                        lateFee: item.late_fine,
+                        isActive: item.isActive,
+                        createdAt: item.createdAt,
+                    }))
+                );
+                return
             }
         } catch (error: any) {
             console.error(error);
@@ -83,11 +94,6 @@ export default function AddBookForm() {
         }
     };
 
-    useEffect(() => {
-        if (token) {
-            fetchSettings();
-        }
-    }, [token]);
 
     /* ================= CREATE NEW SETTING ================= */
     const onSubmit = async (data: BookFormData) => {
@@ -98,7 +104,7 @@ export default function AddBookForm() {
 
         try {
             setIsSubmitting(true);
-            
+
             const payload = {
                 book_fee: data.bookFee,
                 late_fine: data.lateFee,
@@ -142,7 +148,7 @@ export default function AddBookForm() {
             );
 
             toast.success(
-                res.data?.message || 
+                res.data?.message ||
                 `Marked ${!currentStatus ? "active" : "inactive"} successfully`
             );
             fetchSettings(); // Refresh the list
@@ -214,39 +220,63 @@ export default function AddBookForm() {
         </div>
     )
 
+    const ListHeader = (
+        <div className=" w-full flex flex-row justify-between">
+            <div>
+                <h2 className="text-lg font-semibold text-gray-800">
+                    Book Setting
+                </h2>
+                <p className="text-sm text-gray-500">
+                    Book Setting List details
+                </p>
+            </div>
+            {
+                tableData.length > 0 ? null : <Button onClick={() => setFromVisible(true)}>Add book Setting </Button>
+            }
+        </div>
+    )
+
 
     return (
         <div className="min-h-screen w-full bg-gray-50 p-6">
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-1 gap-6">
+                <DataTable
+                    header={ListHeader}
+                    value={tableData}
+                    paginator
+                    rows={5}
+                    responsiveLayout="scroll"
+                    className="text-sm"
+                    loading={loading}
+                    emptyMessage="No settings found"
+                >
+                    <Column field="bookFee" header="Book Fee (₹)" />
+                    <Column field="lateFee" header="Late Fee (₹)" />
+                    <Column header="Status" body={statusTemplate} />
+                    <Column header="Actions" body={actionTemplate} />
+                </DataTable>
 
-                {/* ================= LEFT : DATA TABLE ================= */}
-                <div className="bg-white rounded-2xl shadow-xl p-6">
-                    <h3 className="text-xl font-bold mb-4">Book Fee Settings</h3>
-
-                    <DataTable
-                        value={tableData}
-                        paginator
-                        rows={5}
-                        responsiveLayout="scroll"
-                        className="text-sm"
-                        loading={loading}
-                        emptyMessage="No settings found"
-                    >
-                        <Column field="bookFee" header="Book Fee (₹)" />
-                        <Column field="lateFee" header="Late Fee (₹)" />
-                        <Column header="Status" body={statusTemplate} />
-                        <Column header="Actions" body={actionTemplate} />
-                    </DataTable>
-                </div>
 
                 {/* ================= RIGHT : FORM ================= */}
-                <div className="bg-white rounded-2xl shadow-xl p-8">
-                    <h2 className="text-3xl font-bold text-gray-800 text-center">
-                        Book Settings
-                    </h2>
-                    <p className="text-gray-500 text-center mt-2">
-                        Configure book fee and late fee for your library
-                    </p>
+            </div>
+
+
+            <Dialog visible={fromVisible} onHide={() => setFromVisible(false)}>
+                <div className="bg-white  p-8">
+
+
+                    <div className=" w-full flex  justify-center flex-col items-center">
+                        <div className="inline-flex  items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+                            <i className="pi pi-book text-3xl text-white"></i>
+                        </div>
+                        <h2 className="text-3xl font-bold text-gray-800 text-center">
+                            Book Settings
+                        </h2>
+                        <p className="text-gray-500 text-center mt-2">
+                            Configure book fee and late fee for your library
+                        </p>
+                    </div>
+
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-6">
 
@@ -319,14 +349,14 @@ export default function AddBookForm() {
 
                     <ToastContainer position="top-right" autoClose={3000} />
                 </div>
-            </div>
-            
+            </Dialog>
+
             <div className="card flex justify-content-center">
-                <Dialog 
-                    header={FromHeader} 
-                    visible={visible} 
-                    style={{ width: '30vw' }} 
-                    onHide={() => { 
+                <Dialog
+                    header={FromHeader}
+                    visible={visible}
+                    style={{ width: '30vw' }}
+                    onHide={() => {
                         setVisible(false);
                         setSelectedSetting(null);
                     }}

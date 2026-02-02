@@ -90,33 +90,46 @@ export default function EditFeesMaster({ id, refetch, onClose }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Fee Name</label>
-        <InputText className="w-full mt-1" {...register("name")} />
-        {errors.name && <small className="text-red-500">{String(errors.name.message)}</small>}
+    <div className="px-20 py-10">
+      <div className=" w-full flex  justify-center flex-col items-center">
+        <div className="inline-flex  items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+          <i className="pi pi-file-edit text-3xl text-white"></i>
+        </div>
+        <h2 className="text-3xl font-bold text-gray-800 text-center">
+          Edit Fee Settings
+        </h2>
+        <p className="text-gray-500 text-center mt-2">
+          Configure  fee for your payment
+        </p>
       </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Fee Name</label>
+          <InputText className="w-full mt-1" {...register("name")} />
+          {errors.name && <small className="text-red-500">{String(errors.name.message)}</small>}
+        </div>
 
-      <div>
-        <label className="text-sm font-medium">Amount</label>
-        <InputText type="number" step="0.01" className="w-full mt-1" {...register("amount", { valueAsNumber: true })} />
-        {errors.amount && <small className="text-red-500">{String(errors.amount.message)}</small>}
-      </div>
+        <div>
+          <label className="text-sm font-medium">Amount</label>
+          <InputText type="number" step="0.01" className="w-full mt-1" {...register("amount", { valueAsNumber: true })} />
+          {errors.amount && <small className="text-red-500">{String(errors.amount.message)}</small>}
+        </div>
 
-      <div className="flex items-center gap-3">
-        <Controller
-          name="isActive"
-          control={control}
-          render={({ field }) => (
-            <>
-              <Checkbox inputId="isActive" checked={!!field.value} onChange={(e) => field.onChange(e.checked)} />
-              <label htmlFor="isActive" className="text-sm ml-2">Active</label>
-            </>
-          )}
-        />
-      </div>
+        <div className="flex items-center gap-3">
+          <Controller
+            name="isActive"
+            control={control}
+            render={({ field }) => (
+              <>
+                <Checkbox inputId="isActive" checked={!!field.value} onChange={(e) => field.onChange(e.checked)} />
+                <label htmlFor="isActive" className="text-sm ml-2">Active</label>
+              </>
+            )}
+          />
+        </div>
 
-      <Button type="submit" label={loading ? "Saving..." : "Update Fees"} icon={loading ? "pi pi-spin pi-spinner" : "pi pi-save"} className="w-full" disabled={loading} />
-    </form>
+        <Button type="submit" label={loading ? "Saving..." : "Update Fees"} icon={loading ? "pi pi-spin pi-spinner" : "pi pi-save"} className="w-full" disabled={loading} />
+      </form>
+    </div>
   );
 }

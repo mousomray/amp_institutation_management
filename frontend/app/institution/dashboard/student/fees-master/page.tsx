@@ -13,6 +13,8 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import EditFeesMaster from "@/components/institution/EditFeesMaster";
 import { formatDate } from "@/helper/DateTime";
+import AddFeeMaster from "@/components/institution/AddFeeMaster"
+
 
 export default function FeesMasterTable() {
   const [fees, setFees] = useState<any[]>([]);
@@ -28,6 +30,7 @@ export default function FeesMasterTable() {
 
   // dialog / edit state
   const [visible, setVisible] = useState(false);
+  const [addFromVisible, setAddFromVisible] = useState(false)
   const [selectedFeesId, setSelectedFeesId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,16 +75,26 @@ export default function FeesMasterTable() {
   );
 
   const header = (
-    <div className="flex justify-between items-center bg-primary p-3 rounded-lg">
+    <div className="flex justify-between items-center bg-primary  p-3 rounded-lg">
       <div>
-        <h2 className="text-lg font-semibold text-white">Fees Master</h2>
+        <h2 className="text-lg font-semibold text-white">Fees Setting</h2>
         <p className="text-sm text-black">List of fees master entries</p>
       </div>
 
-      <IconField iconPosition="left">
-        <InputIcon className="pi pi-search" />
-        <InputText value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder="Search fees..." />
-      </IconField>
+      <div className="flex flex-row gap-4 it">
+        <IconField iconPosition="left">
+          <InputIcon className="pi pi-search" />
+          <InputText value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder="Search fees..." />
+        </IconField>
+        <Button
+        onClick={() => setAddFromVisible(true)}
+          unstyled
+          className="bg-white text-blue-600 border border-blue-600 px-4 py-2 rounded hover:bg-blue-50"
+        >
+          Add Fee Setting
+        </Button>
+
+      </div>
     </div>
   );
 
@@ -113,8 +126,11 @@ export default function FeesMasterTable() {
         <Column header="Actions" body={actionTemplate} />
       </DataTable>
 
-      <Dialog header="Edit Fees Master" visible={visible} style={{ width: "40vw" }} onHide={() => setVisible(false)}>
+      <Dialog  visible={visible} style={{ width: "40vw" }} onHide={() => setVisible(false)}>
         <EditFeesMaster id={selectedFeesId} onClose={() => setVisible(false)} refetch={fetchFees} />
+      </Dialog>
+      <Dialog style={{ width: "40vw" }} onHide={()=> setAddFromVisible(false)} visible={addFromVisible}>
+            <AddFeeMaster onClose={() => setAddFromVisible(false)}/>
       </Dialog>
 
       <ToastContainer />

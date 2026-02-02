@@ -15,6 +15,7 @@ import ViewListIcon from "@mui/icons-material/ViewList";
 import ImportContactsIcon from "@mui/icons-material/ImportContacts";
 import SupervisedUserCircleIcon from "@mui/icons-material/SupervisedUserCircle";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import PaymentIcon from '@mui/icons-material/Payment';
 
 /* ---------------- MENU CONFIG ---------------- */
 
@@ -64,15 +65,15 @@ const sidebarItems = [
       {
         id: "3-3",
         label: "Fee Settings",
-        path: "/institution/dashboard/student/fee-master",
+        path: "/institution/dashboard/student/fees-master",
         icon: <SettingsIcon />,
 
       },
       {
         id: "3-4",
-        label: "Installment Settings",
-        path: "/institution/dashboard/student/installment-master",
-        icon: <SettingsIcon />,
+        label: "Student Fees",
+        path: "/institution/dashboard/student/fees",
+        icon: <PaymentIcon/>,
       }
     ],
   },
