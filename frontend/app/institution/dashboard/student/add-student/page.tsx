@@ -34,6 +34,8 @@ export default function Page() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signPreview, setSignPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feesLoading, setFeesLoading] = useState(false);
+  const [feesMaster, setFeesMaster] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
@@ -47,14 +49,13 @@ export default function Page() {
   }, []);
 
 
-
-
-
   useEffect(() => {
     if (token) {
-      courseDataGet()
+      courseDataGet();
+      fetchFeesMaster(); // fetch fees master list when token is ready
     }
   }, [token])
+
   const {
     register,
     handleSubmit,
@@ -96,11 +97,36 @@ export default function Page() {
         });
 
         toast.success(res.data.message);
+        // try to get created student id from response
+        const created = res?.data?.student;
+        const createdStudentId = created?._id;
+
+        console.log("Created Student ID:", res);
+
+        // assign student fees if created and course selected
+        if (createdStudentId && selectedCourse?._id) {
+          try {
+            await axiosInstance.post(
+              "/institution/assign-student-fees",
+              { studentId: createdStudentId, courseId: selectedCourse._id },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success("Fees assigned successfully");
+          } catch (assignErr: any) {
+            if (axios.isAxiosError(assignErr)) {
+              toast.error(assignErr.response?.data?.message || "Failed to assign fees");
+            } else {
+              toast.error("Failed to assign fees");
+            }
+          }
+        }
+
         reset();
         setPhotoFile(null);
         setSignatureFile(null);
         setPhotoPreview(null);
         setSignPreview(null);
+        setSelectedCourse(null); // clear selection after success
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Something went wrong");
@@ -135,6 +161,24 @@ export default function Page() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeesMaster = async () => {
+    try {
+      setFeesLoading(true);
+      const res = await axiosInstance.get("/institution/get-all-fees-master", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setFeesMaster(res.data.data || []);
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to load fees master");
+      } else {
+        toast.error("Unexpected error occurred");
+      }
+    } finally {
+      setFeesLoading(false);
     }
   };
 
@@ -352,6 +396,39 @@ export default function Page() {
                     <Calendar className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
                   )}
                 />
+              </div>
+            </div>
+          </div>
+          
+          {/* ASSIGN STUDENT FEES */}
+          <div className="space-y-4 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <i className="pi pi-money-bill text-blue-600"></i>
+              Assign Student Fees
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Selected Course Fee</label>
+                <InputText className="w-full mt-1" value={selectedCourse ? `₹${selectedCourse.fee}` : "-"} disabled />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Fees Master</label>
+                <div className="mt-1 space-y-2">
+                  {feesLoading ? (
+                    <div className="text-sm text-gray-500">Loading fees...</div>
+                  ) : feesMaster.length ? (
+                    feesMaster.map((f) => (
+                      <div key={f._id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <div className="text-sm text-gray-800">{f.name}</div>
+                        <div className="text-sm font-medium">₹{f.amount}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-500">No fees master found</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
