@@ -8,7 +8,7 @@ import { drawerToggleSlice } from "../../lib/store/features/drawerToggle";
 import AdminSideBar from "./SideBar";
 import SideBar from "../institution/SideBar";
 
-const drawerWidth = 240;
+const drawerWidth = 250;
 
 type DrawerBarProps = {
   type: boolean;
