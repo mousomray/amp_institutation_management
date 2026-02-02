@@ -279,29 +279,14 @@ const studentFeePaymentSchema = new Schema({
   }
 });
 
-const installmentPlanSchema = new Schema({
-  name: { type: String, required: true },
-  description: String,
-  userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // institution admin
-  items: [
-    {
-      name: { type: String, required: true },
-      dueDate: { type: Date, required: true },
-      amount: { type: Number, required: true, min: 0 }
-    }
-  ],
-  totalAmount: { type: Number, required: true, min: 0 }
-}, { timestamps: true });
-
 // Per-student installment items (linked to StudentFees)
 const studentInstallmentItemSchema = new Schema({
   studentFeesId: { type: Schema.Types.ObjectId, ref: "StudentFees", required: true },
-  name: { type: String, required: true },
   dueDate: { type: Date, required: true },
   amount: { type: Number, required: true, min: 0 },
   paidAmount: { type: Number, default: 0, min: 0 },
   status: { type: String, enum: ["DUE", "PARTIAL", "PAID"], default: "DUE" },
-  sequence: { type: Number } // optional ordering
+  sequence: { type: Number } 
 }, { timestamps: true });
 
 
@@ -314,7 +299,6 @@ const FeesMaster = model("FeesMaster", feesMasterSchema);
 const StudentFees = model("StudentFees", studentFeesSchema);
 const StudentFeeItems = model("StudentFeeItems", studentFeeItemsSchema);
 const StudentFeePayment = model("StudentFeePayment", studentFeePaymentSchema);
-const InstallmentPlan = model("InstallmentPlan", installmentPlanSchema);
 const StudentInstallmentItem = model("StudentInstallmentItem", studentInstallmentItemSchema);
 
 module.exports = {
@@ -326,6 +310,5 @@ module.exports = {
   StudentFees,
   StudentFeeItems,
   StudentFeePayment,
-  InstallmentPlan,
   StudentInstallmentItem
 };

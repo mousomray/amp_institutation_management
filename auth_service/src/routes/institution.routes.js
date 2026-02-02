@@ -1,6 +1,6 @@
 const router = require("express").Router();
 
-const { buyCourse, institutionLogOut, institutionDashboard, courseDetails, deleteCoures, updateCourse, studentDetails, loginInstitution, createCourse, getMyCourses, createStudent, getMyStudents, StudentDropDown, updateStudent, deleteStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI,assignStudentFees,getSingleStudentFees,listStudentFees,payStudentFees,createInstallmentPlan, listInstallmentPlans, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems  } = require("../controller/institution.controller.js");
+const { buyCourse, institutionLogOut, institutionDashboard, courseDetails, deleteCoures, updateCourse, studentDetails, loginInstitution, createCourse, getMyCourses, createStudent, getMyStudents, StudentDropDown, updateStudent, deleteStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, createInstallmentPlan, listInstallmentPlans, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, getInstallmentPreview } = require("../controller/institution.controller.js");
 const verifyJwt = require("../middleware/verifiyUser.js");
 const { upload } = require("../middleware/multer.js")
 const { uploadStudentImages } = require("../middleware/multiMulter.js")
@@ -30,9 +30,10 @@ router.post("/assign-student-fees", verifyJwt, assignStudentFees);
 router.get("/get-single-student-fees/:studentFeesId", verifyJwt, getSingleStudentFees);
 router.get("/list-student-fees", verifyJwt, listStudentFees);
 router.post("/pay-student-fees/:studentFeesId", verifyJwt, payStudentFees);
-router.post("/create-installment-plan", verifyJwt, createInstallmentPlan);
-router.get("/list-installment-plans", verifyJwt, listInstallmentPlans);
-router.post("/assign-installments-to-student-fees", verifyJwt, assignInstallmentsToStudentFees);
+// Install ments Routes
+router.get("/student-fees/:studentFeesId/installment-preview", verifyJwt,getInstallmentPreview 
+);
+router.post("/assign-installments-to-student-fees/:studentFeesId", verifyJwt, assignInstallmentsToStudentFees);
 router.post("/pay-installment/:studentFeesId/:installmentItemId", verifyJwt, payInstallment);
 router.get("/list-installment-items/:studentFeesId", verifyJwt, listInstallmentItems);
 module.exports = router;

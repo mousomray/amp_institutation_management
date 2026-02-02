@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { User, Course, Institution, Student, FeesMaster, StudentFees, StudentFeeItems, StudentFeePayment, InstallmentPlan, StudentInstallmentItem } = require("../model/model.js");
+const { User, Course, Institution, Student, FeesMaster, StudentFees, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
 const { AdminLoginSchema, CourseSchema, StudentSchema, EditSthudentSchma, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
@@ -1557,67 +1557,131 @@ const payStudentFees = async (req, res) => {
 };
 
 // Installments Handle Area 
-
-// Admin: create installment plan (Master Settings)
-const createInstallmentPlan = async (req, res) => {
+const getInstallmentPreview = async (req, res) => {
   try {
+    const { studentFeesId } = req.params;
+    const { count } = req.query;
     const userId = req.user.id;
-    const { name, description, items } = req.body;
 
-    if (!items?.length) return res.status(400).json({ message: "Installment items required" });
+    if (!count || count <= 0) {
+      return res.status(400).json({ message: "Invalid installment count" });
+    }
 
-    const totalAmount = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+    const fees = await StudentFees.findOne({
+      _id: studentFeesId,
+      userId
+    }).populate("courseId");
 
-    const plan = await InstallmentPlan.create({ name, description, items, totalAmount, userId });
+    if (!fees) {
+      return res.status(404).json({ message: "Student fees not found" });
+    }
 
-    return res.status(201).json({ message: "Installment plan created", data: plan });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Internal server error" });
+    const totalAmount = fees.totalAmount;
+    const installmentAmount = Math.round(totalAmount / count);
+
+    const durationMonths = parseInt(fees.courseId.duration); // "4 months" → 4
+    const gap = Math.floor(durationMonths / count) || 1;
+
+    const installments = [];
+    let currentDate = new Date();
+
+    for (let i = 1; i <= count; i++) {
+      const dueDate = new Date(currentDate);
+      dueDate.setMonth(dueDate.getMonth() + gap);
+
+      installments.push({
+        installmentNo: i,
+        amount: installmentAmount,
+        dueDate
+      });
+
+      currentDate = dueDate;
+    }
+
+    return res.status(200).json({
+      message: "Installment preview generated",
+      data: {
+        studentFeesId,
+        totalAmount,
+        installmentCount: count,
+        installments
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// Admin: list installment plans
-const listInstallmentPlans = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const plans = await InstallmentPlan.find({ userId }).sort({ createdAt: -1 });
-    return res.status(200).json({ message: "Installment plans fetched", data: plans });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
+
 
 // Assign installments to a StudentFees (after assignStudentFees or along with it)
 const assignInstallmentsToStudentFees = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
+    const { studentFeesId } = req.params;
+    const { installments } = req.body;
     const userId = req.user.id;
-    const { studentFeesId, installmentPlanId } = req.body;
 
-    const fees = await StudentFees.findOne({ _id: studentFeesId, userId });
-    if (!fees) return res.status(404).json({ message: "Student fees not found" });
+    const fees = await StudentFees.findOne({
+      _id: studentFeesId,
+      userId
+    }).session(session);
 
-    const plan = await InstallmentPlan.findOne({ _id: installmentPlanId, userId });
-    if (!plan) return res.status(404).json({ message: "Installment plan not found" });
+    if (!fees) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Student fees not found" });
+    }
 
-    // create per-student installment items
-    const items = plan.items.map((it, idx) => ({
+    if (!installments || !installments.length) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Installments data required" });
+    }
+
+    const total = installments.reduce((sum, i) => sum + i.amount, 0);
+
+    if (total !== fees.totalAmount) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        message: "Installment total does not match fees total amount"
+      });
+    }
+
+    const docs = installments.map((i) => ({
       studentFeesId: fees._id,
-      name: it.name,
-      dueDate: it.dueDate,
-      amount: it.amount,
-      sequence: idx + 1
+      installmentNo: i.installmentNo,
+      amount: i.amount,
+      dueDate: i.dueDate
     }));
 
-    await StudentInstallmentItem.insertMany(items);
+    await StudentInstallmentItem.insertMany(docs, { session });
 
-    return res.status(201).json({ message: "Installments assigned", data: { studentFeesId: fees._id, count: items.length } });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Internal server error" });
+    // mark fees as installment-based
+    fees.paymentType = "INSTALLMENT";
+    await fees.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json({
+      message: "Installments assigned successfully",
+      data: {
+        studentFeesId,
+        installmentCount: docs.length
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // Pay against a specific installment item
 const payInstallment = async (req, res) => {
@@ -1694,4 +1758,4 @@ const listInstallmentItems = async (req, res) => {
   }
 };
 
-module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, createInstallmentPlan, listInstallmentPlans, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems };
+module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees,getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems };
