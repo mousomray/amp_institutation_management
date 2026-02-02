@@ -64,17 +64,17 @@ const sidebarItems = [
       },
       {
         id: "3-3",
+        label: "Student Fees",
+        path: "/institution/dashboard/student/fees",
+        icon: <PaymentIcon/>,
+      },
+      {
+        id: "3-4",
         label: "Fee Settings",
         path: "/institution/dashboard/student/fees-master",
         icon: <SettingsIcon />,
 
       },
-      {
-        id: "3-4",
-        label: "Student Fees",
-        path: "/institution/dashboard/student/fees",
-        icon: <PaymentIcon/>,
-      }
     ],
   },
   {

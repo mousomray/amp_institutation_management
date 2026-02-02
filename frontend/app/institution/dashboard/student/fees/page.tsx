@@ -15,6 +15,9 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "primereact/dialog";
 import SingleStudentFees from "@/components/institution/SingleStudentFees";
 import AddPayment from "@/components/institution/AddPayment";
+import { useRef } from "react";
+import { Menu } from "primereact/menu";
+import SetInstallmentFrom from "@/components/institution/SetInstallmentFrom";
 
 export default function StudentFeesPage() {
   const [data, setData] = useState<any[]>([]);
@@ -30,6 +33,10 @@ export default function StudentFeesPage() {
   const [selectedFeesId, setSelectedFeesId] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+
+  const [installmentVisible, setInstallmentVisible] = useState(false)
+  const [selectedInstallmentId, setSelectedInstallmentId] = useState<string | null>(null)
+
 
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
@@ -91,33 +98,11 @@ export default function StudentFeesPage() {
       row.status === "PAID"
         ? "bg-green-100 text-green-800"
         : row.status === "PARTIAL"
-        ? "bg-yellow-100 text-yellow-800"
-        : "bg-red-100 text-red-800";
+          ? "bg-yellow-100 text-yellow-800"
+          : "bg-red-100 text-red-800";
     return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${cls}`}>{row.status ?? "DUE"}</span>;
   };
 
-  const actionTemplate = (row: any) => (
-    <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
-      <Button
-        icon="pi pi-eye"
-        rounded
-        text
-        onClick={() => {
-          setSelectedFeesId(row._id);
-          setDetailVisible(true);
-        }}
-      />
-      <Button
-        icon="pi pi-credit-card"
-        rounded
-        text
-        onClick={() => {
-          setSelectedPaymentId(row._id);
-          setPaymentVisible(true);
-        }}
-      />
-    </div>
-  );
 
   // Enhanced header layout
   const header = (
@@ -135,6 +120,54 @@ export default function StudentFeesPage() {
       </div>
     </div>
   );
+
+  const actionTemplate = (row: any) => {
+    const menuRef = useRef<Menu>(null);
+
+    const items = [
+      {
+        label: "View Details",
+        icon: "pi pi-eye",
+        command: () => {
+          setSelectedFeesId(row._id);
+          setDetailVisible(true);
+        },
+      },
+      {
+        label: "Full Payment",
+        icon: "pi pi-credit-card",
+        command: () => {
+          setSelectedPaymentId(row._id);
+          setPaymentVisible(true);
+        },
+      },
+
+      {
+        label: "Installment Payment",
+        icon: "pi pi-credit-card",
+        command: () => {
+          setSelectedInstallmentId(row._id)
+          setInstallmentVisible(true)
+        },
+      },
+    ];
+
+    return (
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex justify-center"
+      >
+        <Menu model={items} popup ref={menuRef} />
+
+        <Button
+          icon="pi pi-ellipsis-v"
+          rounded
+          text
+          onClick={(e) => menuRef.current?.toggle(e)}
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="card bg-white p-4 rounded-lg shadow-md">
@@ -190,7 +223,7 @@ export default function StudentFeesPage() {
       <Dialog
         header="Add Payment"
         visible={paymentVisible}
-        style={{ width: "420px" }}
+        style={{ width: "50vw" }}
         onHide={() => setPaymentVisible(false)}
       >
         <AddPayment
@@ -201,6 +234,10 @@ export default function StudentFeesPage() {
             fetchList(); // refresh list after payment
           }}
         />
+      </Dialog>
+
+      <Dialog style={{width: "30vw"}} onHide={() => setInstallmentVisible(false)} visible={installmentVisible}>
+        <SetInstallmentFrom />
       </Dialog>
 
       <ToastContainer />
