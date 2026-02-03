@@ -6,6 +6,7 @@ import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
+import { MultiSelect } from "primereact/multiselect";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "react-toastify";
@@ -35,31 +36,45 @@ const bloodGroups = [
   { label: "AB-", value: "AB-" },
 ];
 
-/* ================= HELPERS ================= */
-
-const getImageUrl = (path?: string) => {
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  return `${process.env.NEXT_PUBLIC_API_URL}/${path}`;
-};
-
 /* ================= COMPONENT ================= */
 
-export default function EditStudent({ student, refetch,onClose }: EditStudentProps) {
+export default function EditStudent({
+  student,
+  refetch,
+  onClose,
+}: EditStudentProps) {
   const {
     register,
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<StudentFormData>({
     resolver: zodResolver(StudentSchema),
   });
 
+  const [courseData, setCourseData] = useState<any[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signPreview, setSignPreview] = useState<string | null>(null);
 
-  /* ================= PREFILL ================= */
+  /* ================= FETCH COURSES ================= */
+
+  const fetchCourses = async () => {
+    try {
+      const res = await axiosInstance.get("/institution/get-course");
+      setCourseData(res.data.data || []);
+    } catch {
+      toast.error("Failed to load courses");
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  /* ================= PREFILL BASIC DATA ================= */
 
   useEffect(() => {
     if (!student) return;
@@ -77,60 +92,73 @@ export default function EditStudent({ student, refetch,onClose }: EditStudentPro
         : undefined,
     });
 
-    setPhotoPreview(getImageUrl(student.photo));
-    setSignPreview(getImageUrl(student.signature));
+    setPhotoPreview(student.photo);
+    setSignPreview(student.signature);
   }, [student, reset]);
+
+  /* ================= PREFILL COURSES (IMPORTANT FIX) ================= */
+
+  const normalizeStudentCourseIds = () => {
+  if (!student?.courses) return [];
+
+  // case 1: already populated
+  if (typeof student.courses[0] === "object") {
+    return student.courses.map((c: any) => c._id);
+  }
+
+  // case 2: only IDs
+  return student.courses;
+};
+
+ useEffect(() => {
+  if (!student || !courseData.length) return;
+
+  const studentCourseIds = normalizeStudentCourseIds();
+
+  const matchedCourses = courseData.filter(course =>
+    studentCourseIds.includes(course._id)
+  );
+
+  setSelectedCourses(matchedCourses);
+
+  // RHF compatibility (schema expects one course)
+  setValue("course" as any, matchedCourses[0] ?? undefined, {
+    shouldValidate: true,
+  });
+
+}, [student, courseData, setValue]);
 
   /* ================= SUBMIT ================= */
 
   const onSubmit = async (data: StudentFormData) => {
     try {
+      const payload = {
+        ...data,
+        courseId: selectedCourses.map((c) => c._id), 
+      };
+
       const res = await axiosInstance.put(
         `/institution/update-student/${student._id}`,
-        data
+        payload
       );
 
       toast.success(res.data.message || "Student updated successfully");
       refetch();
-     onClose()
-    } catch (error) {
-      console.error(error);
-      toast.error("Update failed");
+      onClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Update failed");
     }
   };
 
   /* ================= UI ================= */
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-20 py-5">
+
       {/* STUDENT ID */}
       <div>
         <label className="text-sm font-medium">Student ID</label>
-        <InputText
-          className="w-full mt-1"
-          {...register("studentId")}
-          disabled
-        />
-      </div>
-
-      {/* PHOTO */}
-      <div>
-        <label className="text-sm font-medium">Photo</label>
-        <div className="flex items-center gap-4 mt-1">
-          <div className="w-16 h-16 rounded-full border overflow-hidden">
-            {photoPreview ? (
-              <img
-                src={photoPreview}
-                alt="Student"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <i className="pi pi-user text-gray-400 text-2xl"></i>
-              </div>
-            )}
-          </div>
-        </div>
+        <InputText className="w-full mt-1" {...register("studentId")} disabled />
       </div>
 
       {/* NAME */}
@@ -151,6 +179,51 @@ export default function EditStudent({ student, refetch,onClose }: EditStudentPro
         <InputText className="w-full mt-1" {...register("phone")} />
       </div>
 
+      {/* COURSES */}
+      <div>
+        <label className="text-sm font-medium">Courses</label>
+
+        <MultiSelect
+          value={selectedCourses}
+          options={courseData}
+          optionLabel="name"
+          display="chip"
+          placeholder="Select courses"
+          className="w-full mt-1"
+          onChange={(e) => {
+            const list = e.value || [];
+            setSelectedCourses(list);
+            setValue("course" as any, list[0] || undefined, {
+              shouldValidate: true,
+            });
+          }}
+          itemTemplate={(course) => (
+            <div className="flex items-center gap-3 p-2">
+              {course?.image && (
+                <img
+                  src={course.image}
+                  alt={course.name}
+                  className="w-10 h-10 rounded-lg object-cover"
+                />
+              )}
+              <div>
+                <div className="font-semibold">{course.name}</div>
+                <div className="text-sm text-gray-500">₹{course.fee}</div>
+              </div>
+            </div>
+          )}
+          panelStyle={{ maxHeight: "300px" }}
+        />
+
+        {/* Hidden RHF field (Zod compatibility) */}
+        <input type="hidden" {...register("course" as any)} />
+        {(errors as any)?.course && (
+          <small className="text-red-500">
+            {(errors as any).course.message}
+          </small>
+        )}
+      </div>
+
       {/* DOB */}
       <div>
         <label className="text-sm font-medium">Date of Birth</label>
@@ -160,18 +233,12 @@ export default function EditStudent({ student, refetch,onClose }: EditStudentPro
           render={({ field }) => (
             <Calendar
               className="w-full mt-1"
-              value={field.value ?? null}
               showIcon
+              value={field.value ?? null}
               onChange={(e) => field.onChange(e.value ?? undefined)}
             />
           )}
         />
-      </div>
-
-      {/* FATHER NAME */}
-      <div>
-        <label className="text-sm font-medium">Father Name</label>
-        <InputText className="w-full mt-1" {...register("fatherName")} />
       </div>
 
       {/* BLOOD GROUP */}
@@ -200,25 +267,23 @@ export default function EditStudent({ student, refetch,onClose }: EditStudentPro
           render={({ field }) => (
             <Calendar
               className="w-full mt-1"
-              value={field.value ?? null}
               showIcon
+              value={field.value ?? null}
               onChange={(e) => field.onChange(e.value ?? undefined)}
             />
           )}
         />
       </div>
 
-      {/* SIGNATURE */}
-      <div>
-        <label className="text-sm font-medium">Signature</label>
-        {signPreview && (
-          <img
-            src={signPreview}
-            alt="Signature"
-            className="h-10 border rounded mt-1"
-          />
-        )}
-      </div>
+      {/* PHOTO PREVIEW */}
+      {photoPreview && (
+        <img src={photoPreview} className="h-16 rounded border" />
+      )}
+
+      {/* SIGNATURE PREVIEW */}
+      {signPreview && (
+        <img src={signPreview} className="h-10 rounded border" />
+      )}
 
       <Button
         type="submit"

@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { User, Course, Institution, Student, FeesMaster, StudentFees, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
-const { AdminLoginSchema, CourseSchema, StudentSchema, EditSthudentSchma, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
+const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const mongoose = require("mongoose");
@@ -427,6 +427,7 @@ const getMyStudents = async (req, res) => {
           photo: 1,
           signature: 1,
           createdAt: 1,
+          courses: 1,
           institution: {
             _id: 1,
             name: 1,
@@ -491,24 +492,74 @@ const StudentDropDown = async (req, res) => {
 const updateStudent = async (req, res) => {
   try {
     const studentId = req.params.id;
-    const parsedData = EditSthudentSchm.parse(req.body)
-    const student = await Student.findByIdAndUpdate(studentId, {
-      studentId: parsedData.studentId,
-      name: parsedData.name,
-      email: parsedData.email,
-      phone: parsedData.phone,
-      dob: parsedData.dob,
-      fatherName: parsedData.fatherName,
-      bloodGroup: parsedData.bloodGroup,
-      admissionDate: parsedData.admissionDate,
-    })
 
+    const parsedData = EditStudentSchema.parse(req.body);
 
-    return res.status(200).json({
-      message: "Student updated successfully",
-      student,
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
+    try {
+      const existingStudent = await Student.findById(studentId).session(session);
+      if (!existingStudent) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const oldCourses = existingStudent.courses.map(id => id.toString());
+      const newCourses = parsedData.courseId || [];
+
+      
+      const coursesToAdd = newCourses.filter(id => !oldCourses.includes(id));
+      const coursesToRemove = oldCourses.filter(id => !newCourses.includes(id));
+
+      
+      const updatedStudent = await Student.findByIdAndUpdate(
+        studentId,
+        {
+          studentId: parsedData.studentId,
+          name: parsedData.name,
+          email: parsedData.email,
+          phone: parsedData.phone,
+          dob: parsedData.dob,
+          fatherName: parsedData.fatherName,
+          bloodGroup: parsedData.bloodGroup,
+          admissionDate: parsedData.admissionDate,
+          courses: newCourses,
+        },
+        { new: true, session }
+      );
+
+      // ➕ Add student to new courses
+      if (coursesToAdd.length) {
+        await Course.updateMany(
+          { _id: { $in: coursesToAdd } },
+          { $addToSet: { students: studentId } },
+          { session }
+        );
+      }
+
+      // ➖ Remove student from removed courses
+      if (coursesToRemove.length) {
+        await Course.updateMany(
+          { _id: { $in: coursesToRemove } },
+          { $pull: { students: studentId } },
+          { session }
+        );
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res.status(200).json({
+        message: "Student updated successfully",
+        student: updatedStudent,
+      });
+
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
+    }
 
   } catch (error) {
     if (error.name === "ZodError") {
@@ -523,7 +574,8 @@ const updateStudent = async (req, res) => {
       message: "Internal server error",
     });
   }
-}
+};
+
 
 const deleteStudent = async (req, res) => {
   try {
