@@ -168,6 +168,7 @@ export default function StudentTable() {
       </IconField>
     </div>
   );
+  console.log("selected student", selectedStudent)
 
   /* ================= RENDER ================= */
   return (
@@ -225,6 +226,7 @@ export default function StudentTable() {
         visible={visible}
         style={{ width: "50vw" }}
         onHide={() => setVisible(false)}
+        
       >
         <EditStudent
           onClose={() => setVisible(false)}

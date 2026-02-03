@@ -70,7 +70,7 @@ const StudentSchema = zod.object({
   courseId: zod.array(zod.string()).optional()
 });
 
-const EditSthudentSchm = zod.object({
+const EditStudentSchema = zod.object({
   studentId: zod.string().min(1, "Student ID is required"),
 
   name: zod.string().min(1, "Name is required"),
@@ -111,6 +111,7 @@ const EditSthudentSchm = zod.object({
       (date) => date === undefined || !isNaN(date.getTime()),
       { message: "Invalid admission date" }
     ),
+  courseId: zod.array(zod.string()).optional()
 })
 
 const FeesMasterSchema = zod.object({
@@ -190,7 +191,7 @@ module.exports = {
   institutionSchema,
   CourseSchema,
   StudentSchema,
-  EditSthudentSchm,
+  EditStudentSchema,
   FeesMasterSchema,
   EditFeesMasterSchema,
   createStudentFeesSchema,
