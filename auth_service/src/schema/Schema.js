@@ -67,7 +67,7 @@ const StudentSchema = zod.object({
     .string()
     .refine((date) => !date || !isNaN(Date.parse(date)), 'Invalid establish date')
     .optional(),
-  courseId: zod.string().optional()
+  courseId: zod.array(zod.string()).optional()
 });
 
 const EditSthudentSchm = zod.object({

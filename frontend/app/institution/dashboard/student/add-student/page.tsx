@@ -13,6 +13,7 @@ import { ToastContainer, toast } from "react-toastify";
 import axiosInstance from "@/service/axios.service";
 import { z } from "zod";
 import axios from "axios";
+import { MultiSelect } from "primereact/multiselect";
 
 type StudentFormData = z.infer<typeof StudentSchema>;
 
@@ -38,11 +39,11 @@ export default function Page() {
   const [feesMaster, setFeesMaster] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
-  
+  const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
-  
+
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
@@ -61,6 +62,7 @@ export default function Page() {
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<StudentFormData>({
     resolver: zodResolver(StudentSchema),
@@ -83,7 +85,11 @@ export default function Page() {
       if (data.fatherName) formData.append("fatherName", data.fatherName);
       if (data.bloodGroup) formData.append("bloodGroup", data.bloodGroup);
       if (data.admissionDate) formData.append("admissionDate", data.admissionDate.toISOString());
-      if (selectedCourse) formData.append("courseId", selectedCourse._id); // send course ID
+
+      const courseIds = (selectedCourses || []).map((c: any) => c._id);
+      if (courseIds.length) {
+        courseIds.forEach((id: string) => formData.append("courseId[]", id)); // multiple
+      }
 
       // Files
       formData.append("image", photoFile);
@@ -93,22 +99,20 @@ export default function Page() {
         const res = await axiosInstance.post("/institution/create-student", formData, {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
           },
         });
 
         toast.success(res.data.message);
-        // try to get created student id from response
         const created = res?.data?.student;
         const createdStudentId = created?._id;
 
-        console.log("Created Student ID:", res);
-
-        // assign student fees if created and course selected
-        if (createdStudentId && selectedCourse?._id) {
+        // assign student fees ONCE (backend will aggregate student's courses)
+        if (createdStudentId && selectedCourses && selectedCourses.length) {
           try {
             await axiosInstance.post(
               "/institution/assign-student-fees",
-              { studentId: createdStudentId, courseId: selectedCourse._id },
+              { studentId: createdStudentId },
               { headers: { Authorization: `Bearer ${token}` } }
             );
             toast.success("Fees assigned successfully");
@@ -121,20 +125,20 @@ export default function Page() {
           }
         }
 
-        reset();
-        setPhotoFile(null);
-        setSignatureFile(null);
-        setPhotoPreview(null);
-        setSignPreview(null);
-        setSelectedCourse(null); // clear selection after success
+        // reset();
+        // setPhotoFile(null);
+        // setSignatureFile(null);
+        // setPhotoPreview(null);
+        // setSignPreview(null);
+        // setSelectedCourses([]); // clear selection after success
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Something went wrong");
-      reset();
-        setPhotoFile(null);
-        setSignatureFile(null);
-        setPhotoPreview(null);
-        setSignPreview(null);
+      // reset();
+      // setPhotoFile(null);
+      // setSignatureFile(null);
+      // setPhotoPreview(null);
+      // setSignPreview(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -197,14 +201,14 @@ export default function Page() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          
+
           {/* Photo & Student ID Section */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <i className="pi pi-id-card text-blue-600"></i>
               Identity Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Student ID */}
               <div className="space-y-2">
@@ -228,7 +232,7 @@ export default function Page() {
                 <label className="text-sm font-semibold text-gray-700">
                   Student Photo <span className="text-red-500">*</span>
                 </label>
-                <div 
+                <div
                   className="flex items-center gap-4 cursor-pointer group"
                   onClick={() => photoInputRef.current?.click()}
                 >
@@ -348,43 +352,36 @@ export default function Page() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">Select Course</label>
-                <Controller
-                  name="course"
-                  control={control}
-                  render={({ field }) => (
-                    <Dropdown
-                      {...field}
-                      value={selectedCourse}
-                      options={courseData}
-                      optionLabel="name"
-                      placeholder="Choose a course"
-                      className="w-full"
-                      onChange={(e) => {
-                        setSelectedCourse(e.value);
-                        field.onChange(e.value);
-                      }}
-                      itemTemplate={(course) => (
-                        <div className="flex items-center gap-3 p-2">
-                          <img src={course.image} alt={course.name} className="w-10 h-10 object-cover rounded-lg" />
-                          <div>
-                            <div className="font-semibold text-gray-800">{course.name}</div>
-                            <div className="text-sm text-gray-500">₹{course.fee}</div>
-                          </div>
-                        </div>
-                      )}
-                      valueTemplate={(course) =>
-                        course ? (
-                          <div className="flex items-center gap-3">
-                            <img src={course.image} alt={course.name} className="w-8 h-8 object-cover rounded-lg" />
-                            <span className="font-medium">{course.name}</span>
-                          </div>
-                        ) : (
-                          <span>Select course</span>
-                        )
-                      }
-                    />
+                {/* Use state-driven MultiSelect; update RHF hidden field with first selected course */}
+                <MultiSelect
+                  value={selectedCourses}
+                  options={courseData}
+                  optionLabel="name"
+                  placeholder="Choose one or more courses"
+                  className="w-full"
+                  onChange={(e) => {
+                    const list = e.value || [];
+                    setSelectedCourses(list);
+                    // satisfy StudentSchema expecting a single object
+                    setValue("course" as any, list[0] || undefined, { shouldValidate: true });
+                  }}
+                  itemTemplate={(course) => (
+                    <div className="flex items-center gap-3 p-2">
+                      {course?.image && <img src={course.image} alt={course.name} className="w-10 h-10 object-cover rounded-lg" />}
+                      <div>
+                        <div className="font-semibold text-gray-800">{course.name}</div>
+                        <div className="text-sm text-gray-500">₹{course.fee}</div>
+                      </div>
+                    </div>
                   )}
+                  panelStyle={{ maxHeight: "300px" }}
+                  display="chip"
                 />
+                {/* hidden field to satisfy zod schema expecting an object */}
+                <input type="hidden" {...register("course" as any)} />
+                {errors as any && (errors as any).course && (
+                  <small className="text-red-500">{(errors as any).course.message as any}</small>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -399,20 +396,28 @@ export default function Page() {
               </div>
             </div>
           </div>
-          
+
           {/* ASSIGN STUDENT FEES */}
           <div className="space-y-4 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <i className="pi pi-money-bill text-blue-600"></i>
               Assign Student Fees
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Selected Course Fee</label>
-                <InputText className="w-full mt-1" value={selectedCourse ? `₹${selectedCourse.fee}` : "-"} disabled />
+                <InputText
+                  className="w-full mt-1"
+                  value={
+                    selectedCourses && selectedCourses.length
+                      ? `₹${selectedCourses.reduce((s, c) => s + (c?.fee ?? 0), 0)}`
+                      : "-"
+                  }
+                  disabled
+                />
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium">Fees Master</label>
                 <div className="mt-1 space-y-2">
@@ -438,7 +443,7 @@ export default function Page() {
             <label className="text-sm font-semibold text-gray-700">
               Signature <span className="text-red-500">*</span>
             </label>
-            <div 
+            <div
               className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all bg-gradient-to-br from-blue-50 to-indigo-50 group"
               onClick={() => signatureInputRef.current?.click()}
             >

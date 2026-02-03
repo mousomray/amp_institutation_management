@@ -221,63 +221,51 @@ const createStudent = async (req, res) => {
   session.startTransaction();
 
   try {
-
+    // ✅ Parse body
     const parsedData = StudentSchema.parse(req.body);
 
     const userId = req.user?._id;
     if (!userId) {
       await session.abortTransaction();
-      session.endSession();
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-
+    // ✅ Validate institution user
     const institutionUser = await User.findById(userId).session(session);
     if (!institutionUser || institutionUser.role !== "institution") {
       await session.abortTransaction();
-      session.endSession();
-      return res
-        .status(403)
-        .json({ message: "Only institutions can create students" });
+      return res.status(403).json({ message: "Only institutions can create students" });
     }
+
     const institution = await Institution.findOne({
       adminUser: institutionUser._id,
     }).session(session);
 
     if (!institution) {
       await session.abortTransaction();
-      session.endSession();
       return res.status(404).json({ message: "Institution not found" });
     }
 
     // ✅ Validate files
     if (!req.files?.image || !req.files?.signature) {
       await session.abortTransaction();
-      session.endSession();
-      return res
-        .status(400)
-        .json({ message: "Image and signature are required" });
+      return res.status(400).json({ message: "Image and signature are required" });
     }
 
-
-    const emailExists = await User.findOne({
-      email: parsedData.email,
-    }).session(session);
-
+    // ✅ Check email
+    const emailExists = await User.findOne({ email: parsedData.email }).session(session);
     if (emailExists) {
       await session.abortTransaction();
-      session.endSession();
       return res.status(409).json({ message: "Email already exists" });
     }
 
-
+    // ✅ Upload files
     const photoUrl = await uploadSingleImage(req.files.image[0]);
     const signatureUrl = await uploadSingleImage(req.files.signature[0]);
 
-
     const plainPassword = passwordGenerator();
 
-
+    // ✅ Create user
     const [user] = await User.create(
       [
         {
@@ -289,7 +277,7 @@ const createStudent = async (req, res) => {
       { session }
     );
 
-
+    // ✅ Create student
     const [student] = await Student.create(
       [
         {
@@ -304,48 +292,55 @@ const createStudent = async (req, res) => {
           photo: photoUrl,
           signature: signatureUrl,
           user: user._id,
-          email: parsedData.email
+          email: parsedData.email,
         },
       ],
       { session }
     );
 
-
+    // ✅ Link user → student
     await User.findByIdAndUpdate(
       user._id,
       { student: student._id },
       { session }
     );
 
-    // ✅ COURSE LINKING (IMPORTANT FIX)
-    if (parsedData.courseId) {
-      const course = await Course.findById(parsedData.courseId).session(
-        session
-      );
+    // =====================================================
+    // ✅ MULTIPLE COURSE LINKING (FIXED & SAFE)
+    // =====================================================
+    if (parsedData.courseId?.length) {
+      const courses = await Course.find({
+        _id: { $in: parsedData.courseId },
+      }).session(session);
+      console.log("courses==>", courses.length, parsedData.courseId.length);
+      console.log("courses==>", courses, parsedData.courseId);
 
-      if (!course) {
+      if (courses.length !== parsedData.courseId.length) {
         await session.abortTransaction();
-        session.endSession();
-        return res.status(404).json({ message: "Course not found" });
+        return res.status(404).json({ message: "One or more courses not found" });
       }
 
-      // ✔ Atomic & safe
+      // ✅ Add courses to student
       await Student.findByIdAndUpdate(
         student._id,
-        { $addToSet: { courses: course._id } },
+        {
+          $addToSet: {
+            courses: { $each: courses.map((c) => c._id) },
+          },
+        },
         { session }
       );
 
-      await Course.findByIdAndUpdate(
-        course._id,
+      // ✅ Add student to courses
+      await Course.updateMany(
+        { _id: { $in: courses.map((c) => c._id) } },
         { $addToSet: { students: student._id } },
         { session }
       );
     }
 
-    // ✅ Commit transaction
+    // ✅ Commit
     await session.commitTransaction();
-    session.endSession();
 
     return res.status(201).json({
       message: "Student created successfully",
@@ -355,17 +350,18 @@ const createStudent = async (req, res) => {
         password: plainPassword,
       },
     });
+
   } catch (error) {
     console.error(error);
-
     await session.abortTransaction();
-    session.endSession();
-
     return res.status(500).json({
       message: error?.message || "Internal server error",
     });
+  } finally {
+    session.endSession();
   }
 };
+
 
 const getMyStudents = async (req, res) => {
   try {

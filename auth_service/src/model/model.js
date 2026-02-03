@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 const { Schema, model } = mongoose;
 
@@ -65,12 +64,12 @@ const courseSchema = new Schema(
       ref: "Institution",
       required: true,
     },
-    students: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Student",
-      },
-    ],
+
+    /* make students an explicit array with default so push/update works reliably */
+    students: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Student" }],
+      default: [],
+    },
   },
   { timestamps: true }
 );
@@ -117,13 +116,11 @@ const studentSchema = new Schema(
       required: true,
     },
 
-    /* 🔗 Student → Multiple Courses */
-    courses: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Course",
-      },
-    ],
+    /* 🔗 Student → Multiple Courses (explicit array with default) */
+    courses: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Course" }],
+      default: [],
+    },
 
     /* 🔗 Student ↔ User (1–1) */
     user: {
