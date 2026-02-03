@@ -25,6 +25,7 @@ export default function StudentTable() {
   const [visible, setVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [globalFilter, setGlobalFilter] = useState<string>("");
 
   // ✅ Server pagination
   const [pagination, setPagination] = useState({
@@ -158,7 +159,12 @@ export default function StudentTable() {
 
       <IconField iconPosition="left">
         <InputIcon className="pi pi-search" />
-        <InputText placeholder="Search (server-side)" disabled />
+        <InputText
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          placeholder="Search Students"
+          className="p-inputtext-sm"
+        />
       </IconField>
     </div>
   );
@@ -188,6 +194,15 @@ export default function StudentTable() {
         emptyMessage="No students found"
         onRowClick={onRowClick}
         selectionMode="single"
+        globalFilter={globalFilter}
+        globalFilterFields={[
+          "studentId",
+          "name",
+          "email",
+          "phone",
+          "fatherName",
+          "bloodGroup",
+        ]}
       >
         <Column field="studentId" header="Student ID" />
         <Column header="Photo" body={photoTemplate} />

@@ -19,6 +19,9 @@ export default function IssuedBooksTable() {
   const [allIssues, setAllIssues] = useState<any[]>([]); // full dataset from backend
   const [globalFilter, setGlobalFilter] = useState("");
   const [loading, setLoading] = useState(false);
+   const [page, setPage] = useState(1); // current page
+  const [rows, setRows] = useState(5); // rows per page
+  const [totalRecords, setTotalRecords] = useState(0);
   const router = useRouter();
 
   const [token, setToken] = useState<string | null>(null);
@@ -68,7 +71,7 @@ export default function IssuedBooksTable() {
 
   useEffect(() => {
     if (token) fetchAllIssues();
-  }, [token]);
+  }, [token, page, rows]);
 
   // fetch full list (backend pagination not available)
   const fetchAllIssues = async () => {
@@ -79,8 +82,9 @@ export default function IssuedBooksTable() {
       });
 
       // backend shape: { success, message, total, data: [...] } in sample
-      const data = res.data?.data ?? res.data ?? [];
+      const data = res.data?.data ?? [];
       setAllIssues(Array.isArray(data) ? data : []);
+      setTotalRecords(res.data?.total ?? data.length ?? 0);
     } catch (err: any) {
       if (axios.isAxiosError(err)) {
         toast.error(err.response?.data?.message || "Failed to load issued books");
@@ -223,15 +227,22 @@ export default function IssuedBooksTable() {
     <div className="card bg-white p-6 rounded-xl shadow-md border border-gray-100">
       <Menu model={menuModel} popup ref={menu} />
       <DataTable
-        value={filtered}
+        value={allIssues}
         loading={loading}
         paginator
-        rows={5}
+        lazy
+        first={(page - 1) * rows}      // starting index
+        rows={rows}
+        totalRecords={totalRecords}     // total from backend
         rowsPerPageOptions={[5, 10, 25, 50]}
+        onPage={(e) => {
+          setPage((e.page ?? 0) + 1);  // e.page is zero-based
+          setRows(e.rows ?? 5);
+        }}
         stripedRows
         responsiveLayout="scroll"
         header={header}
-        emptyMessage="No issued books found"
+         emptyMessage="No issued books found"
         selectionMode="single"
         className="text-sm"
       >

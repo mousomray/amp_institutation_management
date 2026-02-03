@@ -1177,23 +1177,35 @@ const listStudentFees = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const data = await StudentFees.aggregate([
-      {
-        $match: {
-          userId: new mongoose.Types.ObjectId(userId)
-        }
-      },
+    // Get page & limit from query params, default to page 1, limit 10
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-      /* ---------- pick latest fees per student + course ---------- */
-      {
-        $sort: { createdAt: -1 }
-      },
+    // First, get total count of unique student-course combinations
+    const totalCountAgg = await StudentFees.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: {
             studentId: "$studentId",
             courseId: "$courseId"
-          },
+          }
+        }
+      },
+      { $count: "total" }
+    ]);
+
+    const total = totalCountAgg[0]?.total || 0;
+
+    // Main aggregation with pagination
+    const data = await StudentFees.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: { studentId: "$studentId", courseId: "$courseId" },
           studentFeesId: { $first: "$_id" },
           totalAmount: { $first: "$totalAmount" },
           paidAmount: { $first: "$paidAmount" },
@@ -1202,6 +1214,10 @@ const listStudentFees = async (req, res) => {
           userId: { $first: "$userId" }
         }
       },
+
+      /* ---------- Pagination ---------- */
+      { $skip: skip },
+      { $limit: limit },
 
       /* ---------- Student ---------- */
       {
@@ -1263,7 +1279,6 @@ const listStudentFees = async (req, res) => {
               }
             }
           },
-
           masterFees: {
             $map: {
               input: {
@@ -1302,26 +1317,23 @@ const listStudentFees = async (req, res) => {
           paidAmount: 1,
           dueAmount: 1,
           status: 1,
-
-          student: {
-            name: "$student.name"
-          },
-          course: {
-            name: "$course.name"
-          },
-
+          student: { name: "$student.name" },
+          course: { name: "$course.name" },
           courseFee: 1,
-          masterFees: {
-            amount: 1,
-            "fee.name": 1
-          }
+          masterFees: { amount: 1, "fee.name": 1 }
         }
       }
     ]);
 
     res.status(200).json({
       message: "Student fees list fetched",
-      data
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
     });
 
   } catch (error) {
@@ -1329,7 +1341,6 @@ const listStudentFees = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 
 const getSingleStudentFees = async (req, res) => {

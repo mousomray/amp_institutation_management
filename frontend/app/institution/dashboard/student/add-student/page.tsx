@@ -13,6 +13,7 @@ import { ToastContainer, toast } from "react-toastify";
 import axiosInstance from "@/service/axios.service";
 import { z } from "zod";
 import axios from "axios";
+import { MultiSelect } from "primereact/multiselect";
 
 type StudentFormData = z.infer<typeof StudentSchema>;
 
@@ -38,11 +39,11 @@ export default function Page() {
   const [feesMaster, setFeesMaster] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
-  
+  const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
-  
+
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
@@ -83,8 +84,9 @@ export default function Page() {
       if (data.fatherName) formData.append("fatherName", data.fatherName);
       if (data.bloodGroup) formData.append("bloodGroup", data.bloodGroup);
       if (data.admissionDate) formData.append("admissionDate", data.admissionDate.toISOString());
-      if (selectedCourse) formData.append("courseId", selectedCourse._id); // send course ID
-
+      selectedCourses.forEach((course, index) => {
+        formData.append(`courseIds[${index}]`, course._id);
+      });
       // Files
       formData.append("image", photoFile);
       formData.append("signature", signatureFile);
@@ -104,11 +106,11 @@ export default function Page() {
         console.log("Created Student ID:", res);
 
         // assign student fees if created and course selected
-        if (createdStudentId && selectedCourse?._id) {
+        if (createdStudentId && selectedCourses.length > 0) {
           try {
             await axiosInstance.post(
               "/institution/assign-student-fees",
-              { studentId: createdStudentId, courseId: selectedCourse._id },
+              { studentId: createdStudentId },
               { headers: { Authorization: `Bearer ${token}` } }
             );
             toast.success("Fees assigned successfully");
@@ -126,15 +128,15 @@ export default function Page() {
         setSignatureFile(null);
         setPhotoPreview(null);
         setSignPreview(null);
-        setSelectedCourse(null); // clear selection after success
+        setSelectedCourses([]); // clear selection after success
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Something went wrong");
       reset();
-        setPhotoFile(null);
-        setSignatureFile(null);
-        setPhotoPreview(null);
-        setSignPreview(null);
+      setPhotoFile(null);
+      setSignatureFile(null);
+      setPhotoPreview(null);
+      setSignPreview(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -184,6 +186,11 @@ export default function Page() {
 
   console.log("=>", courseData)
 
+  const totalCourseFee = selectedCourses.reduce(
+  (sum, c) => sum + (c.fee || 0),
+  0
+);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8">
       <Card className="w-full max-w-4xl shadow-2xl border-0">
@@ -197,14 +204,14 @@ export default function Page() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          
+
           {/* Photo & Student ID Section */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <i className="pi pi-id-card text-blue-600"></i>
               Identity Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Student ID */}
               <div className="space-y-2">
@@ -228,7 +235,7 @@ export default function Page() {
                 <label className="text-sm font-semibold text-gray-700">
                   Student Photo <span className="text-red-500">*</span>
                 </label>
-                <div 
+                <div
                   className="flex items-center gap-4 cursor-pointer group"
                   onClick={() => photoInputRef.current?.click()}
                 >
@@ -352,36 +359,31 @@ export default function Page() {
                   name="course"
                   control={control}
                   render={({ field }) => (
-                    <Dropdown
+                    <MultiSelect
                       {...field}
-                      value={selectedCourse}
+                      value={selectedCourses}
                       options={courseData}
                       optionLabel="name"
-                      placeholder="Choose a course"
+                      placeholder="Select Courses"
                       className="w-full"
+                      display="chip"
                       onChange={(e) => {
-                        setSelectedCourse(e.value);
+                        setSelectedCourses(e.value);
                         field.onChange(e.value);
                       }}
                       itemTemplate={(course) => (
-                        <div className="flex items-center gap-3 p-2">
-                          <img src={course.image} alt={course.name} className="w-10 h-10 object-cover rounded-lg" />
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={course.image}
+                            alt={course.name}
+                            className="w-8 h-8 object-cover rounded-lg"
+                          />
                           <div>
-                            <div className="font-semibold text-gray-800">{course.name}</div>
+                            <div className="font-semibold">{course.name}</div>
                             <div className="text-sm text-gray-500">₹{course.fee}</div>
                           </div>
                         </div>
                       )}
-                      valueTemplate={(course) =>
-                        course ? (
-                          <div className="flex items-center gap-3">
-                            <img src={course.image} alt={course.name} className="w-8 h-8 object-cover rounded-lg" />
-                            <span className="font-medium">{course.name}</span>
-                          </div>
-                        ) : (
-                          <span>Select course</span>
-                        )
-                      }
                     />
                   )}
                 />
@@ -399,20 +401,20 @@ export default function Page() {
               </div>
             </div>
           </div>
-          
+
           {/* ASSIGN STUDENT FEES */}
           <div className="space-y-4 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <i className="pi pi-money-bill text-blue-600"></i>
               Assign Student Fees
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Selected Course Fee</label>
-                <InputText className="w-full mt-1" value={selectedCourse ? `₹${selectedCourse.fee}` : "-"} disabled />
+                <InputText className="w-full mt-1" value={selectedCourses.length ? `₹${totalCourseFee}` : "-"} disabled />
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium">Fees Master</label>
                 <div className="mt-1 space-y-2">
@@ -438,7 +440,7 @@ export default function Page() {
             <label className="text-sm font-semibold text-gray-700">
               Signature <span className="text-red-500">*</span>
             </label>
-            <div 
+            <div
               className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all bg-gradient-to-br from-blue-50 to-indigo-50 group"
               onClick={() => signatureInputRef.current?.click()}
             >
