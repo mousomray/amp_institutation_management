@@ -1201,14 +1201,32 @@ const listStudentFees = async (req, res) => {
     const userId = req.user.id;
 
     const data = await StudentFees.aggregate([
-      /* 1️⃣ Match user */
       {
         $match: {
           userId: new mongoose.Types.ObjectId(userId)
         }
       },
 
-      /* 2️⃣ Student */
+      /* ---------- pick latest fees per student + course ---------- */
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $group: {
+          _id: {
+            studentId: "$studentId",
+            courseId: "$courseId"
+          },
+          studentFeesId: { $first: "$_id" },
+          totalAmount: { $first: "$totalAmount" },
+          paidAmount: { $first: "$paidAmount" },
+          dueAmount: { $first: "$dueAmount" },
+          status: { $first: "$status" },
+          userId: { $first: "$userId" }
+        }
+      },
+
+      /* ---------- Student ---------- */
       {
         $lookup: {
           from: "students",
@@ -1285,7 +1303,6 @@ const listStudentFees = async (req, res) => {
               }
             }
           },
-
           masterFees: {
             $map: {
               input: {
@@ -1325,27 +1342,37 @@ const listStudentFees = async (req, res) => {
       /* 7️⃣ Final response */
       {
         $project: {
-          _id: 0,
-          studentFeesId: "$_id",
-
-          student: {
-            name: "$student.name"
-          },
-
+          _id: "$studentFeesId",
           totalAmount: 1,
           paidAmount: 1,
           dueAmount: 1,
           status: 1,
 
-          courses: 1,
-          masterFees: 1
+          student: {
+            name: "$student.name"
+          },
+          course: {
+            name: "$course.name"
+          },
+
+          courseFee: 1,
+          masterFees: {
+            amount: 1,
+            "fee.name": 1
+          }
         }
       }
     ]);
 
     res.status(200).json({
       message: "Student fees list fetched",
-      data
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
     });
 
   } catch (error) {

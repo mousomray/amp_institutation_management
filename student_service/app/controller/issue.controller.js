@@ -161,88 +161,99 @@ class IssueController {
 
 
     // Get all issued books (with full details)
-    async getAllIssues(req, res) {
-        try {
-            const userId = req.user.id
+  async getAllIssues(req, res) {
+  try {
+    const userId = req.user.id;
 
-            const issues = await IssueModel.aggregate([
-                {
-                    $match: {
-                        userId: userId
-                    }
-                },
+    // Get page and limit from query params, default to page 1, limit 10
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-                {
-                    $lookup: {
-                        from: 'books',
-                        localField: 'book_id',
-                        foreignField: '_id',
-                        as: 'book'
-                    }
-                },
-                {
-                    $unwind: {
-                        path: '$book',
-                        preserveNullAndEmptyArrays: true
-                    }
-                },
+    // First, get total count of issues
+    const totalCountAgg = await IssueModel.aggregate([
+      { $match: { userId: userId } },
+      { $count: "total" }
+    ]);
+    const total = totalCountAgg[0]?.total || 0;
 
-                {
-                    $project: {
-                        book_id: 1,
-                        student_id: 1,
-                        issue_date: 1,
-                        return_date: 1,
-                        actual_return_date: 1,
-                        book_fee: 1,
-                        late_fine: 1,
-                        total_amount: 1,
-                        status: 1,
+    // Get paginated issues
+    const issues = await IssueModel.aggregate([
+      { $match: { userId: userId } },
 
-                        book: {
-                            _id: 1,
-                            name: 1,
-                            authorName: 1,
-                            language: 1,
-                            image: 1
-                        }
-                    }
-                },
-
-                { $sort: { createdAt: -1 } }
-            ])
-
-            const finalResult = []
-
-            for (let issue of issues) {
-                let studentData = null
-
-                try {
-                    studentData = await getStudentFromStudentService(issue.student_id, req)
-                } catch (err) {
-                    console.log('Student service error:', err.message)
-                }
-
-                finalResult.push({
-                    ...issue,
-                    student: studentData || null
-                })
-            }
-
-            return res.status(200).json({
-                success: true,
-                total: finalResult.length,
-                data: finalResult
-            })
-
-        } catch (error) {
-            console.error(error)
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to fetch issued books'
-            })
+      // Lookup book
+      {
+        $lookup: {
+          from: "books",
+          localField: "book_id",
+          foreignField: "_id",
+          as: "book"
         }
+      },
+      { $unwind: { path: "$book", preserveNullAndEmptyArrays: true } },
+
+      // Project fields
+      {
+        $project: {
+          book_id: 1,
+          student_id: 1,
+          issue_date: 1,
+          return_date: 1,
+          actual_return_date: 1,
+          book_fee: 1,
+          late_fine: 1,
+          total_amount: 1,
+          status: 1,
+          book: {
+            _id: 1,
+            name: 1,
+            authorName: 1,
+            language: 1,
+            image: 1
+          }
+        }
+      },
+
+      { $sort: { createdAt: -1 } },
+
+      // Pagination
+      { $skip: skip },
+      { $limit: limit }
+    ]);
+
+    // Fetch student data for each issue
+    const finalResult = [];
+    for (let issue of issues) {
+      let studentData = null;
+      try {
+        studentData = await getStudentFromStudentService(issue.student_id, req);
+      } catch (err) {
+        console.log("Student service error:", err.message);
+      }
+
+      finalResult.push({
+        ...issue,
+        student: studentData || null
+      });
     }
+
+    return res.status(200).json({
+      success: true,
+      total,       // total number of issues (all pages)
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+      data: finalResult
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch issued books"
+    });
+  }
+}
 
 
 

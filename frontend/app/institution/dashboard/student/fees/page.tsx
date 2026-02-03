@@ -48,25 +48,27 @@ export default function StudentFeesPage() {
     if (token) fetchList();
   }, [token, page, rows]);
 
-  const fetchList = async () => {
-    try {
-      setLoading(true);
-      const res = await axiosInstance.get("/institution/list-student-fees", {
-        params: { page, limit: rows },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setData(res.data.data || []);
-      setTotalRecords(res.data.totalCount ?? res.data.data?.length ?? 0);
-    } catch (error: any) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to load student fees");
-      } else {
-        toast.error("Unexpected error occurred");
-      }
-    } finally {
-      setLoading(false);
+ const fetchList = async () => {
+  try {
+    setLoading(true);
+    const res = await axiosInstance.get("/institution/list-student-fees", {
+      params: { page, limit: rows },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    // Backend returns data and pagination info
+    setData(res.data.data || []);
+    setTotalRecords(res.data.pagination?.total || 0);
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      toast.error(error.response?.data?.message || "Failed to load student fees");
+    } else {
+      toast.error("Unexpected error occurred");
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Courses renderer: list courses with amounts + subtotal
   const coursesBody = (row: any) => {
@@ -185,26 +187,26 @@ export default function StudentFeesPage() {
       </div>
 
       <DataTable
-        value={data}
-        loading={loading}
-        paginator
-        lazy
-        first={(page - 1) * rows}
-        rows={rows}
-        totalRecords={totalRecords}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        onPage={(e) => {
-          setPage((e.page ?? 0) + 1);
-          setRows(e.rows ?? 5);
-        }}
-        className="shadow-sm rounded-lg"
-        tableStyle={{ minWidth: "900px" }}
-        rowHover
-        stripedRows
-        responsiveLayout="scroll"
-        globalFilter={globalFilter}
-        emptyMessage="No student fees found"
-        selectionMode="single"
+         value={data}
+  loading={loading}
+  paginator
+  lazy
+  first={(page - 1) * rows}
+  rows={rows}
+  totalRecords={totalRecords}
+  rowsPerPageOptions={[5, 10, 25, 50]}
+  onPage={(e) => {
+    if (e.page !== undefined) setPage(e.page + 1);   
+    if (e.rows !== undefined) setRows(e.rows);        
+  }}
+  className="shadow-sm rounded-lg"
+  tableStyle={{ minWidth: "900px" }}
+  rowHover
+  stripedRows
+  responsiveLayout="scroll"
+  globalFilter={globalFilter}
+  emptyMessage="No student fees found"
+  selectionMode="single"
       >
         <Column header="Student" body={(r) => <div className="font-medium text-gray-800">{r.student?.name ?? "-"}</div>} />
         <Column header="Courses" body={coursesBody} style={{ minWidth: "300px" }} />

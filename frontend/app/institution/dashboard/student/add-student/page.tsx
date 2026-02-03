@@ -14,6 +14,7 @@ import axiosInstance from "@/service/axios.service";
 import { z } from "zod";
 import axios from "axios";
 import { MultiSelect } from "primereact/multiselect";
+import { MultiSelect } from "primereact/multiselect";
 
 type StudentFormData = z.infer<typeof StudentSchema>;
 
@@ -41,8 +42,11 @@ export default function Page() {
   const [courseData, setCourseData] = useState<any[]>([]);
   const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
 
+  const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -112,6 +116,7 @@ export default function Page() {
           try {
             await axiosInstance.post(
               "/institution/assign-student-fees",
+              { studentId: createdStudentId },
               { studentId: createdStudentId },
               { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -188,6 +193,11 @@ export default function Page() {
 
   console.log("=>", courseData)
 
+  const totalCourseFee = selectedCourses.reduce(
+  (sum, c) => sum + (c.fee || 0),
+  0
+);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8">
       <Card className="w-full max-w-4xl shadow-2xl border-0">
@@ -202,12 +212,14 @@ export default function Page() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
+
           {/* Photo & Student ID Section */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <i className="pi pi-id-card text-blue-600"></i>
               Identity Information
             </h3>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Student ID */}
@@ -232,6 +244,7 @@ export default function Page() {
                 <label className="text-sm font-semibold text-gray-700">
                   Student Photo <span className="text-red-500">*</span>
                 </label>
+                <div
                 <div
                   className="flex items-center gap-4 cursor-pointer group"
                   onClick={() => photoInputRef.current?.click()}
@@ -397,12 +410,14 @@ export default function Page() {
             </div>
           </div>
 
+
           {/* ASSIGN STUDENT FEES */}
           <div className="space-y-4 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <i className="pi pi-money-bill text-blue-600"></i>
               Assign Student Fees
             </h3>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -417,6 +432,7 @@ export default function Page() {
                   disabled
                 />
               </div>
+
 
               <div>
                 <label className="text-sm font-medium">Fees Master</label>
@@ -443,6 +459,7 @@ export default function Page() {
             <label className="text-sm font-semibold text-gray-700">
               Signature <span className="text-red-500">*</span>
             </label>
+            <div
             <div
               className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all bg-gradient-to-br from-blue-50 to-indigo-50 group"
               onClick={() => signatureInputRef.current?.click()}
