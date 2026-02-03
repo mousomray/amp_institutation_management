@@ -1546,7 +1546,7 @@ const payStudentFees = async (req, res) => {
     // 2️⃣ Over payment check
     if (amount > fees.dueAmount) {
       return res.status(400).json({
-        message: "Payment amount cannot be greater than due amount"
+        message: "Payment process is allready running through Installment"
       });
     }
 

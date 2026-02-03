@@ -44,10 +44,23 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
     if (t) setToken(t);
   }, []);
 
+  // Reset state and refetch specifically for the incoming studentFeesId
   useEffect(() => {
-    if (studentFeesId && token) {
-      fetchInstallmentItems();
+    // clear any previous data so UI won't show previous student's installments
+    setExistingItems(null);
+    setPreview(null);
+    setPaymentVisible(false);
+    setSelectedItemId(null);
+    setInstallmentCount(2);
+
+    console.log("Fetching installments for studentFeesId:", studentFeesId);
+
+    if (!studentFeesId || !token) {
+      // nothing to fetch (yet) — keep existingItems as null to indicate "not loaded"
+      return;
     }
+
+    fetchInstallmentItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentFeesId, token]);
 
@@ -55,8 +68,16 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
     typeof n === "number" ? n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }) : "₹0";
 
   const fetchInstallmentItems = async () => {
+    // guard: ensure we're fetching for the current studentFeesId and we have token
+    if (!studentFeesId || !token) {
+      setExistingItems(null);
+      return;
+    }
+
     try {
       setItemsLoading(true);
+      // clear previous items immediately so UI won't reuse old entries while fetching
+      setExistingItems(null);
       const url = `${process.env.NEXT_PUBLIC_API_URL}/institution/list-installment-items/${studentFeesId}`;
       const res = await axiosInstance.get(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -123,7 +144,8 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
     return <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${cls}`}>{status}</span>;
   };
 
-  const hasInstallments = existingItems && existingItems.length > 0;
+  // use strict check: existingItems === null -> loading/not-loaded, [] -> no installments
+  const hasInstallments = existingItems !== null && existingItems.length > 0;
 
   return (
     <>

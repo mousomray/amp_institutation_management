@@ -22,27 +22,37 @@ export default function SingleStudentFees({ id, onClose }: Props) {
   }, []);
 
   useEffect(() => {
-    if (id && token) fetchSingle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!id) return;
+    setData(null);        
+    if (token) fetchSingle();
   }, [id, token]);
 
   const fetchSingle = async () => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get(`/institution/get-single-student-fees/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setData(res.data.data || null);
-    } catch (error: any) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to load details");
-      } else {
-        toast.error("Unexpected error occurred");
+
+      const res = await axiosInstance.get(
+        `/institution/get-single-student-fees/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.data?.data) {
+        setData(null);
+        toast.error("No data found for this student");
+        return;
       }
+
+      setData(res.data.data);
+    } catch (err) {
+      setData(null);
+      toast.error("Failed to load details");
     } finally {
       setLoading(false);
     }
   };
+
 
   const fmt = (n?: number) =>
     typeof n === "number"

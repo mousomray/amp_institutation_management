@@ -106,6 +106,34 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
     }
   };
 
+  // New: fetch total amount for normal (non-installment) payment and set read-only field
+  useEffect(() => {
+    if (!isInstallment && id && token) {
+      fetchStudentFeesTotal();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInstallment, id, token]);
+
+  const fetchStudentFeesTotal = async () => {
+    try {
+      setFetchingAmount(true);
+      // fetch the student fees record; adjust endpoint if your API uses a different path
+      const res = await axiosInstance.get(`/institution/get-single-student-fees/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const item = res.data?.data || {};
+      console.log("Fetched student fees item:", item);
+      // prefer totalAmount; fallback to dueAmount if totalAmount missing
+      const total = item?.summary?.totalAmount ?? item?.summary?.dueAmount ?? 0;
+      setAmount(total);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch total amount");
+    } finally {
+      setFetchingAmount(false);
+    }
+  };
+
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="px-2">
@@ -118,7 +146,12 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
           ) : (
             <InputNumber
               value={amount}
-              onValueChange={(e) => !isInstallment && setAmount(e.value)}
+              // keep the field editable only when you explicitly want to allow edits.
+              // For normal (non-installment) payments the field should be read-only per requirement.
+              onValueChange={(e) => {
+                // allow manual changes only for installment mode (if you want)
+                if (isInstallment) setAmount(e.value);
+              }}
               mode="currency"
               currency="INR"
               locale="en-IN"
@@ -126,8 +159,8 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
               className="w-full"
               inputClassName="p-2"
               placeholder="Enter amount"
-              disabled={loading || isInstallment}
-              readOnly={isInstallment}
+              disabled={loading || fetchingAmount || isInstallment} // installment remains disabled
+              readOnly={!isInstallment} // normal (non-installment) payment = read-only showing total
             />
           )}
         </div>
