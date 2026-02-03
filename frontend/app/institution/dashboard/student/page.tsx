@@ -8,32 +8,30 @@ import { InputText } from "primereact/inputtext";
 import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
-import EditStudent from "@/components/institution/EditStudent";
-import axiosInstance from "@/service/axios.service";
+import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
+import { ToastContainer, toast } from "react-toastify";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
-import { formatDateTime, formatDate } from "@/helper/DateTime";
-import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import axiosInstance from "@/service/axios.service";
+import { formatDate } from "@/helper/DateTime";
+import EditStudent from "@/components/institution/EditStudent";
 import { useRouter } from "next/navigation";
 
-
-
-
-
 export default function StudentTable() {
+  const router = useRouter();
+
+  /* ================= STATE ================= */
   const [students, setStudents] = useState<any[]>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
-  const router = useRouter()
-
-  // 🔥 PAGINATION STATE
-  const [page, setPage] = useState(1);
-  const [rows, setRows] = useState(5);
-  const [totalRecords, setTotalRecords] = useState(0);
-
   const [token, setToken] = useState<string | null>(null);
+
+  // ✅ Server pagination
+  const [pagination, setPagination] = useState({
+    page: 1,
+    rows: 5,
+    total: 0,
+  });
 
   /* ================= GET TOKEN ================= */
   useEffect(() => {
@@ -43,19 +41,17 @@ export default function StudentTable() {
 
   /* ================= FETCH STUDENTS ================= */
   useEffect(() => {
-    if (token) {
-      studentGet();
-    }
-  }, [token, page, rows]);
+    if (token) fetchStudents();
+  }, [token, pagination.page, pagination.rows]);
 
-  const studentGet = async () => {
+  const fetchStudents = async () => {
     try {
       setLoading(true);
 
       const res = await axiosInstance.get("/institution/get-student", {
         params: {
-          page,
-          limit: rows,
+          page: pagination.page,
+          limit: pagination.rows,
         },
         headers: {
           Authorization: `Bearer ${token}`,
@@ -63,7 +59,12 @@ export default function StudentTable() {
       });
 
       setStudents(res.data.data);
-      setTotalRecords(res.data.totalCount);
+
+      // ✅ FIXED PAGINATION
+      setPagination((prev) => ({
+        ...prev,
+        total: res.data.pagination.total,
+      }));
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to load students");
@@ -91,31 +92,26 @@ export default function StudentTable() {
       header: "Delete Confirmation",
       icon: "pi pi-exclamation-triangle",
       acceptClassName: "p-button-danger",
-
       accept: async () => {
         try {
-          const res = await axiosInstance.delete(`/institution/delete-student/${rowData._id}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+          const res = await axiosInstance.delete(
+            `/institution/delete-student/${rowData._id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
           toast.success(res.data.message);
-          await studentGet();
-        } catch (error: any) {
-          if (axios.isAxiosError(error)) {
-            toast.error(error.response?.data?.message || "Delete failed");
-          } else {
-            toast.error("Unexpected error occurred");
-          }
+          fetchStudents();
+        } catch {
+          toast.error("Delete failed");
         }
-      },
-
-      reject: () => {
-        toast.info("Delete cancelled");
       },
     });
   };
-  /* ================= TEMPLATES ================= */
+
+  /* ================= COLUMN TEMPLATES ================= */
   const photoTemplate = (rowData: any) =>
     rowData.photo ? (
       <img
@@ -125,7 +121,7 @@ export default function StudentTable() {
       />
     ) : (
       <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border">
-        <i className="pi pi-user text-gray-500"></i>
+        <i className="pi pi-user text-gray-500" />
       </div>
     );
 
@@ -152,7 +148,7 @@ export default function StudentTable() {
     </div>
   );
 
-  /* ================= HEADER ================= */
+
   const header = (
     <div className="flex justify-between items-center bg-primary p-3 rounded-lg">
       <div>
@@ -162,33 +158,32 @@ export default function StudentTable() {
 
       <IconField iconPosition="left">
         <InputIcon className="pi pi-search" />
-        <InputText
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          placeholder="Search student..."
-        />
+        <InputText placeholder="Search (server-side)" disabled />
       </IconField>
     </div>
   );
 
+  /* ================= RENDER ================= */
   return (
     <div className="card bg-white p-4 rounded-lg shadow">
       <DataTable
         value={students}
         loading={loading}
-        paginator
         lazy
-        first={(page - 1) * rows}
-        rows={rows}
-        totalRecords={totalRecords}
+        paginator
+        first={(pagination.page - 1) * pagination.rows}
+        rows={pagination.rows}
+        totalRecords={pagination.total}
         rowsPerPageOptions={[5, 10, 25, 50]}
-        onPage={(e) => {
-          setPage((e.page ?? 0) + 1);
-          setRows(e.rows ?? 5);
-        }}
+        onPage={(e) =>
+          setPagination((prev) => ({
+            ...prev,
+            page: (e.page ?? 0) + 1,
+            rows: e.rows ?? 5,
+          }))
+        }
         stripedRows
         responsiveLayout="scroll"
-        globalFilter={globalFilter}
         header={header}
         emptyMessage="No students found"
         onRowClick={onRowClick}
@@ -199,14 +194,13 @@ export default function StudentTable() {
         <Column field="name" header="Name" />
         <Column field="email" header="Email" />
         <Column field="phone" header="Phone" />
-        <Column
-          field="dob"
-          header="Date of Birth"
-          body={(rowData) => formatDate(rowData.dob)}
-        />
+        <Column header="DOB" body={(rowData) => formatDate(rowData.dob)} />
         <Column field="fatherName" header="Father Name" />
         <Column field="bloodGroup" header="Blood Group" />
-        <Column field="admissionDate" body={(rowData) => formatDate(rowData.admissionDate)} header="Admission Date" />
+        <Column
+          header="Admission Date"
+          body={(rowData) => formatDate(rowData.admissionDate)}
+        />
         <Column header="Signature" body={signatureTemplate} />
         <Column header="Actions" body={actionTemplate} />
       </DataTable>
@@ -217,8 +211,13 @@ export default function StudentTable() {
         style={{ width: "50vw" }}
         onHide={() => setVisible(false)}
       >
-        <EditStudent onClose={() => setVisible(false)} student={selectedStudent} refetch={studentGet} />
+        <EditStudent
+          onClose={() => setVisible(false)}
+          student={selectedStudent}
+          refetch={fetchStudents}
+        />
       </Dialog>
+
       <ConfirmDialog />
       <ToastContainer />
     </div>
