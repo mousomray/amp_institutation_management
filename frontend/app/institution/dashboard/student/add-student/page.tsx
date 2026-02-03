@@ -14,7 +14,6 @@ import axiosInstance from "@/service/axios.service";
 import { z } from "zod";
 import axios from "axios";
 import { MultiSelect } from "primereact/multiselect";
-import { MultiSelect } from "primereact/multiselect";
 
 type StudentFormData = z.infer<typeof StudentSchema>;
 
@@ -40,8 +39,6 @@ export default function Page() {
   const [feesMaster, setFeesMaster] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
-  const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
-
   const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +113,6 @@ export default function Page() {
           try {
             await axiosInstance.post(
               "/institution/assign-student-fees",
-              { studentId: createdStudentId },
               { studentId: createdStudentId },
               { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -194,9 +190,9 @@ export default function Page() {
   console.log("=>", courseData)
 
   const totalCourseFee = selectedCourses.reduce(
-  (sum, c) => sum + (c.fee || 0),
-  0
-);
+    (sum, c) => sum + (c.fee || 0),
+    0
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8">
@@ -244,7 +240,6 @@ export default function Page() {
                 <label className="text-sm font-semibold text-gray-700">
                   Student Photo <span className="text-red-500">*</span>
                 </label>
-                <div
                 <div
                   className="flex items-center gap-4 cursor-pointer group"
                   onClick={() => photoInputRef.current?.click()}
@@ -459,7 +454,6 @@ export default function Page() {
             <label className="text-sm font-semibold text-gray-700">
               Signature <span className="text-red-500">*</span>
             </label>
-            <div
             <div
               className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all bg-gradient-to-br from-blue-50 to-indigo-50 group"
               onClick={() => signatureInputRef.current?.click()}
