@@ -175,12 +175,6 @@ const studentFeesSchema = new Schema(
       required: true
     },
 
-    courseId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: true
-    },
-
     totalAmount: {
       type: Number,
       required: true,
@@ -286,7 +280,7 @@ const studentInstallmentItemSchema = new Schema({
   amount: { type: Number, required: true, min: 0 },
   paidAmount: { type: Number, default: 0, min: 0 },
   status: { type: String, enum: ["DUE", "PARTIAL", "PAID"], default: "DUE" },
-  sequence: { type: Number } 
+  sequence: { type: Number }
 }, { timestamps: true });
 
 

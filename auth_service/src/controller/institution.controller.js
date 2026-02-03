@@ -1105,32 +1105,72 @@ const DeleteFeesMasterAPI = async (req, res) => {
 // Student Fees API Implimentation area 
 const assignStudentFees = async (req, res) => {
   try {
-    const { studentId, courseId } = req.body;
+    const { studentId } = req.body;
     const userId = req.user.id;
 
-    // 1. Course fee
-    const course = await Course.findById(courseId);
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
+    // 1️⃣ Student + Courses (AGGREGATION)
+    const studentData = await Student.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(studentId)
+        }
+      },
+      {
+        $lookup: {
+          from: "courses",
+          localField: "courses",
+          foreignField: "_id",
+          as: "courses"
+        }
+      }
+    ]);
+
+    if (!studentData.length) {
+      return res.status(404).json({ message: "Student not found" });
     }
 
-    // 2. Active master fees
+    const student = studentData[0];
+
+    if (!student.courses || student.courses.length === 0) {
+      return res.status(400).json({
+        message: "Student is not enrolled in any course"
+      });
+    }
+
+    // 2️⃣ Active master fees
     const masterFees = await FeesMaster.find({
       isActive: true,
       userId
     });
 
-    // 3. Calculate total
-    let totalAmount = course.fee;
+    let totalAmount = 0;
+    const feeItems = [];
 
-    masterFees.forEach(fee => {
-      totalAmount += fee.amount;
+    // 3️⃣ Course fees (MULTIPLE)
+    student.courses.forEach(course => {
+      totalAmount += course.fee;
+
+      feeItems.push({
+        feeType: "COURSE",
+        courseId: course._id,
+        amount: course.fee
+      });
     });
 
-    // 4. Create StudentFees (summary)
+    // 4️⃣ Master fees (ONCE)
+    masterFees.forEach(fee => {
+      totalAmount += fee.amount;
+
+      feeItems.push({
+        feeType: "MASTER",
+        feeMasterId: fee._id,
+        amount: fee.amount
+      });
+    });
+
+    // 5️⃣ Create StudentFees (SUMMARY)
     const studentFees = await StudentFees.create({
-      studentId,
-      courseId,
+      studentId: student._id,
       totalAmount,
       paidAmount: 0,
       dueAmount: totalAmount,
@@ -1138,32 +1178,20 @@ const assignStudentFees = async (req, res) => {
       userId
     });
 
-    // 5. Create fee items (IMPORTANT PART)
-    const feeItems = [];
+    // 6️⃣ Attach studentFeesId to fee items
+    const finalFeeItems = feeItems.map(item => ({
+      ...item,
+      studentFeesId: studentFees._id
+    }));
 
-    // 👉 Course fee item (NEW & REQUIRED)
-    feeItems.push({
-      studentFeesId: studentFees._id,
-      feeType: "COURSE",
-      courseId: course._id,
-      amount: course.fee
-    });
-
-    // 👉 Master fee items
-    masterFees.forEach(fee => {
-      feeItems.push({
-        studentFeesId: studentFees._id,
-        feeType: "MASTER",
-        feeMasterId: fee._id,
-        amount: fee.amount
-      });
-    });
-
-    await StudentFeeItems.insertMany(feeItems);
+    await StudentFeeItems.insertMany(finalFeeItems);
 
     return res.status(201).json({
       message: "Student fees assigned successfully",
-      data: studentFees
+      data: {
+        studentFees,
+        feeBreakdown: finalFeeItems
+      }
     });
 
   } catch (error) {
@@ -1172,70 +1200,50 @@ const assignStudentFees = async (req, res) => {
   }
 };
 
-
 const listStudentFees = async (req, res) => {
   try {
     const userId = req.user.id;
 
     const data = await StudentFees.aggregate([
+      /* 1️⃣ Match user */
       {
         $match: {
           userId: new mongoose.Types.ObjectId(userId)
         }
       },
 
-      /* ---------- pick latest fees per student + course ---------- */
-      {
-        $sort: { createdAt: -1 }
-      },
-      {
-        $group: {
-          _id: {
-            studentId: "$studentId",
-            courseId: "$courseId"
-          },
-          studentFeesId: { $first: "$_id" },
-          totalAmount: { $first: "$totalAmount" },
-          paidAmount: { $first: "$paidAmount" },
-          dueAmount: { $first: "$dueAmount" },
-          status: { $first: "$status" },
-          userId: { $first: "$userId" }
-        }
-      },
-
-      /* ---------- Student ---------- */
+      /* 2️⃣ Student */
       {
         $lookup: {
           from: "students",
-          localField: "_id.studentId",
+          localField: "studentId",
           foreignField: "_id",
           as: "student"
         }
       },
       { $unwind: "$student" },
 
-      /* ---------- Course ---------- */
-      {
-        $lookup: {
-          from: "courses",
-          localField: "_id.courseId",
-          foreignField: "_id",
-          as: "course"
-        }
-      },
-      { $unwind: "$course" },
-
-      /* ---------- Fee Items ---------- */
+      /* 3️⃣ Fee Items */
       {
         $lookup: {
           from: "studentfeeitems",
-          localField: "studentFeesId",
+          localField: "_id",
           foreignField: "studentFeesId",
           as: "feeItems"
         }
       },
 
-      /* ---------- Fees Master ---------- */
+      /* 4️⃣ Courses */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "feeItems.courseId",
+          foreignField: "_id",
+          as: "coursesData"
+        }
+      },
+
+      /* 5️⃣ Master Fees */
       {
         $lookup: {
           from: "feesmasters",
@@ -1245,21 +1253,39 @@ const listStudentFees = async (req, res) => {
         }
       },
 
-      /* ---------- Calculate Fees ---------- */
+      /* 6️⃣ Build clean structure */
       {
         $addFields: {
-          courseFee: {
-            $sum: {
-              $map: {
-                input: {
-                  $filter: {
-                    input: "$feeItems",
-                    as: "item",
-                    cond: { $eq: ["$$item.feeType", "COURSE"] }
-                  }
+          courses: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$feeItems",
+                  as: "item",
+                  cond: { $eq: ["$$item.feeType", "COURSE"] }
+                }
+              },
+              as: "c",
+              in: {
+                name: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$coursesData",
+                            as: "cd",
+                            cond: { $eq: ["$$cd._id", "$$c.courseId"] }
+                          }
+                        },
+                        as: "x",
+                        in: "$$x.name"
+                      }
+                    },
+                    0
+                  ]
                 },
-                as: "cf",
-                in: "$$cf.amount"
+                amount: "$$c.amount"
               }
             }
           },
@@ -1273,48 +1299,50 @@ const listStudentFees = async (req, res) => {
                   cond: { $eq: ["$$item.feeType", "MASTER"] }
                 }
               },
-              as: "mf",
+              as: "m",
               in: {
-                amount: "$$mf.amount",
-                fee: {
+                name: {
                   $arrayElemAt: [
                     {
-                      $filter: {
-                        input: "$masterFeesData",
-                        as: "mfd",
-                        cond: { $eq: ["$$mfd._id", "$$mf.feeMasterId"] }
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$masterFeesData",
+                            as: "mf",
+                            cond: { $eq: ["$$mf._id", "$$m.feeMasterId"] }
+                          }
+                        },
+                        as: "y",
+                        in: "$$y.name"
                       }
                     },
                     0
                   ]
-                }
+                },
+                amount: "$$m.amount"
               }
             }
           }
         }
       },
 
-      /* ---------- Final Response ---------- */
+      /* 7️⃣ Final response */
       {
         $project: {
-          _id: "$studentFeesId",
+          _id: 0,
+          studentFeesId: "$_id",
+
+          student: {
+            name: "$student.name"
+          },
+
           totalAmount: 1,
           paidAmount: 1,
           dueAmount: 1,
           status: 1,
 
-          student: {
-            name: "$student.name"
-          },
-          course: {
-            name: "$course.name"
-          },
-
-          courseFee: 1,
-          masterFees: {
-            amount: 1,
-            "fee.name": 1
-          }
+          courses: 1,
+          masterFees: 1
         }
       }
     ]);
@@ -1331,13 +1359,13 @@ const listStudentFees = async (req, res) => {
 };
 
 
-
 const getSingleStudentFees = async (req, res) => {
   try {
     const { studentFeesId } = req.params;
     const userId = req.user.id;
 
     const data = await StudentFees.aggregate([
+      /* 1️⃣ Match */
       {
         $match: {
           _id: new mongoose.Types.ObjectId(studentFeesId),
@@ -1345,7 +1373,7 @@ const getSingleStudentFees = async (req, res) => {
         }
       },
 
-      /* ---------- Student ---------- */
+      /* 2️⃣ Student */
       {
         $lookup: {
           from: "students",
@@ -1356,18 +1384,7 @@ const getSingleStudentFees = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      /* ---------- Course ---------- */
-      {
-        $lookup: {
-          from: "courses",
-          localField: "courseId",
-          foreignField: "_id",
-          as: "course"
-        }
-      },
-      { $unwind: "$course" },
-
-      /* ---------- Fee Items ---------- */
+      /* 3️⃣ Fee Items */
       {
         $lookup: {
           from: "studentfeeitems",
@@ -1377,20 +1394,64 @@ const getSingleStudentFees = async (req, res) => {
         }
       },
 
-      /* ---------- Master Fees ---------- */
+      /* 4️⃣ Courses */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "feeItems.courseId",
+          foreignField: "_id",
+          as: "coursesData"
+        }
+      },
+
+      /* 5️⃣ Master Fees */
       {
         $lookup: {
           from: "feesmasters",
           localField: "feeItems.feeMasterId",
           foreignField: "_id",
-          as: "masterFees"
+          as: "masterFeesData"
         }
       },
 
-      /* ---------- Calculations ---------- */
+      /* 6️⃣ Build final structure */
       {
         $addFields: {
-          masterFeeBreakdown: {
+          courses: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$feeItems",
+                  as: "item",
+                  cond: { $eq: ["$$item.feeType", "COURSE"] }
+                }
+              },
+              as: "c",
+              in: {
+                name: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$coursesData",
+                            as: "cd",
+                            cond: { $eq: ["$$cd._id", "$$c.courseId"] }
+                          }
+                        },
+                        as: "x",
+                        in: "$$x.name"
+                      }
+                    },
+                    0
+                  ]
+                },
+                amount: "$$c.amount"
+              }
+            }
+          },
+
+          masterFees: {
             $map: {
               input: {
                 $filter: {
@@ -1399,7 +1460,7 @@ const getSingleStudentFees = async (req, res) => {
                   cond: { $eq: ["$$item.feeType", "MASTER"] }
                 }
               },
-              as: "mfItem",
+              as: "m",
               in: {
                 name: {
                   $arrayElemAt: [
@@ -1407,48 +1468,37 @@ const getSingleStudentFees = async (req, res) => {
                       $map: {
                         input: {
                           $filter: {
-                            input: "$masterFees",
+                            input: "$masterFeesData",
                             as: "mf",
-                            cond: { $eq: ["$$mf._id", "$$mfItem.feeMasterId"] }
+                            cond: { $eq: ["$$mf._id", "$$m.feeMasterId"] }
                           }
                         },
-                        as: "f",
-                        in: "$$f.name"
+                        as: "y",
+                        in: "$$y.name"
                       }
                     },
                     0
                   ]
                 },
-                amount: "$$mfItem.amount",
-                type: "MASTER"
+                amount: "$$m.amount"
               }
             }
-          },
-
-          courseFee: {
-            name: "$course.name",
-            amount: "$course.fee",
-            type: "COURSE"
           }
         }
       },
 
-      /* ---------- Final Response ---------- */
+      /* 7️⃣ Final Response */
       {
         $project: {
+          _id: 0,
+
           student: {
             name: "$student.name"
           },
-          course: {
-            name: "$course.name",
-            fee: "$course.fee"
-          },
-          fees: {
-            $concatArrays: [
-              "$masterFeeBreakdown",
-              ["$courseFee"]
-            ]
-          },
+
+          courses: 1,
+          masterFees: 1,
+
           summary: {
             totalAmount: "$totalAmount",
             paidAmount: "$paidAmount",
@@ -1469,10 +1519,11 @@ const getSingleStudentFees = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("getSingleStudentFeesByFeesId error:", error);
+    console.error("getSingleStudentFees error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // Pay Student Fees
 const payStudentFees = async (req, res) => {
@@ -1563,52 +1614,105 @@ const getInstallmentPreview = async (req, res) => {
     const { count } = req.query;
     const userId = req.user.id;
 
-    if (!count || count <= 0) {
+    if (!count || Number(count) <= 0) {
       return res.status(400).json({ message: "Invalid installment count" });
     }
 
-    const result = await StudentFees.aggregate([
+    const data = await StudentFees.aggregate([
+      /* 1️⃣ Match */
       {
         $match: {
           _id: new mongoose.Types.ObjectId(studentFeesId),
           userId: new mongoose.Types.ObjectId(userId)
         }
       },
+
+      /* 2️⃣ Fee Items */
       {
         $lookup: {
-          from: "courses",          // Course collection name
-          localField: "courseId",
-          foreignField: "_id",
-          as: "course"
+          from: "studentfeeitems",
+          localField: "_id",
+          foreignField: "studentFeesId",
+          as: "feeItems"
         }
       },
+
+      /* 3️⃣ Course Fee Items */
       {
-        $unwind: "$course"
+        $addFields: {
+          courseItems: {
+            $filter: {
+              input: "$feeItems",
+              as: "item",
+              cond: { $eq: ["$$item.feeType", "COURSE"] }
+            }
+          }
+        }
       },
+
+      /* 4️⃣ Courses */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "courseItems.courseId",
+          foreignField: "_id",
+          as: "courses"
+        }
+      },
+
+      /* 5️⃣ Convert duration string → number */
+      {
+        $addFields: {
+          courseDurations: {
+            $map: {
+              input: "$courses",
+              as: "c",
+              in: {
+                $toInt: {
+                  $arrayElemAt: [
+                    { $split: ["$$c.duration", " "] },
+                    0
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      /* ✅ 6️⃣ SUM of all durations */
+      {
+        $addFields: {
+          totalCourseDurationMonths: {
+            $sum: "$courseDurations"
+          }
+        }
+      },
+
       {
         $project: {
           totalAmount: 1,
-          courseDuration: "$course.duration"
+          totalCourseDurationMonths: 1
         }
       }
     ]);
 
-    if (!result.length) {
+    if (!data.length) {
       return res.status(404).json({ message: "Student fees not found" });
     }
 
-    const { totalAmount, courseDuration } = result[0];
+    const { totalAmount, totalCourseDurationMonths } = data[0];
 
-    const installmentAmount = Math.round(totalAmount / count);
+    const installmentCount = Number(count);
+    const installmentAmount = Math.round(totalAmount / installmentCount);
 
-    // "12 months" / "6months" → number extract
-    const durationMonths = parseInt(courseDuration);
-    const gap = Math.floor(durationMonths / count) || 1;
+    const gap =
+      Math.floor(totalCourseDurationMonths / installmentCount) || 1;
 
     const installments = [];
     let currentDate = new Date();
 
-    for (let i = 1; i <= count; i++) {
+    for (let i = 1; i <= installmentCount; i++) {
       const dueDate = new Date(currentDate);
       dueDate.setMonth(dueDate.getMonth() + gap);
 
@@ -1626,18 +1730,17 @@ const getInstallmentPreview = async (req, res) => {
       data: {
         studentFeesId,
         totalAmount,
-        installmentCount: Number(count),
-        totalCourseDuration: courseDuration, // 👈 NEW
+        installmentCount,
+        totalCourseDuration: `${totalCourseDurationMonths} months`,
         installments
       }
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("getInstallmentPreview error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 // Assign installments to a StudentFees (after assignStudentFees or along with it)
 const assignInstallmentsToStudentFees = async (req, res) => {
@@ -1781,4 +1884,4 @@ const listInstallmentItems = async (req, res) => {
   }
 };
 
-module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees,getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems };
+module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems };

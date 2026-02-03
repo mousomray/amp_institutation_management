@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
@@ -15,7 +15,6 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "primereact/dialog";
 import SingleStudentFees from "@/components/institution/SingleStudentFees";
 import AddPayment from "@/components/institution/AddPayment";
-import { useRef } from "react";
 import { Menu } from "primereact/menu";
 import SetInstallmentFrom from "@/components/institution/SetInstallmentFrom";
 
@@ -37,6 +36,8 @@ export default function StudentFeesPage() {
   const [installmentVisible, setInstallmentVisible] = useState(false)
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string | null>(null)
 
+  // shared menu ref (useRef must be at top level of component)
+  const menuRef = useRef<Menu | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
@@ -67,23 +68,42 @@ export default function StudentFeesPage() {
     }
   };
 
-  // Improved Master Fees renderer: neat two-column list + subtotal
+  // Courses renderer: list courses with amounts + subtotal
+  const coursesBody = (row: any) => {
+    if (!row.courses || !row.courses.length) return <span className="text-sm text-gray-500">—</span>;
+    const coursesSum = (row.courses || []).reduce((s: number, c: any) => s + (c?.amount ?? 0), 0);
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="bg-white/50 rounded border border-gray-100">
+          {(row.courses || []).map((c: any, i: number) => (
+            <div key={i} className="flex justify-between items-center px-3 py-2 hover:bg-gray-50">
+              <div className="text-sm text-gray-700">{c?.name ?? "-"}</div>
+              <div className="text-sm font-medium text-gray-900">₹{c?.amount ?? 0}</div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between items-center mt-1 px-2">
+          <div className="text-xs text-gray-500">Courses Total</div>
+          <div className="text-sm font-semibold">₹{coursesSum}</div>
+        </div>
+      </div>
+    );
+  };
+
+  // Improved Master Fees renderer: neat two-column list + subtotal (matches API shape)
   const masterFeesBody = (row: any) => {
     if (!row.masterFees || !row.masterFees.length) return <span className="text-sm text-gray-500">—</span>;
-
     const masterSum = (row.masterFees || []).reduce((s: number, m: any) => s + (m?.amount ?? 0), 0);
-
     return (
       <div className="flex flex-col gap-1">
         <div className="bg-white/50 rounded border border-gray-100">
           {(row.masterFees || []).map((m: any, i: number) => (
             <div key={i} className="flex justify-between items-center px-3 py-2 hover:bg-gray-50">
-              <div className="text-sm text-gray-700">{m?.fee?.name ?? "-"}</div>
+              <div className="text-sm text-gray-700">{m?.name ?? "-"}</div>
               <div className="text-sm font-medium text-gray-900">₹{m?.amount ?? 0}</div>
             </div>
           ))}
         </div>
-
         <div className="flex justify-between items-center mt-1 px-2">
           <div className="text-xs text-gray-500">Master Total</div>
           <div className="text-sm font-semibold">₹{masterSum}</div>
@@ -103,7 +123,6 @@ export default function StudentFeesPage() {
     return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${cls}`}>{row.status ?? "DUE"}</span>;
   };
 
-
   // Enhanced header layout
   const header = (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -122,14 +141,12 @@ export default function StudentFeesPage() {
   );
 
   const actionTemplate = (row: any) => {
-    const menuRef = useRef<Menu>(null);
-
     const items = [
       {
         label: "View Details",
         icon: "pi pi-eye",
         command: () => {
-          setSelectedFeesId(row._id);
+          setSelectedFeesId(row.studentFeesId);
           setDetailVisible(true);
         },
       },
@@ -137,34 +154,24 @@ export default function StudentFeesPage() {
         label: "Full Payment",
         icon: "pi pi-credit-card",
         command: () => {
-          setSelectedPaymentId(row._id);
+          setSelectedPaymentId(row.studentFeesId);
           setPaymentVisible(true);
         },
       },
-
       {
         label: "Installment Payment",
         icon: "pi pi-credit-card",
         command: () => {
-          setSelectedInstallmentId(row._id)
-          setInstallmentVisible(true)
+          setSelectedInstallmentId(row.studentFeesId);
+          setInstallmentVisible(true);
         },
       },
     ];
 
     return (
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex justify-center"
-      >
+      <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
         <Menu model={items} popup ref={menuRef} />
-
-        <Button
-          icon="pi pi-ellipsis-v"
-          rounded
-          text
-          onClick={(e) => menuRef.current?.toggle(e)}
-        />
+        <Button icon="pi pi-ellipsis-v" rounded text onClick={(e) => menuRef.current?.toggle(e)} />
       </div>
     );
   };
@@ -200,8 +207,7 @@ export default function StudentFeesPage() {
         selectionMode="single"
       >
         <Column header="Student" body={(r) => <div className="font-medium text-gray-800">{r.student?.name ?? "-"}</div>} />
-        <Column header="Course" body={(r) => <div className="text-sm text-gray-700">{r.course?.name ?? "-"}</div>} />
-        <Column field="courseFee" header="Course Fee" body={(r) => <div className="font-medium">₹{r.courseFee ?? 0}</div>} />
+        <Column header="Courses" body={coursesBody} style={{ minWidth: "300px" }} />
         <Column header="Master Fees" body={masterFeesBody} style={{ minWidth: "300px" }} />
         <Column field="totalAmount" header="Total" body={(r) => <div className="font-semibold">₹{r.totalAmount ?? 0}</div>} />
         <Column field="paidAmount" header="Paid" body={(r) => <div className="text-green-700 font-medium">₹{r.paidAmount ?? 0}</div>} />
