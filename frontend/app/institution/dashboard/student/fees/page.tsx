@@ -228,6 +228,7 @@ export default function StudentFeesPage() {
       >
         <AddPayment
           id={selectedPaymentId}
+          studentFeesId={selectedPaymentId}
           onClose={() => setPaymentVisible(false)}
           onSuccess={() => {
             setPaymentVisible(false);
@@ -237,7 +238,14 @@ export default function StudentFeesPage() {
       </Dialog>
 
       <Dialog style={{width: "30vw"}} onHide={() => setInstallmentVisible(false)} visible={installmentVisible}>
-        <SetInstallmentFrom />
+        <SetInstallmentFrom
+          studentFeesId={selectedInstallmentId}
+          onClose={() => setInstallmentVisible(false)}
+          onAssign={() => {
+            setInstallmentVisible(false);
+            fetchList(); // refresh list after assignment
+          }}
+        />
       </Dialog>
 
       <ToastContainer />

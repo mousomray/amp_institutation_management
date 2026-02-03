@@ -5,10 +5,11 @@ import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
 
-export default function AddPayment({ id, onClose, onSuccess }) {
-  const [amount, setAmount] = useState(null); // number
+export default function AddPayment({ id, onClose, onSuccess, isInstallment = false, studentFeesId }) {
+  const [amount, setAmount] = useState(null);
   const [mode, setMode] = useState("CASH");
   const [loading, setLoading] = useState(false);
+  const [fetchingAmount, setFetchingAmount] = useState(false);
   const [token, setToken] = useState(null);
 
   const paymentModes = [
@@ -22,6 +23,33 @@ export default function AddPayment({ id, onClose, onSuccess }) {
     const t = localStorage.getItem("institution-token");
     if (t) setToken(t);
   }, []);
+
+  useEffect(() => {
+    if (isInstallment && id && token && studentFeesId) {
+      fetchInstallmentAmount();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInstallment, id, token, studentFeesId]);
+
+  const fetchInstallmentAmount = async () => {
+    try {
+      setFetchingAmount(true);
+      const res = await axiosInstance.get(`${process.env.NEXT_PUBLIC_API_URL}/institution/list-installment-items/${studentFeesId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const items = res.data.data || [];
+      const item = items.find((i) => i._id === id);
+      if (item) {
+        const remaining = item.amount - item.paidAmount;
+        setAmount(remaining);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch installment amount");
+    } finally {
+      setFetchingAmount(false);
+    }
+  };
 
   const modeOptionTemplate = (option) => {
     if (!option) return null;
@@ -54,7 +82,17 @@ export default function AddPayment({ id, onClose, onSuccess }) {
     try {
       setLoading(true);
       const payload = { amount: Number(amount), paymentMode: mode };
-      const res = await axiosInstance.post(`/institution/pay-student-fees/${id}`, payload, {
+
+      let url;
+      if (isInstallment && studentFeesId) {
+        // installment payment
+        url = `/institution/pay-installment/${studentFeesId}/${id}`;
+      } else {
+        // full fees payment
+        url = `/institution/pay-student-fees/${id}`;
+      }
+
+      const res = await axiosInstance.post(url, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success(res.data?.message || "Payment successful");
@@ -71,20 +109,27 @@ export default function AddPayment({ id, onClose, onSuccess }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="px-2">
-        <label className="text-sm font-medium text-gray-700">Amount (₹)</label>
+        <label className="text-sm font-medium text-gray-700">
+          Amount (₹) {isInstallment && <span className="text-xs text-gray-500">(Remaining)</span>}
+        </label>
         <div className="mt-2">
-          <InputNumber
-            value={amount}
-            onValueChange={(e) => setAmount(e.value)}
-            mode="currency"
-            currency="INR"
-            locale="en-IN"
-            min={0}
-            className="w-full"
-            inputClassName="p-2"
-            placeholder="Enter amount"
-            disabled={loading}
-          />
+          {fetchingAmount ? (
+            <div className="text-sm text-gray-500">Loading amount...</div>
+          ) : (
+            <InputNumber
+              value={amount}
+              onValueChange={(e) => !isInstallment && setAmount(e.value)}
+              mode="currency"
+              currency="INR"
+              locale="en-IN"
+              min={0}
+              className="w-full"
+              inputClassName="p-2"
+              placeholder="Enter amount"
+              disabled={loading || isInstallment}
+              readOnly={isInstallment}
+            />
+          )}
         </div>
       </div>
 
@@ -112,7 +157,7 @@ export default function AddPayment({ id, onClose, onSuccess }) {
           label={loading ? "Processing..." : "Pay"}
           icon={loading ? "pi pi-spin pi-spinner" : "pi pi-check"}
           className="w-full p-button-primary"
-          disabled={loading}
+          disabled={loading || fetchingAmount}
         />
         <Button type="button" label="Cancel" className="p-button-text" onClick={onClose} disabled={loading} />
       </div>

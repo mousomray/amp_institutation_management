@@ -1567,19 +1567,42 @@ const getInstallmentPreview = async (req, res) => {
       return res.status(400).json({ message: "Invalid installment count" });
     }
 
-    const fees = await StudentFees.findOne({
-      _id: studentFeesId,
-      userId
-    }).populate("courseId");
+    const result = await StudentFees.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(studentFeesId),
+          userId: new mongoose.Types.ObjectId(userId)
+        }
+      },
+      {
+        $lookup: {
+          from: "courses",          // Course collection name
+          localField: "courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      {
+        $unwind: "$course"
+      },
+      {
+        $project: {
+          totalAmount: 1,
+          courseDuration: "$course.duration"
+        }
+      }
+    ]);
 
-    if (!fees) {
+    if (!result.length) {
       return res.status(404).json({ message: "Student fees not found" });
     }
 
-    const totalAmount = fees.totalAmount;
+    const { totalAmount, courseDuration } = result[0];
+
     const installmentAmount = Math.round(totalAmount / count);
 
-    const durationMonths = parseInt(fees.courseId.duration); // "4 months" → 4
+    // "12 months" / "6months" → number extract
+    const durationMonths = parseInt(courseDuration);
     const gap = Math.floor(durationMonths / count) || 1;
 
     const installments = [];
@@ -1603,7 +1626,8 @@ const getInstallmentPreview = async (req, res) => {
       data: {
         studentFeesId,
         totalAmount,
-        installmentCount: count,
+        installmentCount: Number(count),
+        totalCourseDuration: courseDuration, // 👈 NEW
         installments
       }
     });
@@ -1613,7 +1637,6 @@ const getInstallmentPreview = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 
 // Assign installments to a StudentFees (after assignStudentFees or along with it)
