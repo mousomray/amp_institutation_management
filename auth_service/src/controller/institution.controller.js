@@ -1792,136 +1792,115 @@ const payStudentFees = async (req, res) => {
 const getInstallmentPreview = async (req, res) => {
   try {
     const { studentFeesId } = req.params;
-    const { count } = req.query;
     const userId = req.user.id;
 
-    if (!count || Number(count) <= 0) {
-      return res.status(400).json({ message: "Invalid installment count" });
+    const {
+      installmentCount,
+      monthsGap,
+      firstInstallmentAmount,
+      startDate
+    } = req.body;
+
+    if (
+      !installmentCount ||
+      installmentCount <= 0 ||
+      !monthsGap ||
+      monthsGap <= 0 ||
+      !firstInstallmentAmount ||
+      !startDate
+    ) {
+      return res.status(400).json({
+        message: "Invalid installment input"
+      });
     }
 
-    const data = await StudentFees.aggregate([
-      /* 1️⃣ Match */
-      {
-        $match: {
-          _id: new mongoose.Types.ObjectId(studentFeesId),
-          userId: new mongoose.Types.ObjectId(userId)
-        }
-      },
+    // 1️⃣ Fetch student fees
+    const studentFees = await StudentFees.findOne({
+      _id: studentFeesId,
+      userId
+    });
 
-      /* 2️⃣ Fee Items */
-      {
-        $lookup: {
-          from: "studentfeeitems",
-          localField: "_id",
-          foreignField: "studentFeesId",
-          as: "feeItems"
-        }
-      },
-
-      /* 3️⃣ Course Fee Items */
-      {
-        $addFields: {
-          courseItems: {
-            $filter: {
-              input: "$feeItems",
-              as: "item",
-              cond: { $eq: ["$$item.feeType", "COURSE"] }
-            }
-          }
-        }
-      },
-
-      /* 4️⃣ Courses */
-      {
-        $lookup: {
-          from: "courses",
-          localField: "courseItems.courseId",
-          foreignField: "_id",
-          as: "courses"
-        }
-      },
-
-      /*  Convert duration string → number */
-      {
-        $addFields: {
-          courseDurations: {
-            $map: {
-              input: "$courses",
-              as: "c",
-              in: {
-                $toInt: {
-                  $arrayElemAt: [
-                    { $split: ["$$c.duration", " "] },
-                    0
-                  ]
-                }
-              }
-            }
-          }
-        }
-      },
-
-      /* SUM of all durations */
-      {
-        $addFields: {
-          totalCourseDurationMonths: {
-            $sum: "$courseDurations"
-          }
-        }
-      },
-
-      {
-        $project: {
-          totalAmount: 1,
-          totalCourseDurationMonths: 1
-        }
-      }
-    ]);
-
-    if (!data.length) {
-      return res.status(404).json({ message: "Student fees not found" });
+    if (!studentFees) {
+      return res.status(404).json({
+        message: "Student fees not found"
+      });
     }
 
-    const { totalAmount, totalCourseDurationMonths } = data[0];
+    // 2️⃣ Validate first installment date (within 1 month)
+    const createdAt = new Date(studentFees.createdAt);
+    const maxAllowedDate = new Date(createdAt);
+    maxAllowedDate.setMonth(maxAllowedDate.getMonth() + 1);
 
-    const installmentCount = Number(count);
-    const installmentAmount = Math.round(totalAmount / installmentCount);
+    const firstDate = new Date(startDate);
 
-    const gap =
-      Math.floor(totalCourseDurationMonths / installmentCount) || 1;
+    if (firstDate < createdAt || firstDate > maxAllowedDate) {
+      return res.status(400).json({
+        message:
+          "First installment date must be within 1 month of fees creation date"
+      });
+    }
 
+    // 3️⃣ Validate first installment amount
+    if (firstInstallmentAmount >= studentFees.totalAmount) {
+      return res.status(400).json({
+        message: "First installment amount must be less than total fees"
+      });
+    }
+
+    // 4️⃣ Calculate remaining amounts
+    const remainingAmount =
+      studentFees.totalAmount - firstInstallmentAmount;
+
+    const remainingInstallments = installmentCount - 1;
+
+    if (remainingInstallments <= 0) {
+      return res.status(400).json({
+        message: "Installment count must be greater than 1"
+      });
+    }
+
+    const eachRemainingAmount = Math.round(
+      remainingAmount / remainingInstallments
+    );
+
+    // 5️⃣ Generate installments
     const installments = [];
-    let currentDate = new Date();
+    let currentDate = firstDate;
 
     for (let i = 1; i <= installmentCount; i++) {
-      const dueDate = new Date(currentDate);
-      dueDate.setMonth(dueDate.getMonth() + gap);
+      let amount =
+        i === 1 ? firstInstallmentAmount : eachRemainingAmount;
 
       installments.push({
         installmentNo: i,
-        amount: installmentAmount,
-        dueDate
+        amount,
+        dueDate: currentDate
       });
 
-      currentDate = dueDate;
+      const nextDate = new Date(currentDate);
+      nextDate.setMonth(nextDate.getMonth() + monthsGap);
+      currentDate = nextDate;
     }
 
     return res.status(200).json({
-      message: "Installment preview generated",
+      message: "Installment preview generated successfully",
       data: {
         studentFeesId,
-        totalAmount,
+        totalFees: studentFees.totalAmount,
         installmentCount,
-        totalCourseDuration: `${totalCourseDurationMonths} months`,
+        monthsGap,
         installments
       }
     });
 
   } catch (error) {
-    console.error("getInstallmentPreview error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Installment preview error:", error);
+    return res.status(500).json({
+      message: "Internal server error"
+    });
   }
 };
+
 
 // Assign installments to a StudentFees (after assignStudentFees or along with it)
 const assignInstallmentsToStudentFees = async (req, res) => {

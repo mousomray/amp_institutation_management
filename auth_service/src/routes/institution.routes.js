@@ -31,7 +31,7 @@ router.get("/get-single-student-fees/:studentFeesId", verifyJwt, getSingleStuden
 router.get("/list-student-fees", verifyJwt, listStudentFees);
 router.post("/pay-student-fees/:studentFeesId", verifyJwt, payStudentFees);
 // Install ments Routes
-router.get("/student-fees/:studentFeesId/installment-preview", verifyJwt,getInstallmentPreview 
+router.post("/student-fees/:studentFeesId/installment-preview", verifyJwt,getInstallmentPreview 
 );
 router.post("/assign-installments-to-student-fees/:studentFeesId", verifyJwt, assignInstallmentsToStudentFees);
 router.post("/pay-installment/:studentFeesId/:installmentItemId", verifyJwt, payInstallment);
