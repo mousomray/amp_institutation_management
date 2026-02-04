@@ -11,7 +11,8 @@ import { ToastContainer, toast } from "react-toastify";
 import axiosInstance from "@/service/axios.service";
 
 const FeesSchema = z.object({
-    name: z.string().min(1, "Name is required"),
+    // disallow names that are only whitespace by checking trimmed length
+    name: z.string().refine((s) => s.trim().length > 0, { message: "Name is required" }),
     amount: z.number().nonnegative("Amount must be >= 0"),
 });
 /** @typedef {import('zod').infer<typeof FeesSchema>} FeesFormData */
@@ -34,6 +35,8 @@ export default function AddFeeMaster({ onClose }: AddFeeMasterProps) {
         handleSubmit,
         reset,
         formState: { errors },
+        setValue,
+        getValues,
     } = useForm({
         resolver: zodResolver(FeesSchema),
     });
@@ -43,7 +46,8 @@ export default function AddFeeMaster({ onClose }: AddFeeMasterProps) {
         setIsSubmitting(true);
         try {
             if (!token) return toast.error("Authentication token missing");
-            const payload = { name: data.name, amount: data.amount };
+            // ensure trimmed name is sent
+            const payload = { name: String(data.name).trim(), amount: data.amount };
             const res = await axiosInstance.post("/institution/add-fees-master", payload, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -76,7 +80,16 @@ export default function AddFeeMaster({ onClose }: AddFeeMasterProps) {
                         <label className="text-sm font-semibold text-gray-700">Fee Name <span className="text-red-500">*</span></label>
                         <div className="p-inputgroup">
                             <span className="p-inputgroup-addon bg-blue-50"><i className="pi pi-tag text-blue-600"></i></span>
-                            <InputText className="w-full" {...register("name")} placeholder="e.g. Electric Fees" />
+                            <InputText
+                                className="w-full"
+                                {...register("name")}
+                                placeholder="e.g. Electric Fees"
+                                onBlur={() => {
+                                    // trim the stored value on blur so whitespace-only gets cleaned
+                                    const v = getValues("name") ?? "";
+                                    setValue("name", String(v).trim());
+                                }}
+                            />
                         </div>
                         {errors.name && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.name.message}</small>}
                     </div>

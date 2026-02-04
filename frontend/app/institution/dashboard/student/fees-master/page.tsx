@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
@@ -8,6 +8,7 @@ import { InputText } from "primereact/inputtext";
 import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
+import { ContextMenu } from "primereact/contextmenu";
 import axiosInstance from "@/service/axios.service";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -32,6 +33,11 @@ export default function FeesMasterTable() {
   const [visible, setVisible] = useState(false);
   const [addFromVisible, setAddFromVisible] = useState(false)
   const [selectedFeesId, setSelectedFeesId] = useState<string | null>(null);
+  // new: keep the whole row for edit/delete commands
+  const [selectedRow, setSelectedRow] = useState<any | null>(null);
+
+  // ContextMenu ref
+  const cm = useRef<any>(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -62,15 +68,65 @@ export default function FeesMasterTable() {
     }
   };
 
+  // delete handler
+  const handleDelete = async (id?: string | null) => {
+    const feeId = id ?? selectedFeesId;
+    if (!feeId) return;
+    if (!token) return toast.error("Authentication token missing");
+    if (!confirm("Are you sure you want to delete this fee?")) return;
+    try {
+      const res = await axiosInstance.delete(`/institution/delete-fees-master/${feeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(res.data?.message || "Fee deleted");
+      fetchFees();
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to delete fee");
+      } else {
+        toast.error("Unexpected error occurred");
+      }
+    }
+  };
+
+  // menu items for ContextMenu; commands use the stored selectedRow / selectedFeesId
+  const menuItems = useMemo(() => [
+    {
+      label: "Edit",
+      icon: "pi pi-pencil",
+      command: () => {
+        if (selectedRow) {
+          handleEdit(selectedRow);
+        }
+      },
+    },
+    {
+      label: "Delete",
+      icon: "pi pi-trash",
+      command: () => handleDelete(),
+    },
+  ], [selectedRow, selectedFeesId, token]);
+
   // open edit dialog (three-dots)
   const handleEdit = (rowData: any) => {
     setSelectedFeesId(rowData._id);
+    setSelectedRow(rowData);
     setVisible(true);
   };
 
   const actionTemplate = (rowData: any) => (
     <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
-      <Button icon="pi pi-ellipsis-v" rounded text onClick={() => handleEdit(rowData)} />
+      <Button
+        icon="pi pi-ellipsis-v"
+        rounded
+        text
+        onClick={(e: React.MouseEvent) => {
+          e.stopPropagation();
+          setSelectedFeesId(rowData._id);
+          setSelectedRow(rowData);
+          cm.current?.show(e.nativeEvent);
+        }}
+      />
     </div>
   );
 
@@ -125,6 +181,9 @@ export default function FeesMasterTable() {
         <Column field="createdAt" header="Created At" body={(row) => formatDate(row.createdAt)} />
         <Column header="Actions" body={actionTemplate} />
       </DataTable>
+
+      {/* ContextMenu placed once; it will act on the selectedRow/selectedFeesId */}
+      <ContextMenu model={menuItems} ref={cm} />
 
       <Dialog  visible={visible} style={{ width: "40vw" }} onHide={() => setVisible(false)}>
         <EditFeesMaster id={selectedFeesId} onClose={() => setVisible(false)} refetch={fetchFees} />
