@@ -7,6 +7,7 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import { Dialog } from "primereact/dialog";
 import EditCourseForm from "@/components/institution/EditCoures";
+import CourseEnroll from "@/components/institution/CourseEnroll";
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center h-full text-center">
@@ -32,6 +33,12 @@ function Page() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
+  const [endrollVisible, setEndrollVisible] = useState(false)
+  const [enrollCoursename, setEnrollCoursename] = useState<string>("");
+const [enrollCourseImage, setEnrollCourseImage] = useState<string>("");
+const [enrollCourseDuration, setEnrollCourseDuration] = useState<string>("");
+const [enrollCourseFee, setEnrollCourseFee] = useState<string | number>("");
+ 
 
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   /* ================= GET TOKEN ================= */
@@ -94,12 +101,22 @@ function Page() {
     setVisible(true);
   };
 
+  const handelEndroll = (rowData: any) => {
+    if(rowData){
+       setEndrollVisible(true)
+       setEnrollCourseDuration(rowData.duration)
+       setEnrollCourseFee(rowData.fee)
+       setEnrollCoursename(rowData.name)
+       setEnrollCourseImage(rowData.image)
+    }
+  }
+
 
 
 
 
   return (
-    <div className="w-full h-[calc(100vh-96px)] flex justify-center items-center">
+    <div className="w-full  flex justify-center items-center">
       {loading && (
         <div className="flex justify-center items-center h-full text-gray-500">
           Loading courses...
@@ -112,6 +129,7 @@ function Page() {
           courses={courseData}
           onDelete={handelDelete}
           onEdit={handleUpdate}
+          onEndroll={handelEndroll}
         />
 
       )}
@@ -123,6 +141,22 @@ function Page() {
       >
         <EditCourseForm onClose={() => setVisible(false)} course={selectedCourse} refetch={courseDataGet} />
       </Dialog>
+
+       <Dialog
+  visible={endrollVisible}
+  onHide={() => setEndrollVisible(false)}
+  header="Enroll Students"
+   style={{ width: "30vw" }}
+>
+  {endrollVisible && (
+    <CourseEnroll
+      courseName={enrollCoursename}
+      courseImage={enrollCourseImage}
+      courseDuration={enrollCourseDuration}
+      courseFee={enrollCourseFee}
+    />
+  )}
+</Dialog>
     </div>
   );
 }
