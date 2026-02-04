@@ -99,34 +99,34 @@ export default function EditStudent({
   /* ================= PREFILL COURSES (IMPORTANT FIX) ================= */
 
   const normalizeStudentCourseIds = () => {
-  if (!student?.courses) return [];
+    if (!student?.courses) return [];
 
-  // case 1: already populated
-  if (typeof student.courses[0] === "object") {
-    return student.courses.map((c: any) => c._id);
-  }
+    // case 1: already populated
+    if (typeof student.courses[0] === "object") {
+      return student.courses.map((c: any) => c._id);
+    }
 
-  // case 2: only IDs
-  return student.courses;
-};
+    // case 2: only IDs
+    return student.courses;
+  };
 
- useEffect(() => {
-  if (!student || !courseData.length) return;
+  useEffect(() => {
+    if (!student || !courseData.length) return;
 
-  const studentCourseIds = normalizeStudentCourseIds();
+    const studentCourseIds = normalizeStudentCourseIds();
 
-  const matchedCourses = courseData.filter(course =>
-    studentCourseIds.includes(course._id)
-  );
+    const matchedCourses = courseData.filter(course =>
+      studentCourseIds.includes(course._id)
+    );
 
-  setSelectedCourses(matchedCourses);
+    setSelectedCourses(matchedCourses);
 
-  // RHF compatibility (schema expects one course)
-  setValue("course" as any, matchedCourses[0] ?? undefined, {
-    shouldValidate: true,
-  });
+    // RHF compatibility (schema expects one course)
+    setValue("course" as any, matchedCourses[0] ?? undefined, {
+      shouldValidate: true,
+    });
 
-}, [student, courseData, setValue]);
+  }, [student, courseData, setValue]);
 
   /* ================= SUBMIT ================= */
 
@@ -134,7 +134,7 @@ export default function EditStudent({
     try {
       const payload = {
         ...data,
-        courseId: selectedCourses.map((c) => c._id), 
+        courseId: selectedCourses.map((c) => c._id),
       };
 
       const res = await axiosInstance.put(
@@ -159,24 +159,37 @@ export default function EditStudent({
       <div>
         <label className="text-sm font-medium">Student ID</label>
         <InputText className="w-full mt-1" {...register("studentId")} disabled />
+        {errors.studentId && (
+          <small className="text-red-500">{errors.studentId.message}</small>
+        )}
+
       </div>
 
       {/* NAME */}
       <div>
         <label className="text-sm font-medium">Name</label>
         <InputText className="w-full mt-1" {...register("name")} />
+        {errors.name && (
+          <small className="text-red-500">{errors.name.message}</small>
+        )}
       </div>
 
       {/* EMAIL */}
       <div>
         <label className="text-sm font-medium">Email</label>
         <InputText className="w-full mt-1" {...register("email")} />
+        {errors.email && (
+          <small className="text-red-500">{errors.email.message}</small>
+        )}
       </div>
 
       {/* PHONE */}
       <div>
         <label className="text-sm font-medium">Phone</label>
-        <InputText className="w-full mt-1" {...register("phone")} />
+        <InputText type="number" className="w-full mt-1" {...register("phone")} />
+        {errors.phone && (
+          <small className="text-red-500">{errors.phone.message}</small>
+        )}
       </div>
 
       {/* COURSES */}
@@ -239,6 +252,9 @@ export default function EditStudent({
             />
           )}
         />
+        {errors.dob && (
+          <small className="text-red-500">{errors.dob.message}</small>
+        )}
       </div>
 
       {/* BLOOD GROUP */}
@@ -256,6 +272,9 @@ export default function EditStudent({
             />
           )}
         />
+        {errors.bloodGroup && (
+          <small className="text-red-500">{errors.bloodGroup.message}</small>
+        )}
       </div>
 
       {/* ADMISSION DATE */}
@@ -273,6 +292,9 @@ export default function EditStudent({
             />
           )}
         />
+        {errors.admissionDate && (
+          <small className="text-red-500">{errors.admissionDate.message}</small>
+        )}
       </div>
 
       {/* PHOTO PREVIEW */}

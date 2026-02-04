@@ -60,8 +60,6 @@ export default function StudentTable() {
       });
 
       setStudents(res.data.data);
-
-      // ✅ FIXED PAGINATION
       setPagination((prev) => ({
         ...prev,
         total: res.data.pagination.total,

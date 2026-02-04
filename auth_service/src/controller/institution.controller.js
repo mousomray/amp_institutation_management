@@ -563,6 +563,7 @@ const updateStudent = async (req, res) => {
 
   } catch (error) {
     if (error.name === "ZodError") {
+      console.log(error)
       return res.status(400).json({
         message: "Validation failed",
         errors: error.errors,
