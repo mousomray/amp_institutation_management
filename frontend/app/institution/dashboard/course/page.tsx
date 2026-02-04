@@ -35,10 +35,10 @@ function Page() {
   const [visible, setVisible] = useState(false);
   const [endrollVisible, setEndrollVisible] = useState(false)
   const [enrollCoursename, setEnrollCoursename] = useState<string>("");
-const [enrollCourseImage, setEnrollCourseImage] = useState<string>("");
-const [enrollCourseDuration, setEnrollCourseDuration] = useState<string>("");
-const [enrollCourseFee, setEnrollCourseFee] = useState<string | number>("");
- 
+  const [enrollCourseImage, setEnrollCourseImage] = useState<string>("");
+  const [enrollCourseDuration, setEnrollCourseDuration] = useState<string>("");
+  const [enrollCourseFee, setEnrollCourseFee] = useState<string | number>("");
+  const [enrollCourseId, setEnrollCourseId] = useState<string | null>(null)
 
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   /* ================= GET TOKEN ================= */
@@ -102,12 +102,13 @@ const [enrollCourseFee, setEnrollCourseFee] = useState<string | number>("");
   };
 
   const handelEndroll = (rowData: any) => {
-    if(rowData){
-       setEndrollVisible(true)
-       setEnrollCourseDuration(rowData.duration)
-       setEnrollCourseFee(rowData.fee)
-       setEnrollCoursename(rowData.name)
-       setEnrollCourseImage(rowData.image)
+    if (rowData) {
+      setEndrollVisible(true)
+      setEnrollCourseDuration(rowData.duration)
+      setEnrollCourseFee(rowData.fee)
+      setEnrollCoursename(rowData.name)
+      setEnrollCourseImage(rowData.image)
+      setEnrollCourseId(rowData._id)
     }
   }
 
@@ -142,21 +143,23 @@ const [enrollCourseFee, setEnrollCourseFee] = useState<string | number>("");
         <EditCourseForm onClose={() => setVisible(false)} course={selectedCourse} refetch={courseDataGet} />
       </Dialog>
 
-       <Dialog
-  visible={endrollVisible}
-  onHide={() => setEndrollVisible(false)}
-  header="Enroll Students"
-   style={{ width: "30vw" }}
->
-  {endrollVisible && (
-    <CourseEnroll
-      courseName={enrollCoursename}
-      courseImage={enrollCourseImage}
-      courseDuration={enrollCourseDuration}
-      courseFee={enrollCourseFee}
-    />
-  )}
-</Dialog>
+      <Dialog
+        visible={endrollVisible}
+        onHide={() => setEndrollVisible(false)}
+        header="Enroll Students"
+        style={{ width: "30vw" }}
+      >
+        {endrollVisible && token !== null && (
+          <CourseEnroll
+            token={token}
+            courseId={enrollCourseId}
+            courseName={enrollCoursename}
+            courseImage={enrollCourseImage}
+            courseDuration={enrollCourseDuration}
+            courseFee={enrollCourseFee}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
