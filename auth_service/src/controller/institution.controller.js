@@ -1789,6 +1789,12 @@ const payStudentFees = async (req, res) => {
 };
 
 // Installments Handle Area 
+const normalizeDate = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 const getInstallmentPreview = async (req, res) => {
   try {
     const { studentFeesId } = req.params;
@@ -1802,10 +1808,8 @@ const getInstallmentPreview = async (req, res) => {
     } = req.body;
 
     if (
-      !installmentCount ||
-      installmentCount <= 0 ||
-      !monthsGap ||
-      monthsGap <= 0 ||
+      !installmentCount || installmentCount <= 1 ||
+      !monthsGap || monthsGap <= 0 ||
       !firstInstallmentAmount ||
       !startDate
     ) {
@@ -1826,12 +1830,14 @@ const getInstallmentPreview = async (req, res) => {
       });
     }
 
+    const totalAmount = studentFees.totalAmount;
+
     // 2️⃣ Validate first installment date (within 1 month)
-    const createdAt = new Date(studentFees.createdAt);
+    const createdAt = normalizeDate(studentFees.createdAt);
     const maxAllowedDate = new Date(createdAt);
     maxAllowedDate.setMonth(maxAllowedDate.getMonth() + 1);
 
-    const firstDate = new Date(startDate);
+    const firstDate = normalizeDate(startDate);
 
     if (firstDate < createdAt || firstDate > maxAllowedDate) {
       return res.status(400).json({
@@ -1841,35 +1847,39 @@ const getInstallmentPreview = async (req, res) => {
     }
 
     // 3️⃣ Validate first installment amount
-    if (firstInstallmentAmount >= studentFees.totalAmount) {
+    if (firstInstallmentAmount >= totalAmount) {
       return res.status(400).json({
         message: "First installment amount must be less than total fees"
       });
     }
 
-    // 4️⃣ Calculate remaining amounts
-    const remainingAmount =
-      studentFees.totalAmount - firstInstallmentAmount;
-
+    // 4️⃣ Calculate remaining
+    const remainingAmount = totalAmount - firstInstallmentAmount;
     const remainingInstallments = installmentCount - 1;
 
-    if (remainingInstallments <= 0) {
-      return res.status(400).json({
-        message: "Installment count must be greater than 1"
-      });
-    }
-
-    const eachRemainingAmount = Math.round(
+    const baseRemainingAmount = Math.floor(
       remainingAmount / remainingInstallments
     );
+
+    const remainder =
+      remainingAmount -
+      baseRemainingAmount * remainingInstallments;
 
     // 5️⃣ Generate installments
     const installments = [];
     let currentDate = firstDate;
 
     for (let i = 1; i <= installmentCount; i++) {
-      let amount =
-        i === 1 ? firstInstallmentAmount : eachRemainingAmount;
+      let amount;
+
+      if (i === 1) {
+        amount = firstInstallmentAmount;
+      } else if (i === installmentCount) {
+        // last installment adjusts rounding difference
+        amount = baseRemainingAmount + remainder;
+      } else {
+        amount = baseRemainingAmount;
+      }
 
       installments.push({
         installmentNo: i,
@@ -1886,7 +1896,7 @@ const getInstallmentPreview = async (req, res) => {
       message: "Installment preview generated successfully",
       data: {
         studentFeesId,
-        totalFees: studentFees.totalAmount,
+        totalAmount,          // ✅ EXACT student fees total
         installmentCount,
         monthsGap,
         installments

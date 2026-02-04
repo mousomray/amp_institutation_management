@@ -9,6 +9,7 @@ import { Dialog } from "primereact/dialog";
 import axiosInstance from "@/service/axios.service";
 import { toast } from "react-toastify";
 import AddPayment from "@/components/institution/AddPayment";
+import { Calendar } from "primereact/calendar"; // added import
 
 type Installment = {
   installmentNo: number;
@@ -29,8 +30,12 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
     totalAmount?: number;
     installmentCount?: number;
     totalCourseDuration?: string;
+    monthsGap?: number;
     installments?: Installment[];
   } | null>(null);
+  const [monthsGap, setMonthsGap] = useState<number>(1);
+  const [firstInstallmentAmount, setFirstInstallmentAmount] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -38,6 +43,7 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
   const [itemsLoading, setItemsLoading] = useState(false);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [showTotal, setShowTotal] = useState<boolean>(false);
 
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
@@ -52,6 +58,12 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
     setPaymentVisible(false);
     setSelectedItemId(null);
     setInstallmentCount(2);
+    // reset new fields
+    setMonthsGap(1);
+    setFirstInstallmentAmount(null);
+    setStartDate(new Date());
+    // hide total on initial load / when studentFeesId changes
+    setShowTotal(false);
 
     console.log("Fetching installments for studentFeesId:", studentFeesId);
 
@@ -95,15 +107,25 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
   const fetchPreview = async () => {
     if (!studentFeesId) return toast.error("No student fees selected");
     if (!installmentCount || installmentCount <= 0) return toast.error("Enter valid installment count");
+    if (monthsGap === null || monthsGap < 0) return toast.error("Enter valid months gap");
+    if (!firstInstallmentAmount || firstInstallmentAmount <= 0) return toast.error("Enter first installment amount");
+    if (!startDate) return toast.error("Select start date");
 
     try {
       setLoading(true);
       const url = `${process.env.NEXT_PUBLIC_API_URL}/institution/student-fees/${studentFeesId}/installment-preview`;
-      const res = await axiosInstance.get(url, {
-        params: { count: installmentCount },
+      const payload = {
+        installmentCount: installmentCount,
+        monthsGap: monthsGap,
+        firstInstallmentAmount: firstInstallmentAmount,
+        startDate: startDate.toISOString(),
+      };
+      const res = await axiosInstance.post(url, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPreview(res.data.data);
+      // show total after successful preview
+      setShowTotal(true);
       toast.success(res.data.message || "Preview generated");
     } catch (err: any) {
       console.error(err);
@@ -127,6 +149,7 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
       // refetch items
       await fetchInstallmentItems();
       setPreview(null); // clear preview
+      setShowTotal(false); // hide total after assign
       if (onAssign) onAssign();
     } catch (err: any) {
       console.error(err);
@@ -139,8 +162,8 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
   const statusBadge = (status: string) => {
     const cls =
       status === "PAID" ? "bg-green-100 text-green-800 border-green-200" :
-      status === "PARTIAL" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
-      "bg-red-100 text-red-800 border-red-200";
+        status === "PARTIAL" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
+          "bg-red-100 text-red-800 border-red-200";
     return <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${cls}`}>{status}</span>;
   };
 
@@ -239,116 +262,208 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
       )}
 
       {!itemsLoading && !hasInstallments && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <i className="pi pi-wallet text-blue-600"></i>
-                <div className="text-xs text-gray-600">Total Amount</div>
-              </div>
-              <div className="text-xl font-bold text-blue-700">{preview ? fmt(preview.totalAmount) : "—"}</div>
+        <div className="space-y-6">
+          {/* Summary: show Total Amount only after preview generated */}
+          {showTotal && preview && (
+            <div className="grid grid-cols-1 gap-4">
+              <Card className="shadow-sm border border-gray-200 bg-white p-4">
+                <div className="text-xs text-gray-500">Total Amount</div>
+                <div className="text-2xl font-bold text-blue-700 mt-2">{fmt(preview.totalAmount)}</div>
+                <div className="text-xs text-gray-500 mt-1">{preview.installmentCount} installments • {preview.monthsGap ?? monthsGap} month(s) gap</div>
+              </Card>
             </div>
-
-            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <i className="pi pi-clock text-indigo-600"></i>
-                <div className="text-xs text-gray-600">Duration</div>
-              </div>
-              <div className="text-xl font-bold text-indigo-700">{preview?.totalCourseDuration ?? "—"}</div>
-            </div>
-          </div>
+          )}
 
           <Divider />
 
-          <div className="space-y-3">
-            <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <i className="pi pi-chart-bar text-blue-600"></i>
-              Number of Installments
-            </label>
-            <InputNumber
-              value={installmentCount}
-              onValueChange={(e: any) => setInstallmentCount(e.value)}
-              min={1}
-              max={24}
-              showButtons
-              className="w-full"
-              inputClassName="text-center font-semibold"
-            />
-          </div>
+          {/* Config card */}
+          <Card className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Configure Installments</h3>
+              <p className="text-sm text-gray-500">Provide details to generate a payment schedule preview</p>
+            </div>
 
-          <div className="flex gap-2">
-            <Button
-              label={loading ? "Generating..." : "Generate Preview"}
-              icon={loading ? "pi pi-spin pi-spinner" : "pi pi-eye"}
-              onClick={fetchPreview}
-              disabled={loading || !installmentCount}
-              className="flex-1"
-            />
-            <Button label="Cancel" className="p-button-text" onClick={onClose} />
-          </div>
+            {/* Top row fields aligned */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Installments</label>
+                <div className="p-inputgroup w-full">
+                  <span className="p-inputgroup-addon bg-blue-50 text-blue-600">
+                    <i className="pi pi-list" />
+                  </span>
+                  <InputNumber
+                    value={installmentCount}
+                    onValueChange={(e: any) => setInstallmentCount(e.value)}
+                    min={1}
+                    max={24}
+                    step={1}
+                    className="w-full"
+                    inputClassName="h-10 text-center font-semibold"
+                    placeholder="e.g. 3"
+                  />
+                </div>
+                <small className="text-xs text-gray-500 mt-1 block">Between 1 and 24</small>
+              </div>
 
-          {preview && preview.installments && (
-            <div className="space-y-3 pt-3">
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b">
-                  <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Months Gap</label>
+                <div className="p-inputgroup w-full">
+                  <span className="p-inputgroup-addon bg-blue-50 text-blue-600">
+                    <i className="pi pi-clock" />
+                  </span>
+                  <InputNumber
+                    value={monthsGap}
+                    onValueChange={(e: any) => setMonthsGap(e.value ?? 0)}
+                    min={0}
+                    max={60}
+                    step={1}
+                    className="w-full"
+                    inputClassName="h-10 text-center font-semibold"
+                    placeholder="e.g. 1"
+                  />
+                </div>
+                <small className="text-xs text-gray-500 mt-1 block">Gap in months between installments</small>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <div className="p-inputgroup w-full">
+                  <span className="p-inputgroup-addon bg-blue-50 text-blue-600">
+                    <i className="pi pi-calendar" />
+                  </span>
+                  <Calendar
+                    value={startDate}
+                    onChange={(e: any) => setStartDate(e.value)}
+                    dateFormat="dd/mm/yy"
+                    showIcon
+                    appendTo={() => document.body}
+                    className="w-full"
+                    inputClassName="h-10 font-semibold"
+                    placeholder="dd/mm/yyyy"
+                  />
+                </div>
+                <small className="text-xs text-gray-500 mt-1 block">First installment due date</small>
+              </div>
+            </div>
+
+            {/* Amount row */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">First Installment Amount (₹)</label>
+              <div className="p-inputgroup w-full">
+                <span className="p-inputgroup-addon bg-blue-50 text-blue-600">
+                  <i className="pi pi-money-bill" />
+                </span>
+                <InputNumber
+                  value={firstInstallmentAmount}
+                  onValueChange={(e: any) => setFirstInstallmentAmount(e.value)}
+                  min={1}
+                  mode="currency"
+                  currency="INR"
+                  locale="en-IN"
+                  className="w-full"
+                  inputClassName="h-10 font-semibold"
+                  placeholder="e.g. 300"
+                />
+              </div>
+              <small className="text-xs text-gray-500 mt-1 block">
+                Amount for the first installment. Remaining will be split across the rest.
+              </small>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-5">
+              <Button
+                label={loading ? "Generating..." : "Generate Preview"}
+                icon={loading ? "pi pi-spin pi-spinner" : "pi pi-eye"}
+                onClick={fetchPreview}
+                disabled={loading || !installmentCount}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 border-0 text-white h-11"
+              />
+              <Button
+                label="Cancel"
+                onClick={onClose}
+                className="h-11 px-5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              />
+            </div>
+
+            {/* Preview */}
+            {preview && preview.installments && (
+              <div className="space-y-3 pt-3">
+                <Card className="overflow-hidden border border-gray-200">
+                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
                     <div className="flex items-center gap-2">
                       <i className="pi pi-list text-gray-700"></i>
                       <div className="font-semibold text-gray-800">Preview Breakdown</div>
                     </div>
-                    <div className="text-sm text-gray-500">{preview.installmentCount} items</div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500">
+                        {preview.installmentCount} items • {preview.monthsGap ?? monthsGap} month(s) gap
+                      </div>
+                      {showTotal && (
+                        <div className="text-lg font-bold text-blue-700">{fmt(preview.totalAmount)}</div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="divide-y max-h-80 overflow-y-auto">
-                  {preview.installments.map((inst: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                          {inst.installmentNo}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-700">Installment {inst.installmentNo}</div>
-                          <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <i className="pi pi-calendar text-xs"></i>
-                            {new Date(inst.dueDate).toLocaleDateString("en-IN")}
+                  <div className="divide-y max-h-80 overflow-y-auto">
+                    {preview.installments.map((inst: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            {inst.installmentNo}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-700">Installment {inst.installmentNo}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <i className="pi pi-calendar text-xs"></i>
+                              {new Date(inst.dueDate).toLocaleDateString("en-IN")}
+                            </div>
                           </div>
                         </div>
+                        <div className="text-sm font-semibold text-gray-900">{fmt(inst.amount)}</div>
                       </div>
-                      <div className="text-sm font-semibold text-gray-900">{fmt(inst.amount)}</div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </Card>
+
+                <div className="flex gap-3">
+                  <Button
+                    label={assigning ? "Saving..." : "Save Plan"}
+                    icon={assigning ? "pi pi-spin pi-spinner" : "pi pi-check"}
+                    onClick={handleAssign}
+                    disabled={assigning}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 border-0 text-white h-11"
+                  />
+                  <Button
+                    label="Reset"
+                    onClick={() => {
+                      setPreview(null);
+                      setShowTotal(false);
+                    }}
+                    className="h-11 px-5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  />
                 </div>
               </div>
+            )}
+          </Card>
 
-              <div className="flex gap-2">
-                <Button
-                  label={assigning ? "Saving..." : "Save Plan"}
-                  icon={assigning ? "pi pi-spin pi-spinner" : "pi pi-check"}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 border-0"
-                  onClick={handleAssign}
-                  disabled={assigning}
-                />
-                <Button label="Reset" className="p-button-text" onClick={() => setPreview(null)} />
-              </div>
-            </div>
-          )}
+          {/* Payment Dialog */}
+          <Dialog header="Pay Installment" visible={paymentVisible} style={{ width: "420px" }} onHide={() => setPaymentVisible(false)}>
+            <AddPayment
+              id={selectedItemId}
+              isInstallment={true}
+              studentFeesId={studentFeesId as string}
+              onClose={() => setPaymentVisible(false)}
+              onSuccess={() => {
+                setPaymentVisible(false);
+                fetchInstallmentItems();
+                if (onAssign) onAssign();
+              }}
+            />
+          </Dialog>
         </div>
       )}
 
-      <Dialog header="Pay Installment" visible={paymentVisible} style={{ width: "420px" }} onHide={() => setPaymentVisible(false)}>
-        <AddPayment
-          id={selectedItemId}
-          isInstallment={true}
-          studentFeesId={studentFeesId as string}
-          onClose={() => setPaymentVisible(false)}
-          onSuccess={() => {
-            setPaymentVisible(false);
-            fetchInstallmentItems();
-            if (onAssign) onAssign();
-          }}
-        />
-      </Dialog>
     </>
   );
 }
