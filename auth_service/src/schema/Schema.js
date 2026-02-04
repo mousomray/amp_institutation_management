@@ -71,7 +71,7 @@ const StudentSchema = zod.object({
 });
 
 const EditStudentSchema = zod.object({
-  studentId: zod.string().min(1, "Student ID is required"),
+  studentId: zod.string().optional(),
 
   name: zod.string().min(1, "Name is required"),
 
@@ -90,7 +90,7 @@ const EditStudentSchema = zod.object({
       { message: "Invalid date of birth" }
     ),
 
-  fatherName: zod.string().min(1, "Father name is required"),
+  fatherName: zod.string().optional(),
 
   bloodGroup: zod.enum([
     "A+",
