@@ -19,9 +19,10 @@ const FeesSchema = z.object({
 
 type AddFeeMasterProps = {
     onClose: () => void;
+    onfetchFees: () => void;
 };
 
-export default function AddFeeMaster({ onClose }: AddFeeMasterProps) {
+export default function AddFeeMaster({ onClose, onfetchFees }: AddFeeMasterProps) {
     const [token, setToken] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,6 +55,7 @@ export default function AddFeeMaster({ onClose }: AddFeeMasterProps) {
             toast.success(res.data?.message || "Fees master added");
             reset();
             onClose()
+            onfetchFees()
         } catch (err: any) {
             toast.error(err.response?.data?.message || "Something went wrong");
         } finally {

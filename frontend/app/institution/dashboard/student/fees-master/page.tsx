@@ -189,7 +189,7 @@ export default function FeesMasterTable() {
         <EditFeesMaster id={selectedFeesId} onClose={() => setVisible(false)} refetch={fetchFees} />
       </Dialog>
       <Dialog style={{ width: "40vw" }} onHide={()=> setAddFromVisible(false)} visible={addFromVisible}>
-            <AddFeeMaster onClose={() => setAddFromVisible(false)}/>
+            <AddFeeMaster onfetchFees={fetchFees} onClose={() => setAddFromVisible(false)}/>
       </Dialog>
 
       <ToastContainer />

@@ -5,13 +5,15 @@ import Image from "next/image";
 import { MultiSelect } from "primereact/multiselect";
 import { Button } from "primereact/button";
 import axiosInstance from "@/service/axios.service";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
 
 type CourseEnrollProps = {
     courseName: string;
     courseImage: string;
     courseDuration: string;
     courseFee: number | string;
+    courseId: string | null;
+    token: string;
 };
 
 function CourseEnroll({
@@ -19,6 +21,8 @@ function CourseEnroll({
     courseImage,
     courseDuration,
     courseFee,
+    courseId,
+    token,
 }: CourseEnrollProps) {
     const [students, setStudents] = useState<any[]>([]);
     const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
@@ -47,13 +51,19 @@ function CourseEnroll({
 
         try {
             setLoading(true);
+            if (courseId !== null) {
+               const res =  await axiosInstance.post(`/institution/courses/${courseId}/enroll-students`, {
+                    studentIds: selectedStudents.map((s) => s._id),
+                }, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    withCredentials: true,
+                });
 
-            await axiosInstance.post("/institution/enroll-students", {
-                studentIds: selectedStudents.map((s) => s._id),
-            });
-
-            toast.success("Students enrolled successfully");
-            setSelectedStudents([]);
+                toast.success(res.data.message);
+                setSelectedStudents([]);
+            }
         } catch (error: any) {
             toast.error(error.response?.data?.message || "Enrollment failed");
         } finally {
@@ -116,6 +126,7 @@ function CourseEnroll({
                 loading={loading}
                 onClick={handleEnroll}
             />
+            <ToastContainer/>
         </div>
     );
 }
