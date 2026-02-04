@@ -34,7 +34,7 @@ router.post("/pay-student-fees/:studentFeesId", verifyJwt, payStudentFees);
 router.post("/student-fees/:studentFeesId/installment-preview", verifyJwt,getInstallmentPreview 
 );
 router.post("/assign-installments-to-student-fees/:studentFeesId", verifyJwt, assignInstallmentsToStudentFees);
-router.post("/pay-installment/:studentFeesId/:installmentItemId", verifyJwt, payInstallment);
+router.post("/pay-installment/:installmentItemId", verifyJwt, payInstallment);
 router.get("/list-installment-items/:studentFeesId", verifyJwt, listInstallmentItems);
 router.post("/courses/:courseId/enroll-students", verifyJwt, enrollMultipleStudentsToCourse);
 module.exports = router;

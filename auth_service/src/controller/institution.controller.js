@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const isValidInstrumentId = require("../helper/Instrument.js")
 const { User, Course, Institution, Student, FeesMaster, StudentFees, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
 const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
@@ -1983,64 +1984,105 @@ const assignInstallmentsToStudentFees = async (req, res) => {
 const payInstallment = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
+
   try {
     const userId = req.user.id;
     const { installmentItemId } = req.params;
-    const { amount, paymentMode } = req.body;
+    const { amount, paymentMode, instrumentId } = req.body;
 
-    const item = await StudentInstallmentItem.findById(installmentItemId).session(session);
-    if (!item) return res.status(404).json({ message: "Installment item not found" });
-    if (!amount || amount <= 0) return res.status(400).json({ message: "Invalid amount" });
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
 
-    // fetch fees summary
-    const fees = await StudentFees.findById(item.studentFeesId).session(session);
-    if (!fees || String(fees.userId) !== String(userId)) return res.status(403).json({ message: "Unauthorized" });
+    if (!paymentMode) {
+      return res.status(400).json({ message: "Payment mode is required" });
+    }
 
-    // cap payment to remaining on item
+    const nonCashModes = ["UPI", "BANK", "CARD"];
+
+    if (nonCashModes.includes(paymentMode)) {
+      if (!isValidInstrumentId(paymentMode, instrumentId)) {
+        return res.status(400).json({
+          message: `Invalid instrumentId for ${paymentMode} payment`
+        });
+      }
+    }
+
+    // Fetch installment item
+    const item = await StudentInstallmentItem
+      .findById(installmentItemId)
+      .session(session);
+
+    if (!item) {
+      return res.status(404).json({ message: "Installment item not found" });
+    }
+
+    const fees = await StudentFees
+      .findById(item.studentFeesId)
+      .session(session);
+
+    if (!fees || String(fees.userId) !== String(userId)) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
     const remainingItem = item.amount - item.paidAmount;
     const payNow = Math.min(amount, remainingItem);
 
-    // record payment (reuse StudentFeePayment)
-    const payment = await StudentFeePayment.create([{
-      studentFeesId: fees._id,
-      studentId: fees.studentId,
-      amount: payNow,
-      paymentMode,
-      userId
-    }], { session });
+    if (payNow <= 0) {
+      return res.status(400).json({
+        message: "Installment already fully paid"
+      });
+    }
 
-    // update installment item
+    const payment = await StudentFeePayment.create(
+      [{
+        studentFeesId: fees._id,
+        studentId: fees.studentId,
+        amount: payNow,
+        paymentMode,
+        instrumentId: paymentMode === "CASH" ? null : instrumentId,
+        userId
+      }],
+      { session }
+    );
+
     item.paidAmount += payNow;
     item.status = item.paidAmount >= item.amount ? "PAID" : "PARTIAL";
     await item.save({ session });
 
-    // update fees summary
     fees.paidAmount += payNow;
     fees.dueAmount = Math.max(0, fees.totalAmount - fees.paidAmount);
-    fees.status = fees.dueAmount === 0 ? "PAID" : (fees.paidAmount > 0 ? "PARTIAL" : "DUE");
+    fees.status =
+      fees.dueAmount === 0
+        ? "PAID"
+        : fees.paidAmount > 0
+          ? "PARTIAL"
+          : "DUE";
+
     await fees.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
     return res.status(200).json({
-      message: "Installment payment recorded",
+      message: "Installment payment recorded successfully",
       data: {
         paymentId: payment[0]._id,
-        installmentItemId: item._id,
-        studentFeesId: fees._id,
         paidAmount: payNow,
-        updatedItemStatus: item.status,
-        updatedFeesStatus: fees.status
+        paymentMode,
+        installmentStatus: item.status,
+        feesStatus: fees.status
       }
     });
-  } catch (err) {
+
+  } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error(err);
+    console.error(error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // List installment items + status for a StudentFees
 const listInstallmentItems = async (req, res) => {
