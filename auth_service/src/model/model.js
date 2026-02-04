@@ -267,7 +267,11 @@ const studentFeePaymentSchema = new Schema({
   paymentDate: {
     type: Date,
     default: Date.now
-  }
+  },
+  instrumentId: {
+    type: String,
+    default: null,
+  },
 });
 
 // Per-student installment items (linked to StudentFees)
