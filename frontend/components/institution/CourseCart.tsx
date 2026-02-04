@@ -19,10 +19,11 @@ type CourseCardProps = {
   courses: Course[];
   onEdit?: (course: Course) => void;
   onDelete?: (id: string) => void;
+  onEndroll?: (course: Course) => void;
 };
 
 
-function CourseCard({ courses, onEdit, onDelete }: CourseCardProps) {
+function CourseCard({ courses, onEdit, onDelete,onEndroll }: CourseCardProps) {
   const router = useRouter()
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 px-10 py-10 w-full">
@@ -31,7 +32,7 @@ function CourseCard({ courses, onEdit, onDelete }: CourseCardProps) {
           key={course._id}
           onClick={(e) => {
             e.stopPropagation();
-             router.push(`/institution/dashboard/course/${course._id}`);
+            router.push(`/institution/dashboard/course/${course._id}`);
           }
           }
           className="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 w-full max-w-sm mx-auto"
@@ -96,6 +97,16 @@ function CourseCard({ courses, onEdit, onDelete }: CourseCardProps) {
               </span>
             </div>
           </div>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEndroll?.(course)
+            }}
+            className="mt-auto w-full bg-primary text-white py-2 rounded-xl font-medium hover:bg-primary/90 transition"
+          >
+            Enroll Students
+          </button>
         </div>
       ))}
     </div>

@@ -34,19 +34,19 @@ export const InstitutionSchema = zod.object({
 })
 
 export const CourseSchema = zod.object({
-  name: zod
-    .string()
-    .min(1, "Course name is required"),
+  name: zod.string().min(1, "Course name is required"),
 
-  duration: zod
-    .string()
-    .min(1, "Duration is required"),
+  durationValue: zod
+    .number({  message: "Duration Value is required" })
+    .min(1, "Duration must be at least 1"),
 
-  fee: zod
-    .string()
-    .min(1, "Fee is required"),
-  description: zod.string()
-    .min(5, "description is required"),
+  durationUnit: zod.enum(["Days", "Months", "Years"],{
+    message: "Duration unit is required",
+  }),
+
+  fee: zod.string().min(1, "Fee is required"),
+
+  description: zod.string().min(1, "Description is required"),
 });
 
 export const StudentSchema = zod.object({

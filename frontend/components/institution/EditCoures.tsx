@@ -2,13 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import Image from "next/image";
 import { z } from "zod";
-import { CourseSchema } from "@/helper/schema/Schema";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ToastContainer, toast } from "react-toastify";
-import axiosInstance from "@/service/axios.service";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+
+import { CourseSchema } from "@/helper/schema/Schema";
+import axiosInstance from "@/service/axios.service";
+
+import { InputText } from "primereact/inputtext";
+import { Dropdown } from "primereact/dropdown";
+import { InputTextarea } from "primereact/inputtextarea";
+import { Button } from "primereact/button";
+import { Card } from "primereact/card";
 
 type CourseFormData = z.infer<typeof CourseSchema>;
 
@@ -18,14 +24,10 @@ type EditCourseProps = {
   onClose: () => void;
 };
 
-const durationOptions = [
-  "1 Month",
-  "2 Months",
-  "3 Months",
-  "4 Months",
-  "6 Months",
-  "8 Months",
-  "12 Months",
+const durationUnitOptions = [
+  { label: "Days", value: "Days" },
+  { label: "Months", value: "Months" },
+  { label: "Years", value: "Years" },
 ];
 
 export default function EditCourseForm({
@@ -33,13 +35,16 @@ export default function EditCourseForm({
   refetch,
   onClose,
 }: EditCourseProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    setValue,
+    watch,
     reset,
+    formState: { errors },
   } = useForm<CourseFormData>({
     resolver: zodResolver(CourseSchema),
   });
@@ -48,158 +53,158 @@ export default function EditCourseForm({
   useEffect(() => {
     if (!course) return;
 
+    const [value, unit] = course.duration.split(" ");
+
     reset({
       name: course.name,
-      duration: course.duration,
+      durationValue: Number(value),
+      durationUnit: unit,
       fee: String(course.fee),
       description: course.description,
     });
 
-    setPreview(course.image || null);
+    setPreview(course.image);
   }, [course, reset]);
 
   /* ================= SUBMIT ================= */
   const onSubmit = async (data: CourseFormData) => {
     try {
+      setIsSubmitting(true);
+
+      const payload = {
+        name: data.name,
+        duration: `${data.durationValue} ${data.durationUnit}`,
+        fee: data.fee,
+        description: data.description,
+      };
+
       const res = await axiosInstance.put(
         `/institution/update-course/${course._id}`,
-        data 
+        payload
       );
 
-      toast.success(res.data.message || "Course updated successfully");
+      toast.success(res.data.message);
       refetch();
       onClose();
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Update failed");
       } else {
-        toast.error("Unexpected error occurred");
+        toast.error("Unexpected error");
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   if (!course) return null;
 
   return (
-    <div className="w-full bg-white rounded-xl p-4">
-      <h2 className="text-xl font-semibold text-gray-800 mb-5 text-center">
-        Edit Course
-      </h2>
+    <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-3xl shadow-xl">
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          Edit Course
+        </h2>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
-        {/* IMAGE (READ ONLY) */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            Course Image
-          </label>
-
-          <div className="relative h-40 w-full border rounded-lg overflow-hidden">
-            {preview ? (
-              <Image
-                src={preview}
-                alt="Course"
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                No Image
-              </div>
+          {/* NAME */}
+          <div>
+            <label className="font-semibold">Course Name *</label>
+            <InputText className="w-full mt-1" {...register("name")} />
+            {errors.name && (
+              <p className="text-red-500 text-sm">{errors.name.message}</p>
             )}
           </div>
-        </div>
 
-        {/* NAME */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Course Name
-          </label>
-          <input
-            type="text"
-            className="w-full mt-1 px-3 py-2 border rounded-lg"
-            {...register("name")}
-          />
-          {errors.name && (
-            <p className="text-red-500 text-xs">{errors.name.message}</p>
-          )}
-        </div>
+          {/* DURATION */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="font-semibold">Duration *</label>
+              <InputText
+                type="number"
+                className="w-full mt-1"
+                {...register("durationValue", { valueAsNumber: true })}
+              />
+              {errors.durationValue && (
+                <p className="text-red-500 text-sm">
+                  {errors.durationValue.message}
+                </p>
+              )}
+            </div>
 
-        {/* DURATION */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Duration
-          </label>
-          <select
-            className="w-full mt-1 px-3 py-2 border rounded-lg bg-white"
-            {...register("duration")}
-          >
-            <option value="">Select duration</option>
-            {durationOptions.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-          {errors.duration && (
-            <p className="text-red-500 text-xs">
-              {errors.duration.message}
-            </p>
-          )}
-        </div>
+            <div>
+              <label className="font-semibold">Unit *</label>
+              <Dropdown
+                className="w-full mt-1"
+                options={durationUnitOptions}
+                value={watch("durationUnit")}
+                onChange={(e) =>
+                  setValue("durationUnit", e.value, { shouldValidate: true })
+                }
+              />
+              {errors.durationUnit && (
+                <p className="text-red-500 text-sm">
+                  {errors.durationUnit.message}
+                </p>
+              )}
+            </div>
+          </div>
 
-        {/* FEE */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Fee
-          </label>
-          <input
-            type="text"
-            className="w-full mt-1 px-3 py-2 border rounded-lg"
-            {...register("fee")}
-          />
-          {errors.fee && (
-            <p className="text-red-500 text-xs">{errors.fee.message}</p>
-          )}
-        </div>
+          {/* FEE */}
+          <div>
+            <label className="font-semibold">Fee *</label>
+            <InputText
+              type="number"
+              className="w-full mt-1"
+              {...register("fee")}
+            />
+            {errors.fee && (
+              <p className="text-red-500 text-sm">{errors.fee.message}</p>
+            )}
+          </div>
 
-        {/* DESCRIPTION */}
-        <div>
-          <label className="block text-sm font-medium text-gray-600">
-            Description
-          </label>
-          <textarea
-            rows={4}
-            className="w-full mt-1 px-3 py-2 border rounded-lg resize-none"
-            {...register("description")}
-          />
-          {errors.description && (
-            <p className="text-red-500 text-xs">
-              {errors.description.message}
-            </p>
-          )}
-        </div>
+          {/* DESCRIPTION */}
+          <div>
+            <label className="font-semibold">Description *</label>
+            <InputTextarea
+              rows={4}
+              className="w-full mt-1"
+              {...register("description")}
+            />
+            {errors.description && (
+              <p className="text-red-500 text-sm">
+                {errors.description.message}
+              </p>
+            )}
+          </div>
 
-        {/* ACTIONS */}
-        <div className="flex gap-3 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border rounded-lg"
-          >
-            Cancel
-          </button>
+          {/* IMAGE (READ ONLY) */}
+          <div>
+            <label className="font-semibold">Course Image</label>
+            <div className="h-52 w-full border rounded-2xl bg-white flex items-center justify-center overflow-hidden mt-2">
+              {preview ? (
+                <img
+                  src={preview}
+                  alt="Course"
+                  className="w-full h-full object-contain p-4"
+                />
+              ) : (
+                <p className="text-gray-400">No image available</p>
+              )}
+            </div>
+          </div>
 
-          <button
+          <Button
             type="submit"
-            className="px-4 py-2 bg-primary text-white rounded-lg"
-          >
-            Update Course
-          </button>
-        </div>
-      </form>
+            label={isSubmitting ? "Updating..." : "Update Course"}
+            loading={isSubmitting}
+            className="w-full"
+          />
+        </form>
 
-      <ToastContainer />
+        <ToastContainer />
+      </Card>
     </div>
   );
 }

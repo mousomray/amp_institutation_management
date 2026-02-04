@@ -111,7 +111,7 @@ function Page() {
   };
 
   return (
-    <div className="w-full h-[calc(100vh-96px)] flex justify-center items-center">
+    <div className="w-full  flex justify-center items-center">
       {loading && (
         <div className="flex justify-center items-center h-full text-gray-500">
           Loading courses...
