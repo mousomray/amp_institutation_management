@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CourseSchema } from "@/helper/schema/Schema";
+
 import { z } from "zod";
 
 type CourseFormData = z.infer<typeof CourseSchema>;
@@ -97,9 +98,13 @@ export default function AddCourseForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-3xl shadow-xl">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          Add New Course
-        </h2>
+        <div className="text-center mb-8 pb-6 border-b border-gray-200">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+            <i className="pi pi-book text-3xl text-white"></i>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Course Registration</h2>
+          <p className="text-gray-500">Add new Course with complete information</p>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 

@@ -135,11 +135,11 @@ export default function Page() {
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Something went wrong");
-      // reset();
-      // setPhotoFile(null);
-      // setSignatureFile(null);
-      // setPhotoPreview(null);
-      // setSignPreview(null);
+      reset();
+      setPhotoFile(null);
+      setSignatureFile(null);
+      setPhotoPreview(null);
+      setSignPreview(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -194,7 +194,7 @@ export default function Page() {
     0
   );
 
-  
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8">

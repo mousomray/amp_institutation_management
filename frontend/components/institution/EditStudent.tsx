@@ -153,7 +153,7 @@ export default function EditStudent({
   /* ================= UI ================= */
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-20 py-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4  py-5">
 
       {/* STUDENT ID */}
       <div>

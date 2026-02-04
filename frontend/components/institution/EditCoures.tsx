@@ -100,111 +100,105 @@ export default function EditCourseForm({
   if (!course) return null;
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-3xl shadow-xl">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          Edit Course
-        </h2>
+    <div className="min-h-[80vh] flex items-center justify-center  p-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* NAME */}
+        <div>
+          <label className="font-semibold">Course Name <span className="text-red-500 text-sm">*</span></label>
+          <InputText className="w-full mt-1" {...register("name")} />
+          {errors.name && (
+            <p className="text-red-500 text-sm">{errors.name.message}</p>
+          )}
+        </div>
 
-          {/* NAME */}
+        {/* DURATION */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="font-semibold">Course Name *</label>
-            <InputText className="w-full mt-1" {...register("name")} />
-            {errors.name && (
-              <p className="text-red-500 text-sm">{errors.name.message}</p>
-            )}
-          </div>
-
-          {/* DURATION */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="font-semibold">Duration *</label>
-              <InputText
-                type="number"
-                className="w-full mt-1"
-                {...register("durationValue", { valueAsNumber: true })}
-              />
-              {errors.durationValue && (
-                <p className="text-red-500 text-sm">
-                  {errors.durationValue.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="font-semibold">Unit *</label>
-              <Dropdown
-                className="w-full mt-1"
-                options={durationUnitOptions}
-                value={watch("durationUnit")}
-                onChange={(e) =>
-                  setValue("durationUnit", e.value, { shouldValidate: true })
-                }
-              />
-              {errors.durationUnit && (
-                <p className="text-red-500 text-sm">
-                  {errors.durationUnit.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* FEE */}
-          <div>
-            <label className="font-semibold">Fee *</label>
+            <label className="font-semibold">Duration <span className="text-red-500 text-sm">*</span></label>
             <InputText
               type="number"
               className="w-full mt-1"
-              {...register("fee")}
+              {...register("durationValue", { valueAsNumber: true })}
             />
-            {errors.fee && (
-              <p className="text-red-500 text-sm">{errors.fee.message}</p>
-            )}
-          </div>
-
-          {/* DESCRIPTION */}
-          <div>
-            <label className="font-semibold">Description *</label>
-            <InputTextarea
-              rows={4}
-              className="w-full mt-1"
-              {...register("description")}
-            />
-            {errors.description && (
+            {errors.durationValue && (
               <p className="text-red-500 text-sm">
-                {errors.description.message}
+                {errors.durationValue.message}
               </p>
             )}
           </div>
 
-          {/* IMAGE (READ ONLY) */}
           <div>
-            <label className="font-semibold">Course Image</label>
-            <div className="h-52 w-full border rounded-2xl bg-white flex items-center justify-center overflow-hidden mt-2">
-              {preview ? (
-                <img
-                  src={preview}
-                  alt="Course"
-                  className="w-full h-full object-contain p-4"
-                />
-              ) : (
-                <p className="text-gray-400">No image available</p>
-              )}
-            </div>
+            <label className="font-semibold">Unit <span className="text-red-500 text-sm">*</span></label>
+            <Dropdown
+              className="w-full mt-1"
+              options={durationUnitOptions}
+              value={watch("durationUnit")}
+              onChange={(e) =>
+                setValue("durationUnit", e.value, { shouldValidate: true })
+              }
+            />
+            {errors.durationUnit && (
+              <p className="text-red-500 text-sm">
+                {errors.durationUnit.message}
+              </p>
+            )}
           </div>
+        </div>
 
-          <Button
-            type="submit"
-            label={isSubmitting ? "Updating..." : "Update Course"}
-            loading={isSubmitting}
-            className="w-full"
+        {/* FEE */}
+        <div>
+          <label className="font-semibold">Fee <span className="text-red-500 text-sm">*</span></label>
+          <InputText
+            type="number"
+            className="w-full mt-1"
+            {...register("fee")}
           />
-        </form>
+          {errors.fee && (
+            <p className="text-red-500 text-sm">{errors.fee.message}</p>
+          )}
+        </div>
 
-        <ToastContainer />
-      </Card>
+        {/* DESCRIPTION */}
+        <div>
+          <label className="font-semibold">Description <span className="text-red-500 text-sm">*</span></label>
+          <InputTextarea
+            rows={4}
+            className="w-full mt-1"
+            {...register("description")}
+          />
+          {errors.description && (
+            <p className="text-red-500 text-sm">
+              {errors.description.message}
+            </p>
+          )}
+        </div>
+
+        {/* IMAGE (READ ONLY) */}
+        <div>
+          <label className="font-semibold">Course Image</label>
+          <div className="h-52 w-full border rounded-2xl bg-white flex items-center justify-center overflow-hidden mt-2">
+            {preview ? (
+              <img
+                src={preview}
+                alt="Course"
+                className="w-full h-full object-contain p-4"
+              />
+            ) : (
+              <p className="text-gray-400">No image available</p>
+            )}
+          </div>
+        </div>
+
+        <Button
+          type="submit"
+          label={isSubmitting ? "Updating..." : "Update Course"}
+          loading={isSubmitting}
+          className="w-full"
+        />
+      </form>
+
+      <ToastContainer />
     </div>
   );
 }
