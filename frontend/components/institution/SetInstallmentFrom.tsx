@@ -284,7 +284,7 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
             </div>
 
             {/* Top row fields aligned */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4 items-start">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Number of Installments</label>
                 <div className="p-inputgroup w-full">
@@ -448,7 +448,12 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
           </Card>
 
           {/* Payment Dialog */}
-          <Dialog header="Pay Installment" visible={paymentVisible} style={{ width: "420px" }} onHide={() => setPaymentVisible(false)}>
+          <Dialog
+            header="Pay Installment"
+            visible={paymentVisible}
+            style={{ width: "420px" }}
+            onHide={() => setPaymentVisible(false)}
+          >
             <AddPayment
               id={selectedItemId}
               isInstallment={true}
