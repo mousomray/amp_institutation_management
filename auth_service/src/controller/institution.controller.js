@@ -508,11 +508,11 @@ const updateStudent = async (req, res) => {
       const oldCourses = existingStudent.courses.map(id => id.toString());
       const newCourses = parsedData.courseId || [];
 
-      
+
       const coursesToAdd = newCourses.filter(id => !oldCourses.includes(id));
       const coursesToRemove = oldCourses.filter(id => !newCourses.includes(id));
 
-      
+
       const updatedStudent = await Student.findByIdAndUpdate(
         studentId,
         {
@@ -1038,23 +1038,75 @@ const OnlyOneStudentAPI = async (req, res) => {
 // Handle Fees Master related operations here
 
 const AddFeesMasterAPI = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const userId = req.user.id;
 
-    const fees = await FeesMaster.create({
-      ...req.body,
-      userId
-    });
+    // 1️⃣ Create Fees Master
+    const feesMaster = await FeesMaster.create(
+      [
+        {
+          ...req.body,
+          userId,
+          isActive: true
+        }
+      ],
+      { session }
+    );
+
+    const newMasterFee = feesMaster[0];
+
+    // 2️⃣ Find all student fees of this user
+    const studentFeesList = await StudentFees.find({ userId }).session(session);
+
+    if (studentFeesList.length) {
+      // 3️⃣ Prepare fee items for all students
+      const feeItems = studentFeesList.map(sf => ({
+        studentFeesId: sf._id,
+        feeType: "MASTER",
+        feeMasterId: newMasterFee._id,
+        amount: newMasterFee.amount
+      }));
+
+      // 4️⃣ Insert fee items
+      await StudentFeeItems.insertMany(feeItems, { session });
+
+      // 5️⃣ Update student fees total & due
+      const bulkUpdates = studentFeesList.map(sf => ({
+        updateOne: {
+          filter: { _id: sf._id },
+          update: {
+            $inc: {
+              totalAmount: newMasterFee.amount,
+              dueAmount: newMasterFee.amount
+            },
+            $set: { status: "DUE" }
+          }
+        }
+      }));
+
+      await StudentFees.bulkWrite(bulkUpdates, { session });
+    }
+
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(201).json({
-      message: "Fees master created successfully",
-      data: fees
+      message: "Fees master created & applied to all students successfully",
+      data: newMasterFee
     });
+
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.error("Add fees master error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 const GetAllFeesMasterAPI = async (req, res) => {
   try {
@@ -1153,16 +1205,17 @@ const DeleteFeesMasterAPI = async (req, res) => {
 
 // Student Fees API Implimentation area 
 const assignStudentFees = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { studentId } = req.body;
     const userId = req.user.id;
 
-    // 1️⃣ Student + Courses (AGGREGATION)
+    // 1️⃣ Student + Courses
     const studentData = await Student.aggregate([
       {
-        $match: {
-          _id: new mongoose.Types.ObjectId(studentId)
-        }
+        $match: { _id: new mongoose.Types.ObjectId(studentId) }
       },
       {
         $lookup: {
@@ -1180,9 +1233,9 @@ const assignStudentFees = async (req, res) => {
 
     const student = studentData[0];
 
-    if (!student.courses || student.courses.length === 0) {
+    if (!student.courses.length) {
       return res.status(400).json({
-        message: "Student is not enrolled in any course"
+        message: "Student has no assigned courses"
       });
     }
 
@@ -1190,64 +1243,142 @@ const assignStudentFees = async (req, res) => {
     const masterFees = await FeesMaster.find({
       isActive: true,
       userId
-    });
+    }).session(session);
 
-    let totalAmount = 0;
-    const feeItems = [];
-
-    // 3️⃣ Course fees (MULTIPLE)
-    student.courses.forEach(course => {
-      totalAmount += course.fee;
-
-      feeItems.push({
-        feeType: "COURSE",
-        courseId: course._id,
-        amount: course.fee
-      });
-    });
-
-    // 4️⃣ Master fees (ONCE)
-    masterFees.forEach(fee => {
-      totalAmount += fee.amount;
-
-      feeItems.push({
-        feeType: "MASTER",
-        feeMasterId: fee._id,
-        amount: fee.amount
-      });
-    });
-
-    // 5️⃣ Create StudentFees (SUMMARY)
-    const studentFees = await StudentFees.create({
-      studentId: student._id,
-      totalAmount,
-      paidAmount: 0,
-      dueAmount: totalAmount,
-      status: "DUE",
+    // 3️⃣ Check existing StudentFees
+    let studentFees = await StudentFees.findOne({
+      studentId,
       userId
-    });
+    }).session(session);
 
-    // 6️⃣ Attach studentFeesId to fee items
-    const finalFeeItems = feeItems.map(item => ({
-      ...item,
+    // 👉 CASE 1: FIRST TIME ASSIGN
+    if (!studentFees) {
+      let totalAmount = 0;
+      const feeItems = [];
+
+      // Courses
+      student.courses.forEach(course => {
+        totalAmount += course.fee;
+        feeItems.push({
+          feeType: "COURSE",
+          courseId: course._id,
+          amount: course.fee
+        });
+      });
+
+      // Master fees
+      masterFees.forEach(fee => {
+        totalAmount += fee.amount;
+        feeItems.push({
+          feeType: "MASTER",
+          feeMasterId: fee._id,
+          amount: fee.amount
+        });
+      });
+
+      studentFees = await StudentFees.create(
+        [{
+          studentId,
+          totalAmount,
+          paidAmount: 0,
+          dueAmount: totalAmount,
+          status: "DUE",
+          userId
+        }],
+        { session }
+      );
+
+      const finalItems = feeItems.map(item => ({
+        ...item,
+        studentFeesId: studentFees[0]._id
+      }));
+
+      await StudentFeeItems.insertMany(finalItems, { session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res.status(201).json({
+        message: "Student fees assigned successfully",
+        data: studentFees[0]
+      });
+    }
+
+    // 👉 CASE 2: UPDATE EXISTING FEES
+    const existingItems = await StudentFeeItems.find({
       studentFeesId: studentFees._id
-    }));
+    }).session(session);
 
-    await StudentFeeItems.insertMany(finalFeeItems);
+    const existingCourseIds = existingItems
+      .filter(i => i.courseId)
+      .map(i => i.courseId.toString());
 
-    return res.status(201).json({
-      message: "Student fees assigned successfully",
-      data: {
-        studentFees,
-        feeBreakdown: finalFeeItems
+    const existingMasterIds = existingItems
+      .filter(i => i.feeMasterId)
+      .map(i => i.feeMasterId.toString());
+
+    let addedAmount = 0;
+    const newItems = [];
+
+    // 🟢 New courses
+    student.courses.forEach(course => {
+      if (!existingCourseIds.includes(course._id.toString())) {
+        addedAmount += course.fee;
+        newItems.push({
+          feeType: "COURSE",
+          courseId: course._id,
+          amount: course.fee,
+          studentFeesId: studentFees._id
+        });
       }
     });
 
+    // 🟢 New master fees
+    masterFees.forEach(fee => {
+      if (!existingMasterIds.includes(fee._id.toString())) {
+        addedAmount += fee.amount;
+        newItems.push({
+          feeType: "MASTER",
+          feeMasterId: fee._id,
+          amount: fee.amount,
+          studentFeesId: studentFees._id
+        });
+      }
+    });
+
+    if (newItems.length) {
+      await StudentFeeItems.insertMany(newItems, { session });
+
+      await StudentFees.updateOne(
+        { _id: studentFees._id },
+        {
+          $inc: {
+            totalAmount: addedAmount,
+            dueAmount: addedAmount
+          },
+          $set: { status: "DUE" }
+        },
+        { session }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      message: "Student fees updated successfully",
+      addedAmount,
+      addedItems: newItems.length
+    });
+
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 const listStudentFees = async (req, res) => {
   try {
@@ -1710,7 +1841,7 @@ const getInstallmentPreview = async (req, res) => {
         }
       },
 
-      /* 5️⃣ Convert duration string → number */
+      /*  Convert duration string → number */
       {
         $addFields: {
           courseDurations: {
@@ -1730,7 +1861,7 @@ const getInstallmentPreview = async (req, res) => {
         }
       },
 
-      /* ✅ 6️⃣ SUM of all durations */
+      /* SUM of all durations */
       {
         $addFields: {
           totalCourseDurationMonths: {
@@ -1934,4 +2065,140 @@ const listInstallmentItems = async (req, res) => {
   }
 };
 
-module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems };
+const enrollMultipleStudentsToCourse = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { courseId } = req.params;
+    const { studentIds } = req.body;
+    const userId = req.user.id;
+
+    if (!Array.isArray(studentIds) || !studentIds.length) {
+      return res.status(400).json({ message: "studentIds array required" });
+    }
+
+    //  Fetch course
+    const course = await Course.findById(courseId).session(session);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    //  Update COURSE → students
+    await Course.updateOne(
+      { _id: courseId },
+      { $addToSet: { students: { $each: studentIds } } },
+      { session }
+    );
+
+    //  Update STUDENTS → courses
+    await Student.updateMany(
+      { _id: { $in: studentIds } },
+      { $addToSet: { courses: courseId } },
+      { session }
+    );
+
+    //  Process fees for each student
+    for (const studentId of studentIds) {
+
+      let studentFees = await StudentFees.findOne({
+        studentId,
+        userId
+      }).session(session);
+
+      //  First time fees assign
+      if (!studentFees) {
+        const masterFees = await FeesMaster.find({
+          isActive: true,
+          userId
+        }).session(session);
+
+        let totalAmount = course.fee;
+        const feeItems = [
+          {
+            feeType: "COURSE",
+            courseId,
+            amount: course.fee
+          }
+        ];
+
+        masterFees.forEach(fee => {
+          totalAmount += fee.amount;
+          feeItems.push({
+            feeType: "MASTER",
+            feeMasterId: fee._id,
+            amount: fee.amount
+          });
+        });
+
+        const createdFees = await StudentFees.create(
+          [{
+            studentId,
+            totalAmount,
+            paidAmount: 0,
+            dueAmount: totalAmount,
+            status: "DUE",
+            userId
+          }],
+          { session }
+        );
+
+        const finalItems = feeItems.map(item => ({
+          ...item,
+          studentFeesId: createdFees[0]._id
+        }));
+
+        await StudentFeeItems.insertMany(finalItems, { session });
+      }
+
+      else {
+        const existingCourseFee = await StudentFeeItems.findOne({
+          studentFeesId: studentFees._id,
+          courseId
+        }).session(session);
+
+        if (!existingCourseFee) {
+          await StudentFeeItems.create(
+            [{
+              feeType: "COURSE",
+              courseId,
+              amount: course.fee,
+              studentFeesId: studentFees._id
+            }],
+            { session }
+          );
+
+          await StudentFees.updateOne(
+            { _id: studentFees._id },
+            {
+              $inc: {
+                totalAmount: course.fee,
+                dueAmount: course.fee
+              },
+              $set: { status: "DUE" }
+            },
+            { session }
+          );
+        }
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      message: "Students enrolled & fees assigned successfully",
+      courseId,
+      totalStudents: studentIds.length
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
