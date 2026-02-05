@@ -110,7 +110,7 @@ export default function AddCourseForm() {
 
           {/* Course Name */}
           <div>
-            <label className="font-semibold">Course Name *</label>
+            <label className="font-semibold">Course Name <span className=" text-red-500">*</span></label>
             <InputText
               className="w-full mt-1"
               {...register("name")}
@@ -125,7 +125,7 @@ export default function AddCourseForm() {
 
             {/* Duration Value */}
             <div>
-              <label className="font-semibold">Duration *</label>
+              <label className="font-semibold">Duration <span className=" text-red-500">*</span></label>
               <InputText
                 type="number"
                 className="w-full mt-1"
@@ -140,7 +140,7 @@ export default function AddCourseForm() {
 
             {/* Duration Unit */}
             <div>
-              <label className="font-semibold">Duration Unit *</label>
+              <label className="font-semibold">Duration Unit <span className=" text-red-500">*</span></label>
               <Dropdown
                 className="w-full mt-1"
                 options={durationUnitOptions}
@@ -160,7 +160,7 @@ export default function AddCourseForm() {
 
           {/* Fee */}
           <div>
-            <label className="font-semibold">Fee *</label>
+            <label className="font-semibold">Fee <span className=" text-red-500">*</span></label>
             <InputText
               type="number"
               className="w-full mt-1"
@@ -173,7 +173,7 @@ export default function AddCourseForm() {
 
           {/* Description */}
           <div>
-            <label className="font-semibold">Description *</label>
+            <label className="font-semibold">Description <span className=" text-red-500">*</span></label>
             <InputTextarea
               rows={4}
               className="w-full mt-1"
