@@ -1520,6 +1520,7 @@ const listStudentFees = async (req, res) => {
             name: "$student.name", email: "$student.email",
             photo: "$student.photo"
           },
+          paymentType: 1,
           totalAmount: 1,
           paidAmount: 1,
           dueAmount: 1,
@@ -1702,19 +1703,25 @@ const getSingleStudentFees = async (req, res) => {
           },
 
           installments: {
-            $map: {
-              input: "$installmentItems",
-              as: "ins",
-              in: {
-                installmentNo: "$$ins.installmentNo",
-                amount: "$$ins.amount",
-                paidAmount: "$$ins.paidAmount",
-                dueAmount: {
-                  $subtract: ["$$ins.amount", "$$ins.paidAmount"]
-                },
-                dueDate: "$$ins.dueDate",
-                status: "$$ins.status"
-              }
+            $cond: {
+              if: { $eq: ["$paymentType", "INSTALLMENT"] },
+              then: {
+                $map: {
+                  input: "$installmentItems",
+                  as: "ins",
+                  in: {
+                    installmentNo: "$$ins.installmentNo",
+                    amount: "$$ins.amount",
+                    paidAmount: "$$ins.paidAmount",
+                    dueAmount: {
+                      $subtract: ["$$ins.amount", "$$ins.paidAmount"]
+                    },
+                    dueDate: "$$ins.dueDate",
+                    status: "$$ins.status"
+                  }
+                }
+              },
+              else: [] 
             }
           }
         }
@@ -1999,11 +2006,13 @@ const assignInstallmentsToStudentFees = async (req, res) => {
 
     if (!fees) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: "Student fees not found" });
     }
 
-    if (!installments || !installments.length) {
+    if (!installments || !Array.isArray(installments) || installments.length === 0) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: "Installments data required" });
     }
 
@@ -2011,6 +2020,7 @@ const assignInstallmentsToStudentFees = async (req, res) => {
 
     if (total !== fees.totalAmount) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         message: "Installment total does not match fees total amount"
       });
@@ -2020,13 +2030,16 @@ const assignInstallmentsToStudentFees = async (req, res) => {
       studentFeesId: fees._id,
       installmentNo: i.installmentNo,
       amount: i.amount,
-      dueDate: i.dueDate
+      dueDate: i.dueDate,
+      paidAmount: 0,
+      status: "DUE"
     }));
 
     await StudentInstallmentItem.insertMany(docs, { session });
 
-    // mark fees as installment-based
+    // 🔥 IMPORTANT PART (exactly what you wanted)
     fees.paymentType = "INSTALLMENT";
+    fees.status = "DUE"; // optional but logical
     await fees.save({ session });
 
     await session.commitTransaction();
@@ -2035,7 +2048,8 @@ const assignInstallmentsToStudentFees = async (req, res) => {
     return res.status(201).json({
       message: "Installments assigned successfully",
       data: {
-        studentFeesId,
+        studentFeesId: fees._id,
+        paymentType: fees.paymentType,
         installmentCount: docs.length
       }
     });
@@ -2043,10 +2057,11 @@ const assignInstallmentsToStudentFees = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error(error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("assignInstallmentsToStudentFees error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 
 // Pay against a specific installment item

@@ -190,6 +190,12 @@ const studentFeesSchema = new Schema(
       min: 0
     },
 
+    paymentType: {
+      type: String,
+      enum: ["NORMAL", "INSTALLMENT"],
+      default: "NORMAL"
+    },
+
     status: {
       type: String,
       enum: ["DUE", "PARTIAL", "PAID"],
