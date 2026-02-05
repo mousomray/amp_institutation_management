@@ -5,12 +5,21 @@ import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
 
-export default function AddPayment({ id, onClose, onSuccess, isInstallment = false, studentFeesId }) {
-  const [amount, setAmount] = useState(null);
-  const [mode, setMode] = useState("CASH");
+type Props = {
+  id?: string | null;
+  onClose?: () => void;
+  onSuccess?: () => void;
+  isInstallment?: boolean;
+  studentFeesId?: string | null;
+};
+
+export default function AddPayment({ id, onClose, onSuccess, isInstallment = false, studentFeesId }: Props) {
+  const [amount, setAmount] = useState<number | null>(null);
+  const [instrumentId, setInstrumentId] = useState<string>(""); // for UPI/bank/check references
+  const [mode, setMode] = useState<string>("CASH");
   const [loading, setLoading] = useState(false);
   const [fetchingAmount, setFetchingAmount] = useState(false);
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState<string | null>(null);
 
   const paymentModes = [
     { label: "Cash", value: "CASH", icon: "pi pi-money-bill" },
@@ -38,20 +47,49 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
         headers: { Authorization: `Bearer ${token}` },
       });
       const items = res.data.data || [];
-      const item = items.find((i) => i._id === id);
+      const item = items.find((i: any) => i._id === id);
       if (item) {
-        const remaining = item.amount - item.paidAmount;
-        setAmount(remaining);
+        const remaining = Number(item.amount || 0) - Number(item.paidAmount || 0);
+        setAmount(Number.isFinite(remaining) ? remaining : 0);
+      } else {
+        setAmount(0);
       }
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch installment amount");
+      setAmount(0);
     } finally {
       setFetchingAmount(false);
     }
   };
 
-  const modeOptionTemplate = (option) => {
+  // Fetch total for non-installment payments
+  useEffect(() => {
+    if (!isInstallment && id && token) {
+      fetchStudentFeesTotal();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInstallment, id, token]);
+
+  const fetchStudentFeesTotal = async () => {
+    try {
+      setFetchingAmount(true);
+      const res = await axiosInstance.get(`${process.env.NEXT_PUBLIC_API_URL}/institution/get-single-student-fees/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const item = res.data?.data || {};
+      const total = Number(item?.summary?.totalAmount ?? item?.summary?.dueAmount ?? 0);
+      setAmount(Number.isFinite(total) ? total : 0);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch total amount");
+      setAmount(0);
+    } finally {
+      setFetchingAmount(false);
+    }
+  };
+
+  const modeOptionTemplate = (option: any) => {
     if (!option) return null;
     return (
       <div className="flex items-center gap-3">
@@ -64,7 +102,7 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
     );
   };
 
-  const modeValueTemplate = (option) => {
+  const modeValueTemplate = (option: any) => {
     if (!option) return <span className="text-gray-400">Select mode</span>;
     return (
       <div className="flex items-center gap-3">
@@ -74,21 +112,21 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
     );
   };
 
-  const submit = async (e) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return toast.error("No payment target selected");
     if (!amount || Number(amount) <= 0) return toast.error("Enter a valid amount");
 
     try {
       setLoading(true);
-      const payload = { amount: Number(amount), paymentMode: mode };
+      // include instrumentId only when provided (for UPI/Bank/Check)
+      const payload: any = { amount: Number(amount), paymentMode: mode };
+      if (instrumentId && instrumentId.trim().length > 0) payload.instrumentId = instrumentId.trim();
 
-      let url;
+      let url: string;
       if (isInstallment && studentFeesId) {
-        // installment payment
-        url = `/institution/pay-installment/${studentFeesId}/${id}`;
+        url = `/institution/pay-installment/${id}`;
       } else {
-        // full fees payment
         url = `/institution/pay-student-fees/${id}`;
       }
 
@@ -97,40 +135,13 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
       });
       toast.success(res.data?.message || "Payment successful");
       setAmount(null);
+      setInstrumentId("");
       if (onSuccess) onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       toast.error(err?.response?.data?.message || "Payment failed");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // New: fetch total amount for normal (non-installment) payment and set read-only field
-  useEffect(() => {
-    if (!isInstallment && id && token) {
-      fetchStudentFeesTotal();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInstallment, id, token]);
-
-  const fetchStudentFeesTotal = async () => {
-    try {
-      setFetchingAmount(true);
-      // fetch the student fees record; adjust endpoint if your API uses a different path
-      const res = await axiosInstance.get(`/institution/get-single-student-fees/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const item = res.data?.data || {};
-      console.log("Fetched student fees item:", item);
-      // prefer totalAmount; fallback to dueAmount if totalAmount missing
-      const total = item?.summary?.totalAmount ?? item?.summary?.dueAmount ?? 0;
-      setAmount(total);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch total amount");
-    } finally {
-      setFetchingAmount(false);
     }
   };
 
@@ -146,11 +157,9 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
           ) : (
             <InputNumber
               value={amount}
-              // keep the field editable only when you explicitly want to allow edits.
-              // For normal (non-installment) payments the field should be read-only per requirement.
-              onValueChange={(e) => {
-                // allow manual changes only for installment mode (if you want)
-                if (isInstallment) setAmount(e.value);
+              onValueChange={(e: any) => {
+                // keep numeric value; allow edits for installments, show read-only for full-fees
+                setAmount(e.value ?? null);
               }}
               mode="currency"
               currency="INR"
@@ -159,12 +168,28 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
               className="w-full"
               inputClassName="p-2"
               placeholder="Enter amount"
-              disabled={loading || fetchingAmount || isInstallment} // installment remains disabled
-              readOnly={!isInstallment} // normal (non-installment) payment = read-only showing total
+              disabled={loading || fetchingAmount}
+              readOnly={!isInstallment} // non-installment (full fees) read-only
             />
           )}
         </div>
       </div>
+
+      {/* instrumentId input for UPI/Bank/Check modes */}
+      {mode && mode !== "CASH" && (
+        <div className="px-2">
+          <label className="text-sm font-medium text-gray-700">Transaction / Instrument ID</label>
+          <div className="mt-2">
+            <input
+              value={instrumentId}
+              onChange={(e) => setInstrumentId(e.target.value)}
+              className="w-full p-2 border rounded"
+              placeholder="e.g. UPI txn id or cheque number (optional)"
+              disabled={loading}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="px-2">
         <label className="text-sm font-medium text-gray-700">Payment Mode</label>
@@ -192,7 +217,13 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
           className="w-full p-button-primary"
           disabled={loading || fetchingAmount}
         />
-        <Button type="button" label="Cancel" className="p-button-text" onClick={onClose} disabled={loading} />
+        <Button
+          type="button"
+          label="Cancel"
+          className="p-button-text"
+          onClick={onClose}
+          disabled={loading}
+        />
       </div>
     </form>
   );

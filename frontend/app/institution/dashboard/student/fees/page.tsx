@@ -146,6 +146,18 @@ export default function StudentFeesPage() {
   const actionTemplate = (row: any) => {
     const menuRef = useRef<Menu | null>(null);
 
+    // status flags
+    const isDue = row?.status === "DUE";
+    const isPartial = row?.status === "PARTIAL";
+    const isPaid = row?.status === "PAID";
+
+    // Rules:
+    // - DUE: both Full and Installment enabled
+    // - PARTIAL: only Installment enabled (Full disabled)
+    // - PAID: both disabled
+    const disabledFull = isPartial || isPaid;
+    const disabledInstallment = isPaid;
+
     const items = [
       {
         label: "View Details",
@@ -158,6 +170,7 @@ export default function StudentFeesPage() {
       {
         label: "Full Payment",
         icon: "pi pi-credit-card",
+        disabled: disabledFull,
         command: () => {
           setSelectedPaymentId(row.studentFeesId);
           setPaymentVisible(true);
@@ -166,6 +179,7 @@ export default function StudentFeesPage() {
       {
         label: "Installment Payment",
         icon: "pi pi-credit-card",
+        disabled: disabledInstallment,
         command: () => {
           setSelectedInstallmentId(row.studentFeesId);
           setInstallmentVisible(true);

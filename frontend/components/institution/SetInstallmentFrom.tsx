@@ -170,6 +170,8 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
   // use strict check: existingItems === null -> loading/not-loaded, [] -> no installments
   const hasInstallments = existingItems !== null && existingItems.length > 0;
 
+  console.log("Selected Item ID:", selectedItemId);
+
   return (
     <>
       {/* HEADER with gradient */}
@@ -212,7 +214,10 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
 
             <div className="space-y-3">
               {existingItems.map((item, idx) => (
-                <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div
+                  key={item?._id ?? idx}
+                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
@@ -240,11 +245,19 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
                       {statusBadge(item.status)}
                       {item.status !== "PAID" && (
                         <Button
+                          type="button"
                           icon="pi pi-credit-card"
                           label="Pay"
                           size="small"
-                          className="p-button-sm"
-                          onClick={() => {
+                          className="p-button-sm pointer-events-auto"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            if (!item?._id) {
+                              toast.error("Invalid installment item");
+                              return;
+                            }
+
                             setSelectedItemId(item._id);
                             setPaymentVisible(true);
                           }}
@@ -257,7 +270,7 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
             </div>
           </div>
 
-          <Button label="Close" className="w-full" onClick={onClose} />
+          <Button type="button" label="Close" className="w-full" onClick={onClose} />
         </div>
       )}
 
@@ -446,28 +459,43 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
               </div>
             )}
           </Card>
-
-          {/* Payment Dialog */}
-          <Dialog
-            header="Pay Installment"
-            visible={paymentVisible}
-            style={{ width: "420px" }}
-            onHide={() => setPaymentVisible(false)}
-          >
-            <AddPayment
-              id={selectedItemId}
-              isInstallment={true}
-              studentFeesId={studentFeesId as string}
-              onClose={() => setPaymentVisible(false)}
-              onSuccess={() => {
-                setPaymentVisible(false);
-                fetchInstallmentItems();
-                if (onAssign) onAssign();
-              }}
-            />
-          </Dialog>
         </div>
       )}
+
+      <Dialog
+        header="Pay Installment"
+        visible={paymentVisible}
+        modal
+        dismissableMask
+        appendTo={() => document.body}
+        style={{ width: "420px" }}
+        onHide={() => {
+          setPaymentVisible(false);
+          setSelectedItemId(null);
+        }}
+      >
+        {selectedItemId ? (
+          <AddPayment
+            id={selectedItemId}
+            isInstallment={true}
+            studentFeesId={studentFeesId as string}
+            onClose={() => {
+              setPaymentVisible(false);
+              setSelectedItemId(null);
+            }}
+            onSuccess={() => {
+              setPaymentVisible(false);
+              setSelectedItemId(null);
+              fetchInstallmentItems();
+              if (onAssign) onAssign();
+            }}
+          />
+        ) : (
+          <div className="p-4 text-sm text-gray-500">
+            No installment selected.
+          </div>
+        )}
+      </Dialog>
 
     </>
   );
