@@ -100,6 +100,7 @@ function CourseEnroll({
                 <MultiSelect
                     value={selectedStudents}
                     options={students}
+                    selectionLimit={1}
                     optionLabel="name"
                     display="chip"
                     placeholder="Select students"
