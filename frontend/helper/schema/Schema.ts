@@ -71,13 +71,6 @@ export const StudentSchema = zod.object({
       message: "Admission date is required",
     })
     .optional(),
-  course: zod.object({
-    _id: zod.string(),
-    name: zod.string(),
-    fee: zod.number(),
-    image: zod.string().optional(),
-  }).optional(),
-
 });
 
 // Add FeesSchema here
