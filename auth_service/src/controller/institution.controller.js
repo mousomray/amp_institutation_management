@@ -1721,7 +1721,7 @@ const getSingleStudentFees = async (req, res) => {
                   }
                 }
               },
-              else: [] 
+              else: []
             }
           }
         }
@@ -1792,16 +1792,27 @@ const payStudentFees = async (req, res) => {
       return res.status(400).json({ message: "Payment mode is required" });
     }
 
-    const nonCashModes = ["UPI", "BANK", "CARD"];
+    const nonCashModes = ["UPI", "BANK", "CARD", "CHEQUE"];
 
     if (nonCashModes.includes(paymentMode)) {
+      if (!instrumentId) {
+        return res.status(400).json({
+          message: `${paymentMode} payment requires instrumentId`
+        });
+      }
+
       if (!isValidInstrumentId(paymentMode, instrumentId)) {
         return res.status(400).json({
           message: `Invalid instrumentId for ${paymentMode} payment`
         });
       }
+    } else if (paymentMode === "CASH") {
+      instrumentId = null;
+    } else {
+      return res.status(400).json({
+        message: "Invalid payment mode"
+      });
     }
-
 
     // 2️⃣ Over payment check
     if (amount > fees.dueAmount) {
@@ -2082,14 +2093,26 @@ const payInstallment = async (req, res) => {
       return res.status(400).json({ message: "Payment mode is required" });
     }
 
-    const nonCashModes = ["UPI", "BANK", "CARD"];
+    const nonCashModes = ["UPI", "BANK", "CARD", "CHEQUE"];
 
     if (nonCashModes.includes(paymentMode)) {
+      if (!instrumentId) {
+        return res.status(400).json({
+          message: `${paymentMode} payment requires instrumentId`
+        });
+      }
+
       if (!isValidInstrumentId(paymentMode, instrumentId)) {
         return res.status(400).json({
           message: `Invalid instrumentId for ${paymentMode} payment`
         });
       }
+    } else if (paymentMode === "CASH") {
+      instrumentId = null;
+    } else {
+      return res.status(400).json({
+        message: "Invalid payment mode"
+      });
     }
 
     // Fetch installment item
