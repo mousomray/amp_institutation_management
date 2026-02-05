@@ -126,20 +126,15 @@ export default function Page() {
           }
         }
 
-        // reset();
-        // setPhotoFile(null);
-        // setSignatureFile(null);
-        // setPhotoPreview(null);
-        // setSignPreview(null);
-        // setSelectedCourses([]); // clear selection after success
+        reset();
+        setPhotoFile(null);
+        setSignatureFile(null);
+        setPhotoPreview(null);
+        setSignPreview(null);
+        setSelectedCourses([]); // clear selection after success
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Something went wrong");
-      reset();
-      setPhotoFile(null);
-      setSignatureFile(null);
-      setPhotoPreview(null);
-      setSignPreview(null);
     } finally {
       setIsSubmitting(false);
     }

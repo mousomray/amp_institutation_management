@@ -150,7 +150,7 @@ export default function StudentTable() {
   const EditHEader = (
     <div className="text-center mb-8 pb-6 border-b border-gray-200">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
-            <i className="pi pi-user-plus text-3xl text-white"></i>
+            <i className="pi pi-pencil text-3xl text-white"></i>
           </div>
           <h2 className="text-3xl font-bold text-gray-800 mb-2">Edit Student Registration</h2>
           <p className="text-gray-500">Edit student with complete information</p>
@@ -232,7 +232,7 @@ export default function StudentTable() {
       <Dialog
         header={EditHEader}
         visible={visible}
-        style={{ width: "30vw" }}
+        style={{ width: "50vw" }}
         onHide={() => setVisible(false)}
         
       >

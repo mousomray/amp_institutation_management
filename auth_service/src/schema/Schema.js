@@ -92,16 +92,7 @@ const EditStudentSchema = zod.object({
 
   fatherName: zod.string().optional(),
 
-  bloodGroup: zod.enum([
-    "A+",
-    "A-",
-    "B+",
-    "B-",
-    "O+",
-    "O-",
-    "AB+",
-    "AB-",
-  ]),
+  bloodGroup: zod.string().optional(),
 
   admissionDate: zod
     .union([zod.string(), zod.date()])

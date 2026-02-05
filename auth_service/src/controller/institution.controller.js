@@ -735,31 +735,46 @@ const updateCourse = async (req, res) => {
 
 const deleteCoures = async (req, res) => {
   try {
-    const courseId = req.params.id
+    const courseId = req.params.id;
 
     if (!courseId) {
-      return res.status(404).json({ message: "courseId user not found" });
-    }
-
-    await Course.findByIdAndDelete(courseId)
-    return res.status(200).json({ message: "Cousers delete deleted successfully", deleteStudent })
-
-  } catch (error) {
-    if (error.name === "ZodError") {
       return res.status(400).json({
-        message: "Validation failed",
-        errors: error.errors,
+        message: "Course id is required"
       });
     }
 
-    console.error(error);
-    return res.status(500).json({
-      message: "Internal server error",
+    // 1️⃣ Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      return res.status(404).json({
+        message: "Course not found"
+      });
+    }
+
+    // 2️⃣ Check student enrollment
+    if (course.students && course.students.length > 0) {
+      return res.status(400).json({
+        message:
+          "You can't delete this course because students are enrolled in this course"
+      });
+    }
+
+    // 3️⃣ Safe delete
+    await Course.findByIdAndDelete(courseId);
+
+    return res.status(200).json({
+      message: "Course deleted successfully"
     });
 
-
+  } catch (error) {
+    console.error("Delete course error:", error);
+    return res.status(500).json({
+      message: "Internal server error"
+    });
   }
-}
+};
+
 
 const courseDetails = async (req, res) => {
   try {
@@ -1184,25 +1199,48 @@ const DeleteFeesMasterAPI = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const deletedFee = await FeesMaster.findOneAndDelete({
+
+    const feeMaster = await FeesMaster.findOne({
       _id: id,
       userId
     });
 
-    if (!deletedFee) {
+    if (!feeMaster) {
       return res.status(404).json({
         message: "Fees master not found or unauthorized"
       });
     }
 
+
+    const isUsed = await StudentFeeItems.exists({
+      feeMasterId: id
+    });
+
+    if (isUsed) {
+      return res.status(400).json({
+        message:
+          "This fees master is already used in student fees. Cannot delete."
+      });
+    }
+
+    // 3️⃣ Safe to delete
+    await FeesMaster.deleteOne({
+      _id: id,
+      userId
+    });
+
     return res.status(200).json({
       message: "Fees master deleted successfully"
     });
+
   } catch (error) {
     console.error("Delete fees master error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({
+      message: "Internal server error"
+    });
   }
 };
+
 
 // Student Fees API Implimentation area 
 const assignStudentFees = async (req, res) => {
@@ -1774,7 +1812,7 @@ const payStudentFees = async (req, res) => {
 
   try {
     const { studentFeesId } = req.params;
-    const { amount, paymentMode, instrumentId } = req.body;
+    let { amount, paymentMode, instrumentId } = req.body;
     const userId = req.user.id;
 
     if (!amount || amount <= 0) {
@@ -2083,7 +2121,7 @@ const payInstallment = async (req, res) => {
   try {
     const userId = req.user.id;
     const { installmentItemId } = req.params;
-    const { amount, paymentMode, instrumentId } = req.body;
+    let { amount, paymentMode, instrumentId } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
