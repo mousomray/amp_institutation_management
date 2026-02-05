@@ -27,19 +27,19 @@ export default function RecentActivities({ activities }: RecentActivitiesProps) 
   const bookTemplate = (rowData: ActivityType) => (
     <div className="flex items-center gap-3">
       <img
-        src={rowData.book.image}
-        alt={rowData.book.name}
+        src={rowData?.book?.image}
+        alt={rowData?.book?.name}
         className="w-12 h-12 object-cover rounded-lg shadow-sm"
         onError={(e: any) => (e.target.src = "/placeholder-book.png")}
       />
-      <span className="font-medium text-gray-800">{rowData.book.name}</span>
+      <span className="font-medium text-gray-800">{rowData?.book?.name}</span>
     </div>
   );
 
   const studentTemplate = (rowData: ActivityType) => (
     <div>
-      <div className="font-semibold text-gray-800">{rowData.student.name}</div>
-      <div className="text-xs text-gray-500">{rowData.student.phone}</div>
+      <div className="font-semibold text-gray-800">{rowData?.student?.name}</div>
+      <div className="text-xs text-gray-500">{rowData?.student?.phone}</div>
     </div>
   );
 

@@ -168,6 +168,20 @@ export default function FeesMasterTable() {
     </div>
   )
 
+  const EditfreemasterSettingHeader = (
+    <div className=" w-full flex  justify-center flex-col items-center">
+      <div className="inline-flex  items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+        <i className="pi pi-pencil text-3xl text-white"></i>
+      </div>
+      <h2 className="text-3xl font-bold text-gray-800 text-center">
+        Edit Fee Settings
+      </h2>
+      <p className="text-gray-500 text-center mt-2">
+        Configure  fee for your payment
+      </p>
+    </div>
+  )
+
   return (
     <div className="card bg-white p-4 rounded-lg shadow">
       <DataTable
@@ -199,7 +213,7 @@ export default function FeesMasterTable() {
       {/* ContextMenu placed once; it will act on the selectedRow/selectedFeesId */}
       <ContextMenu model={menuItems} ref={cm} />
 
-      <Dialog visible={visible} style={{ width: "40vw" }} onHide={() => setVisible(false)}>
+      <Dialog header={EditfreemasterSettingHeader} visible={visible} style={{ width: "30vw" }} onHide={() => setVisible(false)}>
         <EditFeesMaster id={selectedFeesId} onClose={() => setVisible(false)} refetch={fetchFees} />
       </Dialog>
       <Dialog style={{ width: "30vw", }} header={AddfreemasterSettingHeader} onHide={() => setAddFromVisible(false)} visible={addFromVisible}>
