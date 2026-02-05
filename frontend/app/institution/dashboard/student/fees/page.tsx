@@ -248,7 +248,7 @@ export default function StudentFeesPage() {
       <Dialog
         header="Student Fees Details"
         visible={detailVisible}
-        style={{ width: "50vw" }}
+        style={{ width: "100vw" }}
         onHide={() => setDetailVisible(false)}
       >
         <SingleStudentFees id={selectedFeesId} onClose={() => setDetailVisible(false)} />

@@ -1617,7 +1617,17 @@ const getSingleStudentFees = async (req, res) => {
         }
       },
 
-      /* 6️⃣ Build final structure */
+      /* 6️⃣ Installment Items */
+      {
+        $lookup: {
+          from: "studentinstallmentitems",
+          localField: "_id",
+          foreignField: "studentFeesId",
+          as: "installmentItems"
+        }
+      },
+
+      /* 7️⃣ Build structured fields */
       {
         $addFields: {
           courses: {
@@ -1686,11 +1696,28 @@ const getSingleStudentFees = async (req, res) => {
                 amount: "$$m.amount"
               }
             }
+          },
+
+          installments: {
+            $map: {
+              input: "$installmentItems",
+              as: "ins",
+              in: {
+                installmentNo: "$$ins.installmentNo",
+                amount: "$$ins.amount",
+                paidAmount: "$$ins.paidAmount",
+                dueAmount: {
+                  $subtract: ["$$ins.amount", "$$ins.paidAmount"]
+                },
+                dueDate: "$$ins.dueDate",
+                status: "$$ins.status"
+              }
+            }
           }
         }
       },
 
-      /* 7️⃣ Final Response */
+      /* 8️⃣ Final response */
       {
         $project: {
           _id: 0,
@@ -1701,6 +1728,7 @@ const getSingleStudentFees = async (req, res) => {
 
           courses: 1,
           masterFees: 1,
+          installments: 1,
 
           summary: {
             totalAmount: "$totalAmount",
@@ -1716,16 +1744,17 @@ const getSingleStudentFees = async (req, res) => {
       return res.status(404).json({ message: "Student fees not found" });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Student fees fetched successfully",
       data: data[0]
     });
 
   } catch (error) {
     console.error("getSingleStudentFees error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 
 // Pay Student Fees

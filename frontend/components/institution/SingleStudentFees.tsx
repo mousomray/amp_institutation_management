@@ -5,6 +5,7 @@ import axiosInstance from "@/service/axios.service";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { Button } from "primereact/button";
+import { formatDate } from "@/helper/DateTime"; // added import
 
 type Props = {
   id: string | null;
@@ -143,22 +144,21 @@ export default function SingleStudentFees({ id, onClose }: Props) {
         <div className="text-xs text-gray-500 mt-1">{calcPercent()}% paid</div>
       </div>
 
-      {/* Breakdown panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Breakdown panels (updated) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Courses */}
         <div className="bg-white border rounded shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b flex items-center justify-between">
             <div className="font-medium text-gray-800">Courses ({(data?.courses || []).length})</div>
             <div className="text-sm text-gray-500 font-semibold">Subtotal: {fmt(coursesTotal)}</div>
           </div>
-          <div className="divide-y max-h-56 overflow-auto">
+          <div className="divide-y max-h-48 overflow-auto">
             {(data?.courses || []).map((c: any, i: number) => (
               <div key={i} className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-start gap-3">
                   <div className="text-indigo-600 mt-0.5"><i className="pi pi-book" /></div>
                   <div>
                     <div className="text-sm font-medium text-gray-700">{c?.name}</div>
-                    {/* optional subtitle */}
                   </div>
                 </div>
                 <div className="text-sm font-semibold text-gray-900"> {fmt(c?.amount)}</div>
@@ -174,7 +174,7 @@ export default function SingleStudentFees({ id, onClose }: Props) {
             <div className="font-medium text-gray-800">Master Fees ({(data?.masterFees || []).length})</div>
             <div className="text-sm text-gray-500 font-semibold">Subtotal: {fmt(masterTotal)}</div>
           </div>
-          <div className="divide-y max-h-56 overflow-auto">
+          <div className="divide-y max-h-48 overflow-auto">
             {(data?.masterFees || []).map((m: any, i: number) => (
               <div key={i} className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -187,6 +187,68 @@ export default function SingleStudentFees({ id, onClose }: Props) {
               </div>
             ))}
             {!(data?.masterFees || []).length && <div className="px-4 py-3 text-sm text-gray-500">No master fees</div>}
+          </div>
+        </div>
+
+        {/* Installments (new professional panel) */}
+        <div className="bg-white border rounded shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b flex items-center justify-between">
+            <div>
+              <div className="font-medium text-gray-800">Installments ({(data?.installments || []).length})</div>
+              <div className="text-xs text-gray-500">Detailed schedule & status</div>
+            </div>
+            <div className="text-sm text-gray-500 font-semibold">{fmt((data?.installments || []).reduce((s: number, it: any) => s + (it?.amount ?? 0), 0))}</div>
+          </div>
+
+          <div className="divide-y max-h-56 overflow-auto">
+            {(data?.installments || []).length ? (
+              (data?.installments || []).map((it: any, idx: number) => (
+                <div key={idx} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-start gap-3 w-full sm:w-2/3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-semibold">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">Installment {idx + 1}</div>
+                      <div className="text-xs text-gray-500">Due: {formatDate(it?.dueDate)}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 w-full sm:w-1/3 justify-end">
+                    <div className="text-right">
+                      <div className="text-sm text-gray-600">Amount</div>
+                      <div className="font-semibold text-gray-900">{fmt(it?.amount)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-green-600">Paid</div>
+                      <div className="font-semibold text-green-700">{fmt(it?.paidAmount)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-red-600">Due</div>
+                      <div className="font-semibold text-red-700">{fmt(it?.dueAmount)}</div>
+                    </div>
+                    <div>
+                      <div className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusClass(it?.status)}`}>
+                        {(it?.status ?? "DUE").toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-3 text-sm text-gray-500">No installments set</div>
+            )}
+          </div>
+
+          {/* Installments summary footer */}
+          <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between">
+            <div className="text-sm text-gray-600">Next due</div>
+            <div className="text-sm font-medium text-gray-800">
+              {(() => {
+                const next = (data?.installments || []).find((x: any) => x?.status !== "PAID");
+                return next ? `${formatDate(next.dueDate)} • ${fmt(next.dueAmount ?? 0)}` : "All paid";
+              })()}
+            </div>
           </div>
         </div>
       </div>
