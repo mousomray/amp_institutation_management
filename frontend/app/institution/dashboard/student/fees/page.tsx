@@ -71,6 +71,39 @@ export default function StudentFeesPage() {
     }
   };
 
+  const studentBody = (row: any) => {
+    const student = row.student;
+
+    return (
+      <div className="flex items-center gap-3">
+        {/* Avatar */}
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+          {student?.photo ? (
+            <img
+              src={student.photo}
+              alt={student.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-sm font-semibold text-gray-600">
+              {student?.name?.charAt(0)?.toUpperCase() || "?"}
+            </span>
+          )}
+        </div>
+
+        {/* Name + Email */}
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-800">
+            {student?.name || "-"}
+          </span>
+          <span className="text-xs text-gray-500">
+            {student?.email || ""}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   // Courses renderer: list courses with amounts + subtotal
   const coursesBody = (row: any) => {
     if (!row.courses || !row.courses.length) return <span className="text-sm text-gray-500">—</span>;
@@ -234,7 +267,11 @@ export default function StudentFeesPage() {
         emptyMessage="No student fees found"
         selectionMode="single"
       >
-        <Column header="Student" body={(r) => <div className="font-medium text-gray-800">{r.student?.name ?? "-"}</div>} />
+        <Column
+          header="Student"
+          body={studentBody}
+          style={{ minWidth: "250px" }}
+        />
         <Column header="Courses" body={coursesBody} style={{ minWidth: "300px" }} />
         <Column header="Master Fees" body={masterFeesBody} style={{ minWidth: "300px" }} />
         <Column field="totalAmount" header="Total" body={(r) => <div className="font-semibold">₹{r.totalAmount ?? 0}</div>} />
