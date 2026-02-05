@@ -1516,7 +1516,10 @@ const listStudentFees = async (req, res) => {
         $project: {
           _id: 0,
           studentFeesId: "$_id",
-          student: { name: "$student.name" },
+          student: {
+            name: "$student.name", email: "$student.email",
+            photo: "$student.photo"
+          },
           totalAmount: 1,
           paidAmount: 1,
           dueAmount: 1,
