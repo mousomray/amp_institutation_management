@@ -1385,7 +1385,11 @@ const listStudentFees = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const data = await StudentFees.aggregate([
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const result = await StudentFees.aggregate([
       /* 1️⃣ Match user */
       {
         $match: {
@@ -1507,30 +1511,47 @@ const listStudentFees = async (req, res) => {
         }
       },
 
-      /* 7️⃣ Final response */
+      /* 7️⃣ Project */
       {
         $project: {
           _id: 0,
           studentFeesId: "$_id",
-
-          student: {
-            name: "$student.name"
-          },
-
+          student: { name: "$student.name" },
           totalAmount: 1,
           paidAmount: 1,
           dueAmount: 1,
           status: 1,
-
           courses: 1,
           masterFees: 1
+        }
+      },
+
+      /* 8️⃣ Pagination + Count */
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit }
+          ],
+          totalCount: [
+            { $count: "count" }
+          ]
         }
       }
     ]);
 
+    const data = result[0].data;
+    const total = result[0].totalCount[0]?.count || 0;
+
     res.status(200).json({
       message: "Student fees list fetched",
-      data
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
     });
 
   } catch (error) {
@@ -1714,19 +1735,34 @@ const payStudentFees = async (req, res) => {
 
   try {
     const { studentFeesId } = req.params;
-    const { amount, paymentMode } = req.body;
+    const { amount, paymentMode, instrumentId } = req.body;
     const userId = req.user.id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid payment amount" });
     }
 
-    // 1️⃣ Get student fees
+
     const fees = await StudentFees.findById(studentFeesId).session(session);
 
     if (!fees) {
       return res.status(404).json({ message: "Fees record not found" });
     }
+
+    if (!paymentMode) {
+      return res.status(400).json({ message: "Payment mode is required" });
+    }
+
+    const nonCashModes = ["UPI", "BANK", "CARD"];
+
+    if (nonCashModes.includes(paymentMode)) {
+      if (!isValidInstrumentId(paymentMode, instrumentId)) {
+        return res.status(400).json({
+          message: `Invalid instrumentId for ${paymentMode} payment`
+        });
+      }
+    }
+
 
     // 2️⃣ Over payment check
     if (amount > fees.dueAmount) {
@@ -1743,7 +1779,8 @@ const payStudentFees = async (req, res) => {
           studentId: fees.studentId,
           amount,
           paymentMode,
-          userId: userId
+          userId: userId,
+          instrumentId: isValidInstrumentId(paymentMode, instrumentId) ? instrumentId : null
         }
       ],
       { session }

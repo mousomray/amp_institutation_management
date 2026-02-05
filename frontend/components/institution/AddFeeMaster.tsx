@@ -64,18 +64,8 @@ export default function AddFeeMaster({ onClose, onfetchFees }: AddFeeMasterProps
     };
 
     return (
-        <div className="px-20 py-10">
-            <div className=" w-full flex  justify-center flex-col items-center">
-                <div className="inline-flex  items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
-                    <i className="pi pi-plus text-3xl text-white"></i>
-                </div>
-                <h2 className="text-3xl font-bold text-gray-800 text-center">
-                    Add Fee Settings
-                </h2>
-                <p className="text-gray-500 text-center mt-2">
-                    Configure  fee for your payment
-                </p>
-            </div>
+        <div className="px-10 ">
+            
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <div className="space-y-4">
                     <div className="space-y-2">
