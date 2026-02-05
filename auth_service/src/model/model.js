@@ -261,7 +261,7 @@ const studentFeePaymentSchema = new Schema({
 
   paymentMode: {
     type: String,
-    enum: ["CASH", "UPI", "BANK", "CARD"],
+    enum: ["CASH", "UPI", "BANK", "CARD","CHEQUE"],
     required: true
   },
 

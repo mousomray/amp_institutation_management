@@ -148,18 +148,53 @@ export default function StudentFeesPage() {
     );
   };
 
-  // nicer status pill
-  const statusBody = (row: any) => {
+  // currency formatter
+  const fmt = (n?: number) =>
+    typeof n === "number"
+      ? n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })
+      : "₹0";
+
+  // improved payment type badge with icon
+  const paymentTypeBody = (row: any) => {
+    const type = String(row?.paymentType ?? "DUE").toUpperCase();
     const cls =
-      row.status === "PAID"
-        ? "bg-green-100 text-green-800"
-        : row.status === "PARTIAL"
-          ? "bg-yellow-100 text-yellow-800"
-          : "bg-red-100 text-red-800";
-    return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${cls}`}>{row.status ?? "DUE"}</span>;
+      type === "INSTALLMENT"
+        ? "bg-indigo-50 text-indigo-700"
+        : type === "FULL"
+          ? "bg-green-50 text-green-700"
+          : "bg-gray-50 text-gray-700";
+    const icon = type === "INSTALLMENT" ? "pi pi-clock" : type === "FULL" ? "pi pi-wallet" : "pi pi-question";
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${cls}`}>
+        <i className={`${icon} text-sm`} />
+        <span>{type}</span>
+      </div>
+    );
   };
 
-  // Enhanced header layout
+  // nicer status pill with icon
+  const statusBody = (row: any) => {
+    const s = String(row?.status ?? "DUE").toUpperCase();
+    const cls =
+      s === "PAID"
+        ? "bg-green-100 text-green-800 border-green-200"
+        : s === "PARTIAL"
+          ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+          : "bg-red-100 text-red-800 border-red-200";
+    const icon = s === "PAID" ? "pi pi-check" : s === "PARTIAL" ? "pi pi-info-circle" : "pi pi-clock";
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${cls}`}>
+        <i className={`${icon} text-sm`} />
+        <span>{s}</span>
+      </div>
+    );
+  };
+
+  // optional small renderers for currency columns
+  const totalBody = (r: any) => <div className="font-semibold text-gray-800">{fmt(r.totalAmount)}</div>;
+  const paidBody = (r: any) => <div className="text-green-700 font-medium">{fmt(r.paidAmount)}</div>;
+  const dueBody = (r: any) => <div className="text-red-700 font-medium">{fmt(r.dueAmount)}</div>;
+
   const header = (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>
@@ -184,14 +219,21 @@ export default function StudentFeesPage() {
     const isPartial = row?.status === "PARTIAL";
     const isPaid = row?.status === "PAID";
 
+    // detect if installments are assigned for this student fees row
+    const hasInstallments = Array.isArray(row?.installments) ? row.installments.length > 0 : !!row?.hasInstallments;
+
+    // detect paymentType sent by API
+    const isInstallmentType = String(row?.paymentType ?? "").toUpperCase() === "INSTALLMENT";
+
     // Rules:
-    // - DUE: both Full and Installment enabled
-    // - PARTIAL: only Installment enabled (Full disabled)
-    // - PAID: both disabled
+    // - Hide Full Payment if paymentType is INSTALLMENT or if installments already assigned
+    // - PARTIAL: only Installment enabled (Full disabled/hidden)
+    // - PAID: both disabled/hidden
+    const hideFull = isInstallmentType || hasInstallments;
     const disabledFull = isPartial || isPaid;
     const disabledInstallment = isPaid;
 
-    const items = [
+    const items: any[] = [
       {
         label: "View Details",
         icon: "pi pi-eye",
@@ -200,7 +242,10 @@ export default function StudentFeesPage() {
           setDetailVisible(true);
         },
       },
-      {
+    ];
+
+    if (!hideFull) {
+      items.push({
         label: "Full Payment",
         icon: "pi pi-credit-card",
         disabled: disabledFull,
@@ -208,17 +253,18 @@ export default function StudentFeesPage() {
           setSelectedPaymentId(row.studentFeesId);
           setPaymentVisible(true);
         },
+      });
+    }
+
+    items.push({
+      label: "Installment Payment",
+      icon: "pi pi-credit-card",
+      disabled: disabledInstallment,
+      command: () => {
+        setSelectedInstallmentId(row.studentFeesId);
+        setInstallmentVisible(true);
       },
-      {
-        label: "Installment Payment",
-        icon: "pi pi-credit-card",
-        disabled: disabledInstallment,
-        command: () => {
-          setSelectedInstallmentId(row.studentFeesId);
-          setInstallmentVisible(true);
-        },
-      },
-    ];
+    });
 
     return (
       <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
@@ -258,7 +304,7 @@ export default function StudentFeesPage() {
           if (e.page !== undefined) setPage(e.page + 1);
           if (e.rows !== undefined) setRows(e.rows);
         }}
-        className="shadow-sm rounded-lg"
+        className="shadow-sm rounded-lg overflow-hidden"
         tableStyle={{ minWidth: "900px" }}
         rowHover
         stripedRows
@@ -266,20 +312,27 @@ export default function StudentFeesPage() {
         globalFilter={globalFilter}
         emptyMessage="No student fees found"
         selectionMode="single"
+        paginatorTemplate="CurrentPageReport FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+        currentPageReportTemplate="Showing {first} to {last} of {totalRecords}"
+        rowClassName={(data) => "odd:bg-white even:bg-gray-50"} // subtle zebra
       >
         <Column
           header="Student"
           body={studentBody}
-          style={{ minWidth: "250px" }}
+          style={{ minWidth: "260px" }}
         />
         <Column header="Courses" body={coursesBody} style={{ minWidth: "300px" }} />
         <Column header="Master Fees" body={masterFeesBody} style={{ minWidth: "300px" }} />
-        <Column field="totalAmount" header="Total" body={(r) => <div className="font-semibold">₹{r.totalAmount ?? 0}</div>} />
-        <Column field="paidAmount" header="Paid" body={(r) => <div className="text-green-700 font-medium">₹{r.paidAmount ?? 0}</div>} />
-        <Column field="dueAmount" header="Due" body={(r) => <div className="text-red-700 font-medium">₹{r.dueAmount ?? 0}</div>} />
-        <Column header="Status" body={statusBody} />
+        <Column field="totalAmount" header="Total" body={totalBody} style={{ width: "120px" }} />
+        <Column field="paidAmount" header="Paid" body={paidBody} style={{ width: "120px" }} />
+        <Column field="dueAmount" header="Due" body={dueBody} style={{ width: "120px" }} />
+
+        {/* New: show payment type as badge */}
+        <Column header="Payment Type" body={paymentTypeBody} style={{ width: "160px" }} />
+
+        <Column header="Status" body={statusBody} style={{ width: "160px" }} />
         {/* <Column field="createdAt" header="Created At" body={(r) => formatDate(r.createdAt)} /> */}
-        <Column header="Actions" body={actionTemplate} />
+        <Column header="Actions" body={actionTemplate} style={{ width: "80px" }} />
       </DataTable>
 
       <Dialog

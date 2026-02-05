@@ -26,6 +26,7 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
     { label: "UPI", value: "UPI", icon: "pi pi-qrcode" },
     { label: "Bank", value: "BANK", icon: "pi pi-university" },
     { label: "Card", value: "CARD", icon: "pi pi-credit-card" },
+    { label: "Cheque", value: "CHEQUE", icon: "pi pi-file" }, // added cheque
   ];
 
   useEffect(() => {
@@ -117,9 +118,14 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
     if (!id) return toast.error("No payment target selected");
     if (!amount || Number(amount) <= 0) return toast.error("Enter a valid amount");
 
+    // require instrument id for cheque payments
+    if (mode === "CHEQUE" && (!instrumentId || instrumentId.trim().length === 0)) {
+      return toast.error("Enter cheque number");
+    }
+
     try {
       setLoading(true);
-      // include instrumentId only when provided (for UPI/Bank/Check)
+      // include instrumentId only when provided (for UPI/bank/check references)
       const payload: any = { amount: Number(amount), paymentMode: mode };
       if (instrumentId && instrumentId.trim().length > 0) payload.instrumentId = instrumentId.trim();
 
@@ -175,16 +181,22 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
         </div>
       </div>
 
-      {/* instrumentId input for UPI/Bank/Check modes */}
+      {/* instrumentId input for UPI/Bank/CHEQUE modes */}
       {mode && mode !== "CASH" && (
         <div className="px-2">
-          <label className="text-sm font-medium text-gray-700">Transaction / Instrument ID</label>
+          <label className="text-sm font-medium text-gray-700">
+            {mode === "CHEQUE" ? "Cheque Number" : "Transaction / Instrument ID"}
+          </label>
           <div className="mt-2">
             <input
               value={instrumentId}
               onChange={(e) => setInstrumentId(e.target.value)}
               className="w-full p-2 border rounded"
-              placeholder="e.g. UPI txn id or cheque number (optional)"
+              placeholder={
+                mode === "CHEQUE"
+                  ? "e.g. Cheque number"
+                  : "e.g. UPI txn id or cheque number (optional)"
+              }
               disabled={loading}
             />
           </div>
