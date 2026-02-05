@@ -158,9 +158,12 @@ export default function BookIssuePage() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-white px-4 py-8">
       <div className="w-full max-w-2xl bg-white rounded-xl shadow p-8">
-        <div className="mb-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-800">Issue Book</h2>
-          <p className="text-gray-500 mt-2">Select student and book, set return date</p>
+        <div className="text-center mb-8 pb-6 border-b border-gray-200">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+            <i className="pi pi-book text-3xl text-white"></i>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Issue Book</h2>
+          <p className="text-gray-500">Select student and book, set return date</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
