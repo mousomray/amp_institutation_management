@@ -50,7 +50,7 @@ export const CourseSchema = zod.object({
 });
 
 export const StudentSchema = zod.object({
-  studentId: zod.string().optional(),
+  studentId: zod.string().min(1, "Name is required"),
   name: zod.string().min(1, "Name is required"),
   email: zod.string().email("Invalid email address"),
   phone: zod

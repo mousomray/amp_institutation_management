@@ -49,7 +49,7 @@ export default function StudentTable() {
     try {
       setLoading(true);
 
-      const res = await axiosInstance.get("/institution/get-student", {
+      const res = await axiosInstance.get("/student/get-all-students", {
         params: {
           page: pagination.page,
           limit: pagination.rows,
@@ -94,7 +94,7 @@ export default function StudentTable() {
       accept: async () => {
         try {
           const res = await axiosInstance.delete(
-            `/institution/delete-student/${rowData._id}`,
+            `/student/delete-student/${rowData._id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -232,7 +232,7 @@ export default function StudentTable() {
       <Dialog
         header={EditHEader}
         visible={visible}
-        style={{ width: "50vw" }}
+        style={{ width: "40vw" }}
         onHide={() => setVisible(false)}
         
       >

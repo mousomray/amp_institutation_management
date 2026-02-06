@@ -51,12 +51,6 @@ export default function Page() {
   }, []);
 
 
-  useEffect(() => {
-    if (token) {
-      courseDataGet();
-      fetchFeesMaster(); // fetch fees master list when token is ready
-    }
-  }, [token])
 
   const {
     register,
@@ -79,25 +73,20 @@ export default function Page() {
       formData.append("name", data.name);
       formData.append("email", data.email);
       formData.append("phone", data.phone);
-
-      // Optional fields
       if (data.studentId) formData.append("studentId", data.studentId);
       if (data.dob) formData.append("dob", data.dob.toISOString());
       if (data.fatherName) formData.append("fatherName", data.fatherName);
       if (data.bloodGroup) formData.append("bloodGroup", data.bloodGroup);
       if (data.admissionDate) formData.append("admissionDate", data.admissionDate.toISOString());
-
-      const courseIds = (selectedCourses || []).map((c: any) => c._id);
-      if (courseIds.length) {
-        courseIds.forEach((id: string) => formData.append("courseId[]", id)); // multiple
+      if (photoFile) {
+        formData.append("image", photoFile);
+      }
+      if (signatureFile) {
+        formData.append("signature", signatureFile);
       }
 
-      // Files
-      formData.append("image", photoFile);
-      formData.append("signature", signatureFile);
-
       if (token) {
-        const res = await axiosInstance.post("/institution/create-student", formData, {
+        const res = await axiosInstance.post("/student/create-student", formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
@@ -105,33 +94,12 @@ export default function Page() {
         });
 
         toast.success(res.data.message);
-        const created = res?.data?.student;
-        const createdStudentId = created?._id;
-
-        // assign student fees ONCE (backend will aggregate student's courses)
-        if (createdStudentId && selectedCourses && selectedCourses.length) {
-          try {
-            await axiosInstance.post(
-              "/institution/assign-student-fees",
-              { studentId: createdStudentId },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            // toast.success("Fees assigned successfully");
-          } catch (assignErr: any) {
-            if (axios.isAxiosError(assignErr)) {
-              toast.error(assignErr.response?.data?.message || "Failed to assign fees");
-            } else {
-              toast.error("Failed to assign fees");
-            }
-          }
-        }
-
         reset();
         setPhotoFile(null);
         setSignatureFile(null);
         setPhotoPreview(null);
         setSignPreview(null);
-        setSelectedCourses([]); // clear selection after success
+        setSelectedCourses([]);
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Something went wrong");
@@ -141,53 +109,7 @@ export default function Page() {
   };
 
 
-  const courseDataGet = async () => {
-    try {
-      setLoading(true);
 
-      const res = await axiosInstance.get("/institution/get-course", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        withCredentials: true,
-      });
-
-      setCourseData(res.data.data);
-    } catch (error: any) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Something went wrong");
-      } else {
-        toast.error("Unexpected error occurred");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchFeesMaster = async () => {
-    try {
-      setFeesLoading(true);
-      const res = await axiosInstance.get("/institution/get-all-fees-master", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setFeesMaster(res.data.data || []);
-    } catch (error: any) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to load fees master");
-      } else {
-        toast.error("Unexpected error occurred");
-      }
-    } finally {
-      setFeesLoading(false);
-    }
-  };
-
-  console.log("=>", courseData)
-
-  const totalCourseFee = selectedCourses.reduce(
-    (sum, c) => sum + (c.fee || 0),
-    0
-  );
 
 
 
@@ -217,7 +139,7 @@ export default function Page() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Student ID */}
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Student ID</label>
+                <label className="text-sm font-semibold text-gray-700">Student ID <span className="text-red-500">*</span></label>
                 <div className="p-inputgroup">
                   <span className="p-inputgroup-addon bg-white">
                     <i className="pi pi-hashtag text-blue-600"></i>
@@ -294,7 +216,7 @@ export default function Page() {
                   <span className="p-inputgroup-addon bg-blue-50">
                     <i className="pi pi-envelope text-blue-600"></i>
                   </span>
-                  <InputText className="w-full" {...register("email")} placeholder="student@example.com" />
+                  <InputText className="w-full" {...register("email")} placeholder="Enter your emaill" />
                 </div>
                 {errors.email && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.email.message}</small>}
               </div>
@@ -307,7 +229,7 @@ export default function Page() {
                   <span className="p-inputgroup-addon bg-blue-50">
                     <i className="pi pi-phone text-blue-600"></i>
                   </span>
-                  <InputText className="w-full" {...register("phone")} placeholder="+91 9876543210" />
+                  <InputText className="w-full" {...register("phone")} placeholder="Enter your phone number" />
                 </div>
                 {errors.phone && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.phone.message}</small>}
               </div>
@@ -329,7 +251,7 @@ export default function Page() {
                   name="dob"
                   control={control}
                   render={({ field }) => (
-                    <Calendar className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
+                    <Calendar placeholder="Select date of birth"className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
                   )}
                 />
               </div>
@@ -344,50 +266,6 @@ export default function Page() {
                   )}
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Academic Information */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <i className="pi pi-book text-blue-600"></i>
-              Academic Information
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Select Course</label>
-                {/* Use state-driven MultiSelect; update RHF hidden field with first selected course */}
-                <MultiSelect
-                  value={selectedCourses}
-                  options={courseData}
-                  optionLabel="name"
-                  placeholder="Choose one or more courses"
-                  className="w-full"
-                  onChange={(e) => {
-                    const list = e.value || [];
-                    setSelectedCourses(list);
-                    // satisfy StudentSchema expecting a single object
-                    setValue("course" as any, list[0] || undefined, { shouldValidate: true });
-                  }}
-                  itemTemplate={(course) => (
-                    <div className="flex items-center gap-3 p-2">
-                      {course?.image && <img src={course.image} alt={course.name} className="w-10 h-10 object-cover rounded-lg" />}
-                      <div>
-                        <div className="font-semibold text-gray-800">{course.name}</div>
-                        <div className="text-sm text-gray-500">₹{course.fee}</div>
-                      </div>
-                    </div>
-                  )}
-                  panelStyle={{ maxHeight: "300px" }}
-                  display="chip"
-                />
-                {/* hidden field to satisfy zod schema expecting an object */}
-                <input type="hidden" {...register("course" as any)} />
-                {errors as any && (errors as any).course && (
-                  <small className="text-red-500">{(errors as any).course.message as any}</small>
-                )}
-              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">Admission Date</label>
@@ -395,57 +273,12 @@ export default function Page() {
                   name="admissionDate"
                   control={control}
                   render={({ field }) => (
-                    <Calendar className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
+                    <Calendar placeholder="Select admission date" className="w-full" showIcon value={field.value} onChange={(e) => field.onChange(e.value)} dateFormat="dd/mm/yy" />
                   )}
                 />
               </div>
             </div>
           </div>
-
-
-          {/* ASSIGN STUDENT FEES */}
-          <div className="space-y-4 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <i className="pi pi-money-bill text-blue-600"></i>
-              Assign Student Fees
-            </h3>
-
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Selected Course Fee</label>
-                <InputText
-                  className="w-full mt-1"
-                  value={
-                    selectedCourses && selectedCourses.length
-                      ? `₹${selectedCourses.reduce((s, c) => s + (c?.fee ?? 0), 0)}`
-                      : "-"
-                  }
-                  disabled
-                />
-              </div>
-
-
-              <div>
-                <label className="text-sm font-medium">Fees Master</label>
-                <div className="mt-1 space-y-2">
-                  {feesLoading ? (
-                    <div className="text-sm text-gray-500">Loading fees...</div>
-                  ) : feesMaster.length ? (
-                    feesMaster.map((f) => (
-                      <div key={f._id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                        <div className="text-sm text-gray-800">{f.name}</div>
-                        <div className="text-sm font-medium">₹{f.amount}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-500">No fees master found</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* SIGNATURE */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">
