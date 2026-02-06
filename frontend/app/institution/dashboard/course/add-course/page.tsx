@@ -69,7 +69,7 @@ export default function AddCourseForm() {
       formData.append("image", imageFile);
 
       const res = await axiosInstance.post(
-        "/institution/create-course",
+        "/institution/add-course",
         formData,
         {
           headers: {
@@ -102,7 +102,7 @@ export default function AddCourseForm() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
             <i className="pi pi-book text-3xl text-white"></i>
           </div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">Course Registration</h2>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Add Course</h2>
           <p className="text-gray-500">Add new Course with complete information</p>
         </div>
 
@@ -113,6 +113,8 @@ export default function AddCourseForm() {
             <label className="font-semibold">Course Name <span className=" text-red-500">*</span></label>
             <InputText
               className="w-full mt-1"
+              placeholder="e.g. Full Stack Web Development"
+              aria-label="Course name"
               {...register("name")}
             />
             {errors.name && (
@@ -128,7 +130,9 @@ export default function AddCourseForm() {
               <label className="font-semibold">Duration <span className=" text-red-500">*</span></label>
               <InputText
                 type="number"
+                inputMode="numeric"
                 className="w-full mt-1"
+                placeholder="e.g. 6"
                 {...register("durationValue", { valueAsNumber: true })}
               />
               {errors.durationValue && (
@@ -145,6 +149,7 @@ export default function AddCourseForm() {
                 className="w-full mt-1"
                 options={durationUnitOptions}
                 placeholder="Select unit"
+                aria-label="Duration unit"
                 value={watch("durationUnit")}
                 onChange={(e) =>
                   setValue("durationUnit", e.value, { shouldValidate: true })
@@ -163,7 +168,9 @@ export default function AddCourseForm() {
             <label className="font-semibold">Fee <span className=" text-red-500">*</span></label>
             <InputText
               type="number"
+              inputMode="numeric"
               className="w-full mt-1"
+              placeholder="e.g. 5000"
               {...register("fee")}
             />
             {errors.fee && (
@@ -177,6 +184,7 @@ export default function AddCourseForm() {
             <InputTextarea
               rows={4}
               className="w-full mt-1"
+              placeholder="Briefly describe the course, syllabus and outcomes"
               {...register("description")}
             />
             {errors.description && (
@@ -187,7 +195,7 @@ export default function AddCourseForm() {
           </div>
 
           {/* Image */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100"> <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"> <i className="pi pi-image text-blue-600"></i> Course Image </h3> <div className="space-y-2"> <label className="block text-sm font-semibold text-gray-700"> Course Image <span className="text-red-500">*</span> </label> <div className="relative h-52 w-full border-2 border-dashed border-blue-300 rounded-2xl flex items-center justify-center overflow-hidden bg-white hover:border-blue-500 cursor-pointer transition-all duration-300" onClick={() => imageInputRef.current?.click()} > {preview ? (<img src={preview} alt="Course Image Preview" className="w-full h-full object-contain p-4" />) : (<div className="text-center p-6"> <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"> <i className="pi pi-cloud-upload text-4xl text-blue-500"></i> </div> <p className="text-blue-600 font-semibold text-lg mb-1"> Click to upload course image </p> <p className="text-sm text-gray-500"> PNG, JPG or GIF up to 10MB </p> </div>)} </div> <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { setImageFile(file); handleImagePreview(file); } }} /> </div> </div>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100"> <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"> <i className="pi pi-image text-blue-600"></i> Course Image </h3> <div className="space-y-2"> <label className="block text-sm font-semibold text-gray-700"> Course Image <span className="text-red-500">*</span> </label> <div role="button" tabIndex={0} aria-label="Upload course image area" className="relative h-52 w-full border-2 border-dashed border-blue-300 rounded-2xl flex items-center justify-center overflow-hidden bg-white hover:border-blue-500 cursor-pointer transition-all duration-300" onClick={() => imageInputRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") imageInputRef.current?.click(); }} > {preview ? (<img src={preview} alt="Course Image Preview" className="w-full h-full object-contain p-4" />) : (<div className="text-center p-6"> <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"> <i className="pi pi-cloud-upload text-4xl text-blue-500"></i> </div> <p className="text-blue-600 font-semibold text-lg mb-1"> Click to upload course image </p> <p className="text-sm text-gray-500"> PNG, JPG or GIF up to 10MB </p> </div>)} </div> <input ref={imageInputRef} type="file" accept="image/*" className="hidden" aria-label="Upload course image" title="Upload course image" onChange={(e) => { const file = e.target.files?.[0]; if (file) { setImageFile(file); handleImagePreview(file); } }} /> </div> </div>
 
           <Button
             type="submit"

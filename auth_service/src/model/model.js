@@ -48,90 +48,6 @@ const institutionSchema = new Schema(
 );
 
 
-const courseSchema = new Schema(
-  {
-    name: { type: String, required: true, trim: true },
-
-    duration: { type: String, required: true },
-
-    fee: { type: Number, required: true },
-
-    image: String,
-    description: String,
-
-    institution: {
-      type: Schema.Types.ObjectId,
-      ref: "Institution",
-      required: true,
-    },
-
-    /* make students an explicit array with default so push/update works reliably */
-    students: {
-      type: [{ type: Schema.Types.ObjectId, ref: "Student" }],
-      default: [],
-    },
-  },
-  { timestamps: true }
-);
-
-
-
-
-const studentSchema = new Schema(
-  {
-    studentId: {
-      type: String,
-      trim: true,
-    },
-    name: { type: String, required: true, trim: true },
-
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-
-    phone: String,
-    dob: Date,
-    fatherName: String,
-
-    bloodGroup: {
-      type: String,
-      enum: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"],
-    },
-
-    admissionDate: {
-      type: Date,
-      default: Date.now,
-    },
-
-    photo: String,
-    signature: String,
-
-    institution: {
-      type: Schema.Types.ObjectId,
-      ref: "Institution",
-      required: true,
-    },
-
-    /* 🔗 Student → Multiple Courses (explicit array with default) */
-    courses: {
-      type: [{ type: Schema.Types.ObjectId, ref: "Course" }],
-      default: [],
-    },
-
-    /* 🔗 Student ↔ User (1–1) */
-    user: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      unique: true,
-    },
-  },
-  { timestamps: true }
-);
-
 // Fees Master Schema 
 const feesMasterSchema = new Schema(
   {
@@ -261,7 +177,7 @@ const studentFeePaymentSchema = new Schema({
 
   paymentMode: {
     type: String,
-    enum: ["CASH", "UPI", "BANK", "CARD","CHEQUE"],
+    enum: ["CASH", "UPI", "BANK", "CARD", "CHEQUE"],
     required: true
   },
 
@@ -294,8 +210,6 @@ const studentInstallmentItemSchema = new Schema({
 
 const User = model("User", userSchema);
 const Institution = model("Institution", institutionSchema);
-const Course = model("Course", courseSchema);
-const Student = model("Student", studentSchema);
 const FeesMaster = model("FeesMaster", feesMasterSchema);
 const StudentFees = model("StudentFees", studentFeesSchema);
 const StudentFeeItems = model("StudentFeeItems", studentFeeItemsSchema);
@@ -305,8 +219,6 @@ const StudentInstallmentItem = model("StudentInstallmentItem", studentInstallmen
 module.exports = {
   User,
   Institution,
-  Course,
-  Student,
   FeesMaster,
   StudentFees,
   StudentFeeItems,

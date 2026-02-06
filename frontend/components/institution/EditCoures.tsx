@@ -79,7 +79,7 @@ export default function EditCourseForm({
       };
 
       const res = await axiosInstance.put(
-        `/institution/update-course/${course._id}`,
+        `/institution/edit-course/${course._id}`,
         payload
       );
 
