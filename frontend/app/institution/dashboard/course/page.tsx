@@ -23,10 +23,6 @@ const EmptyState = () => (
 );
 
 
-
-
-
-
 function Page() {
   const [loading, setLoading] = useState(false);
   const [courseData, setCourseData] = useState<any[]>([]);
@@ -87,11 +83,8 @@ function Page() {
         toast.success(res.data.message);
         await courseDataGet();
       } catch (error: any) {
-        if (axios.isAxiosError(error)) {
-          toast.error(error.response?.data?.message || "Delete failed");
-        } else {
-          toast.error("Unexpected error occurred");
-        }
+        console.log("Error dellete course", error);
+        toast.error(error.response?.data?.message);
       }
     }
   }
@@ -157,9 +150,13 @@ function Page() {
             courseImage={enrollCourseImage}
             courseDuration={enrollCourseDuration}
             courseFee={enrollCourseFee}
+            onClose={() => {
+              setEndrollVisible(false);
+            }}
           />
         )}
       </Dialog>
+      <ToastContainer position="top-right" />
     </div>
   );
 }

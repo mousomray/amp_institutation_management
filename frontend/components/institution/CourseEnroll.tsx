@@ -14,6 +14,7 @@ type CourseEnrollProps = {
     courseFee: number | string;
     courseId: string | null;
     token: string;
+    onClose?: () => void;
 };
 
 function CourseEnroll({
@@ -23,6 +24,7 @@ function CourseEnroll({
     courseFee,
     courseId,
     token,
+    onClose,
 }: CourseEnrollProps) {
     const [students, setStudents] = useState<any[]>([]);
     const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
@@ -63,6 +65,7 @@ function CourseEnroll({
 
                 toast.success(res.data.message);
                 setSelectedStudents([]);
+                onClose?.();
             }
         } catch (error: any) {
             toast.error(error.response?.data?.message || "Enrollment failed");

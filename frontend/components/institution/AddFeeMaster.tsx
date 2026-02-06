@@ -75,7 +75,7 @@ export default function AddFeeMaster({ onClose, onfetchFees }: AddFeeMasterProps
                             <InputText
                                 className="w-full"
                                 {...register("name")}
-                                placeholder="e.g. Electric Fees"
+                                placeholder="Please Enter Electric Fees"
                                 onBlur={() => {
                                     // trim the stored value on blur so whitespace-only gets cleaned
                                     const v = getValues("name") ?? "";

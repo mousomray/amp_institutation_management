@@ -312,8 +312,6 @@ export default function StudentFeesPage() {
         globalFilter={globalFilter}
         emptyMessage="No student fees found"
         selectionMode="single"
-        paginatorTemplate="CurrentPageReport FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-        currentPageReportTemplate="Showing {first} to {last} of {totalRecords}"
         rowClassName={(data) => "odd:bg-white even:bg-gray-50"} // subtle zebra
       >
         <Column

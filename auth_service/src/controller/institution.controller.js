@@ -2277,12 +2277,20 @@ const enrollMultipleStudentsToCourse = async (req, res) => {
     //  Process fees for each student
     for (const studentId of studentIds) {
 
+      // 🔥 Always take latest fees
       let studentFees = await StudentFees.findOne({
         studentId,
         userId
-      }).session(session);
+      })
+        .sort({ createdAt: -1 })
+        .session(session);
 
-      //  First time fees assign
+      // 🔥 IMPORTANT RULE
+      if (studentFees && ["PAID", "PARTIAL"].includes(studentFees.status)) {
+        studentFees = null; // force new entry
+      }
+
+      // 🟢 CREATE NEW FEES ENTRY
       if (!studentFees) {
         const masterFees = await FeesMaster.find({
           isActive: true,
@@ -2327,6 +2335,7 @@ const enrollMultipleStudentsToCourse = async (req, res) => {
         await StudentFeeItems.insertMany(finalItems, { session });
       }
 
+      // 🟡 UPDATE ONLY IF STATUS = DUE
       else {
         const existingCourseFee = await StudentFeeItems.findOne({
           studentFeesId: studentFees._id,
@@ -2375,6 +2384,5 @@ const enrollMultipleStudentsToCourse = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
