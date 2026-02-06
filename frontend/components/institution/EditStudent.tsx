@@ -54,27 +54,10 @@ export default function EditStudent({
     resolver: zodResolver(StudentSchema),
   });
 
-  const [courseData, setCourseData] = useState<any[]>([]);
-  const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
+
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signPreview, setSignPreview] = useState<string | null>(null);
 
-  /* ================= FETCH COURSES ================= */
-
-  const fetchCourses = async () => {
-    try {
-      const res = await axiosInstance.get("/institution/get-course");
-      setCourseData(res.data.data || []);
-    } catch {
-      toast.error("Failed to load courses");
-    }
-  };
-
-  useEffect(() => {
-    fetchCourses();
-  }, []);
-
-  /* ================= PREFILL BASIC DATA ================= */
 
   useEffect(() => {
     if (!student) return;
@@ -96,37 +79,10 @@ export default function EditStudent({
     setSignPreview(student.signature);
   }, [student, reset]);
 
-  /* ================= PREFILL COURSES (IMPORTANT FIX) ================= */
+ 
 
-  const normalizeStudentCourseIds = () => {
-    if (!student?.courses) return [];
+  
 
-    // case 1: already populated
-    if (typeof student.courses[0] === "object") {
-      return student.courses.map((c: any) => c._id);
-    }
-
-    // case 2: only IDs
-    return student.courses;
-  };
-
-  useEffect(() => {
-    if (!student || !courseData.length) return;
-
-    const studentCourseIds = normalizeStudentCourseIds();
-
-    const matchedCourses = courseData.filter(course =>
-      studentCourseIds.includes(course._id)
-    );
-
-    setSelectedCourses(matchedCourses);
-
-    // RHF compatibility (schema expects one course)
-    setValue("course" as any, matchedCourses[0] ?? undefined, {
-      shouldValidate: true,
-    });
-
-  }, [student, courseData, setValue]);
 
   /* ================= SUBMIT ================= */
 
@@ -134,11 +90,10 @@ export default function EditStudent({
     try {
       const payload = {
         ...data,
-        courseId: selectedCourses.map((c) => c._id),
       };
 
       const res = await axiosInstance.put(
-        `/institution/update-student/${student._id}`,
+        `/student/update-student/${student._id}`,
         payload
       );
 
@@ -189,51 +144,6 @@ export default function EditStudent({
         <InputText type="number" className="w-full mt-1" {...register("phone")} />
         {errors.phone && (
           <small className="text-red-500">{errors.phone.message}</small>
-        )}
-      </div>
-
-      {/* COURSES */}
-      <div>
-        <label className="text-sm font-medium">Courses</label>
-
-        <MultiSelect
-          value={selectedCourses}
-          options={courseData}
-          optionLabel="name"
-          display="chip"
-          placeholder="Select courses"
-          className="w-full mt-1"
-          onChange={(e) => {
-            const list = e.value || [];
-            setSelectedCourses(list);
-            setValue("course" as any, list[0] || undefined, {
-              shouldValidate: true,
-            });
-          }}
-          itemTemplate={(course) => (
-            <div className="flex items-center gap-3 p-2">
-              {course?.image && (
-                <img
-                  src={course.image}
-                  alt={course.name}
-                  className="w-10 h-10 rounded-lg object-cover"
-                />
-              )}
-              <div>
-                <div className="font-semibold">{course.name}</div>
-                <div className="text-sm text-gray-500">₹{course.fee}</div>
-              </div>
-            </div>
-          )}
-          panelStyle={{ maxHeight: "300px" }}
-        />
-
-        {/* Hidden RHF field (Zod compatibility) */}
-        <input type="hidden" {...register("course" as any)} />
-        {(errors as any)?.course && (
-          <small className="text-red-500">
-            {(errors as any).course.message}
-          </small>
         )}
       </div>
 

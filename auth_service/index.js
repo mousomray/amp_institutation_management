@@ -24,9 +24,11 @@ app.use(express.urlencoded({ extended: true }));
 
 const adminRoutes = require ("./src/routes/admin.routes.js")
 const institutionRoutes = require("./src/routes/institution.routes.js")
+const studentRoutes = require("./src/routes/student.routes.js")
 
 app.use("/api/admin", adminRoutes)
 app.use("/api/institution",institutionRoutes)
+app.use("/api/student",studentRoutes)
 
 
 const port = process.env.PORT
