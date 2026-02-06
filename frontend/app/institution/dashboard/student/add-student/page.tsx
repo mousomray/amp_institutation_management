@@ -116,7 +116,7 @@ export default function Page() {
               { studentId: createdStudentId },
               { headers: { Authorization: `Bearer ${token}` } }
             );
-            toast.success("Fees assigned successfully");
+            // toast.success("Fees assigned successfully");
           } catch (assignErr: any) {
             if (axios.isAxiosError(assignErr)) {
               toast.error(assignErr.response?.data?.message || "Failed to assign fees");

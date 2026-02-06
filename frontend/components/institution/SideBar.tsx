@@ -64,7 +64,7 @@ const sidebarItems = [
       },
       {
         id: "3-3",
-        label: "Student Fees",
+        label: "Payment",
         path: "/institution/dashboard/student/fees",
         icon: <PaymentIcon/>,
       },
