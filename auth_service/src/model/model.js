@@ -48,37 +48,6 @@ const institutionSchema = new Schema(
 );
 
 
-// Fees Master Schema 
-const feesMasterSchema = new Schema(
-  {
-    name: {
-      type: String,
-      required: true
-    },
-
-    amount: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-
-    description: {
-      type: String
-    },
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    }
-  },
-  { timestamps: true }
-);
-
 // Student Fees Schema 
 const studentFeesSchema = new Schema(
   {
@@ -210,7 +179,6 @@ const studentInstallmentItemSchema = new Schema({
 
 const User = model("User", userSchema);
 const Institution = model("Institution", institutionSchema);
-const FeesMaster = model("FeesMaster", feesMasterSchema);
 const StudentFees = model("StudentFees", studentFeesSchema);
 const StudentFeeItems = model("StudentFeeItems", studentFeeItemsSchema);
 const StudentFeePayment = model("StudentFeePayment", studentFeePaymentSchema);
@@ -219,7 +187,6 @@ const StudentInstallmentItem = model("StudentInstallmentItem", studentInstallmen
 module.exports = {
   User,
   Institution,
-  FeesMaster,
   StudentFees,
   StudentFeeItems,
   StudentFeePayment,

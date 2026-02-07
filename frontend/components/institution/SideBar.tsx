@@ -43,6 +43,12 @@ const sidebarItems = [
         path: "/institution/dashboard/course",
         icon: <ViewListIcon />,
       },
+      {
+        id: "2-3",
+        label: "Enroll Student",
+        path: "/institution/dashboard/course/enroll-student",
+        icon: <NoteAltIcon />,
+      },
     ],
   },
   {

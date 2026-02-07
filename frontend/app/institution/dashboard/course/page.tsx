@@ -244,7 +244,7 @@ function Page() {
           }
           responsiveLayout="scroll"
           emptyMessage="No courses found"
-          // server-side search used via debouncedSearch -> name param
+        // server-side search used via debouncedSearch -> name param
         >
           <Column field="name" header="Name" sortable />
           <Column header="Image" body={imageTemplate} />
@@ -275,7 +275,6 @@ function Page() {
             />
           )}
         </Dialog>
-
         <ConfirmDialog />
         <ToastContainer position="top-right" />
       </div>

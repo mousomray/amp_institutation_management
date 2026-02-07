@@ -52,14 +52,16 @@ export default function StudentFeesPage() {
   const fetchList = async () => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get("/institution/list-student-fees", {
+      const headers: any = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await axios.get("http://localhost:8080/api/student-fees-ledger/list-student-fees", {
         params: { page, limit: rows },
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
       });
 
-      // Backend returns data and pagination info
+      // API shape: { success, total, data: [...] }
       setData(res.data.data || []);
-      setTotalRecords(res.data.pagination?.total || 0);
+      setTotalRecords(res.data.total ?? 0);
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to load student fees");
@@ -71,78 +73,66 @@ export default function StudentFeesPage() {
     }
   };
 
+  // student renderer: use row.student and receipt from API
   const studentBody = (row: any) => {
     const student = row.student;
-
     return (
       <div className="flex items-center gap-3">
-        {/* Avatar */}
         <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-          {student?.photo ? (
-            <img
-              src={student.photo}
-              alt={student.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-sm font-semibold text-gray-600">
-              {student?.name?.charAt(0)?.toUpperCase() || "?"}
-            </span>
-          )}
+          <span className="text-sm font-semibold text-gray-600">
+            {student?.name?.charAt(0)?.toUpperCase() || "?"}
+          </span>
         </div>
 
-        {/* Name + Email */}
         <div className="flex flex-col">
-          <span className="font-medium text-gray-800">
-            {student?.name || "-"}
-          </span>
+          <span className="font-medium text-gray-800">{student?.name || "-"}</span>
           <span className="text-xs text-gray-500">
-            {student?.email || ""}
+            {row.receipt?.receiptNo ? `Receipt: ${row.receipt.receiptNo}` : ""}
           </span>
         </div>
       </div>
     );
   };
 
-  // Courses renderer: list courses with amounts + subtotal
+  // course renderer: single course + enrollment netPayableAmount
   const coursesBody = (row: any) => {
-    if (!row.courses || !row.courses.length) return <span className="text-sm text-gray-500">—</span>;
-    const coursesSum = (row.courses || []).reduce((s: number, c: any) => s + (c?.amount ?? 0), 0);
+    const course = row.course;
+    const enrollment = row.enrollment;
     return (
       <div className="flex flex-col gap-1">
-        <div className="bg-white/50 rounded border border-gray-100">
-          {(row.courses || []).map((c: any, i: number) => (
-            <div key={i} className="flex justify-between items-center px-3 py-2 hover:bg-gray-50">
-              <div className="text-sm text-gray-700">{c?.name ?? "-"}</div>
-              <div className="text-sm font-medium text-gray-900">₹{c?.amount ?? 0}</div>
-            </div>
-          ))}
-        </div>
+        <div className="text-sm text-gray-700">{course?.name || "-"}</div>
+        <div className="text-xs text-gray-500">Duration: {course?.duration || "-"}</div>
+
         <div className="flex justify-between items-center mt-1 px-2">
-          <div className="text-xs text-gray-500">Courses Total</div>
-          <div className="text-sm font-semibold">₹{coursesSum}</div>
+          <div className="text-xs text-gray-500">Course Fee</div>
+          <div className="text-sm font-semibold">₹{course?.fees ?? "-"}</div>
+        </div>
+
+        <div className="flex justify-between items-center px-2">
+          <div className="text-xs text-gray-500">Net Payable</div>
+          <div className="text-sm font-semibold">₹{enrollment?.netPayableAmount ?? "-"}</div>
         </div>
       </div>
     );
   };
 
-  // Improved Master Fees renderer: neat two-column list + subtotal (matches API shape)
-  const masterFeesBody = (row: any) => {
-    if (!row.masterFees || !row.masterFees.length) return <span className="text-sm text-gray-500">—</span>;
-    const masterSum = (row.masterFees || []).reduce((s: number, m: any) => s + (m?.amount ?? 0), 0);
+  // heads renderer (was masterFeesBody): show fees heads and subtotal
+  const headsBody = (row: any) => {
+    if (!row.heads || !row.heads.length) return <span className="text-sm text-gray-500">—</span>;
+    const headsSum = (row.heads || []).reduce((s: number, h: any) => s + (h?.amount ?? 0), 0);
     return (
       <div className="flex flex-col gap-1">
         <div className="bg-white/50 rounded border border-gray-100">
-          {(row.masterFees || []).map((m: any, i: number) => (
+          {(row.heads || []).map((h: any, i: number) => (
             <div key={i} className="flex justify-between items-center px-3 py-2 hover:bg-gray-50">
-              <div className="text-sm text-gray-700">{m?.name ?? "-"}</div>
-              <div className="text-sm font-medium text-gray-900">₹{m?.amount ?? 0}</div>
+              <div className="text-sm text-gray-700">{h?.feesHeadName ?? "-"}</div>
+              <div className="text-sm font-medium text-gray-900">₹{h?.amount ?? 0}</div>
             </div>
           ))}
         </div>
         <div className="flex justify-between items-center mt-1 px-2">
-          <div className="text-xs text-gray-500">Master Total</div>
-          <div className="text-sm font-semibold">₹{masterSum}</div>
+          <div className="text-xs text-gray-500">Heads Total</div>
+          <div className="text-sm font-semibold">₹{headsSum}</div>
         </div>
       </div>
     );
@@ -238,7 +228,7 @@ export default function StudentFeesPage() {
         label: "View Details",
         icon: "pi pi-eye",
         command: () => {
-          setSelectedFeesId(row.studentFeesId);
+          setSelectedFeesId(row._id);
           setDetailVisible(true);
         },
       },
@@ -250,7 +240,7 @@ export default function StudentFeesPage() {
         icon: "pi pi-credit-card",
         disabled: disabledFull,
         command: () => {
-          setSelectedPaymentId(row.studentFeesId);
+          setSelectedPaymentId(row._id);
           setPaymentVisible(true);
         },
       });
@@ -261,7 +251,7 @@ export default function StudentFeesPage() {
       icon: "pi pi-credit-card",
       disabled: disabledInstallment,
       command: () => {
-        setSelectedInstallmentId(row.studentFeesId);
+        setSelectedInstallmentId(row._id);
         setInstallmentVisible(true);
       },
     });
@@ -319,17 +309,13 @@ export default function StudentFeesPage() {
           body={studentBody}
           style={{ minWidth: "260px" }}
         />
-        <Column header="Courses" body={coursesBody} style={{ minWidth: "300px" }} />
-        <Column header="Master Fees" body={masterFeesBody} style={{ minWidth: "300px" }} />
+        <Column header="Course" body={coursesBody} style={{ minWidth: "300px" }} />
+        <Column header="Heads" body={headsBody} style={{ minWidth: "300px" }} />
         <Column field="totalAmount" header="Total" body={totalBody} style={{ width: "120px" }} />
         <Column field="paidAmount" header="Paid" body={paidBody} style={{ width: "120px" }} />
         <Column field="dueAmount" header="Due" body={dueBody} style={{ width: "120px" }} />
-
-        {/* New: show payment type as badge */}
         <Column header="Payment Type" body={paymentTypeBody} style={{ width: "160px" }} />
-
         <Column header="Status" body={statusBody} style={{ width: "160px" }} />
-        {/* <Column field="createdAt" header="Created At" body={(r) => formatDate(r.createdAt)} /> */}
         <Column header="Actions" body={actionTemplate} style={{ width: "80px" }} />
       </DataTable>
 

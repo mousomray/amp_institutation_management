@@ -263,31 +263,31 @@ const updateStudent = async (req, res) => {
 
 
 const deleteStudent = async (req, res) => {
-  try {
-    const institutionId = req.user._id
-    if (!institutionId) {
-      return res.status(403).json({ message: "Only institution can delete students" });
-    }
-    const isinstitution = await User.findById(institutionId);
-    if (!isinstitution || isinstitution.role !== "institution") {
-      return res.status(403).json({ message: "Only institution can delete students" });
-    }
+    try {
+        const institutionId = req.user._id
+        if (!institutionId) {
+            return res.status(403).json({ message: "Only institution can delete students" });
+        }
+        const isinstitution = await User.findById(institutionId);
+        if (!isinstitution || isinstitution.role !== "institution") {
+            return res.status(403).json({ message: "Only institution can delete students" });
+        }
 
-    const studentId = req.params.id
-    const student = await StudentModel.findById(studentId)
-    if (!student) {
-      return res.status(404).json({ message: "Student user not found" })
-    }
+        const studentId = req.params.id
+        const student = await StudentModel.findById(studentId)
+        if (!student) {
+            return res.status(404).json({ message: "Student user not found" })
+        }
 
-    const isDeleteData= await StudentModel.findByIdAndUpdate(student._id,{
-        isDeleted: true
-    })
+        const isDeleteData = await StudentModel.findByIdAndUpdate(student._id, {
+            isDeleted: true
+        })
 
-    
 
-    return res.status(200).json({ message: "Student deleted successfully", isDeleteData })
-  } catch (error) {
-    if (error instanceof ZodError) {
+
+        return res.status(200).json({ message: "Student deleted successfully", isDeleteData })
+    } catch (error) {
+        if (error instanceof ZodError) {
             return res.status(400).json({
                 message: "Validation failed",
                 errors: error.issues.map(err => ({
@@ -302,8 +302,32 @@ const deleteStudent = async (req, res) => {
             message: "Internal server error",
         });
 
-    
-  }
+
+    }
+}
+
+const StudentDropDown = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        if (!userId) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const institutionUser = await User.findById(userId);
+        if (!institutionUser || institutionUser.role !== "institution") {
+            return res.status(403).json({ message: "Only institutions can access this resource" });
+        }
+
+        const institution = await Institution.findOne({ adminUser: institutionUser._id });
+        if (!institution) {
+            return res.status(404).json({ message: "Institution not found" });
+        }
+        const data = await StudentModel.find({ institution: institution._id, isDeleted: false })
+        return res.status(200).json({ message: "All students fetched successfully", data });
+    } catch (error) {
+        console.error("Get all students error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
 }
 
 
@@ -312,4 +336,4 @@ const deleteStudent = async (req, res) => {
 
 
 
-module.exports = { createStudent, getMyStudents, updateStudent,deleteStudent };
+module.exports = { createStudent, getMyStudents, updateStudent, deleteStudent, StudentDropDown };

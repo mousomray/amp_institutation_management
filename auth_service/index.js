@@ -29,12 +29,28 @@ const studentRoutes = require("./src/routes/student.routes.js")
 // Course Routes 
 const courseRoutes = require("./src/routes/course.routes.js") 
 
+// Student Course Enroll Routes
+const studentCourseRoutes = require("./src/routes/studentCourse.routes.js")
+
+// Fees Master Routes
+const feesMasterRoutes = require("./src/routes/feesmaster.routes.js")
+
+// Receipt Routes
+const receiptRoutes = require("./src/routes/recipt.routes.js")
+
+// Student Fees Ledger Routes
+const studentFeesLedgerRoutes = require("./src/routes/studentfeesledger.routes.js")
+
 app.use("/api/admin", adminRoutes)
 app.use("/api/institution",institutionRoutes)
+
+// New requirement routes
 app.use("/api/student",studentRoutes)
-
 app.use("/api/institution", courseRoutes)
-
+app.use("/api/student-course", studentCourseRoutes)
+app.use("/api/fees-master", feesMasterRoutes)
+app.use("/api/receipt", receiptRoutes)
+app.use("/api/student-fees-ledger", studentFeesLedgerRoutes)
 
 const port = process.env.PORT
 
