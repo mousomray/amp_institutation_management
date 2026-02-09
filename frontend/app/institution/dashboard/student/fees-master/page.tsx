@@ -15,7 +15,8 @@ import { toast, ToastContainer } from "react-toastify";
 import EditFeesMaster from "@/components/institution/EditFeesMaster";
 import { formatDate } from "@/helper/DateTime";
 import AddFeeMaster from "@/components/institution/AddFeeMaster"
-
+import { Tag } from "primereact/tag";
+import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 
 export default function FeesMasterTable() {
   const [fees, setFees] = useState<any[]>([]);
@@ -35,6 +36,7 @@ export default function FeesMasterTable() {
   const [selectedFeesId, setSelectedFeesId] = useState<string | null>(null);
   // new: keep the whole row for edit/delete commands
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
+  
 
   // ContextMenu ref
   const cm = useRef<any>(null);
@@ -51,7 +53,7 @@ export default function FeesMasterTable() {
   const fetchFees = async () => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get("/institution/get-all-fees-master", {
+      const res = await axiosInstance.get("/fees-master/get-all-fees-master", {
         params: { page, limit: rows },
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -89,6 +91,32 @@ export default function FeesMasterTable() {
     }
   };
 
+
+  const confirmDelete = (rowData: any) => {
+    confirmDialog({
+      message: `Are you sure you want to delete "${rowData.name}"?`,
+      header: "Delete Confirmation",
+      icon: "pi pi-exclamation-triangle",
+      acceptClassName: "p-button-danger",
+      accept: async () => {
+        try {
+          const res = await axiosInstance.delete(
+            `/fees-master/delete-fees-master/${rowData._id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          toast.success(res.data.message);
+          await fetchFees();
+        } catch (err: any) {
+          toast.error(err?.response?.data?.message || "Delete failed");
+        }
+      },
+    });
+  };
+
+
+
   // menu items for ContextMenu; commands use the stored selectedRow / selectedFeesId
   const menuItems = useMemo(() => [
     {
@@ -103,12 +131,17 @@ export default function FeesMasterTable() {
     {
       label: "Delete",
       icon: "pi pi-trash",
-      command: () => handleDelete(),
+     command: () => {
+        if (selectedRow) {
+          confirmDelete(selectedRow);
+        }
+      },
     },
   ], [selectedRow, selectedFeesId, token]);
 
   // open edit dialog (three-dots)
   const handleEdit = (rowData: any) => {
+    console.log("-->",rowData)
     setSelectedFeesId(rowData._id);
     setSelectedRow(rowData);
     setVisible(true);
@@ -182,6 +215,19 @@ export default function FeesMasterTable() {
     </div>
   )
 
+ const statusBodyTemplate = (rowData: any) => {
+    const isActive = rowData.isActive ?? true;
+    
+    return (
+      <Tag 
+        value={isActive ? "Active" : "Inactive"} 
+        severity={isActive ? "success" : "danger"}
+        icon={isActive ? "pi pi-check-circle" : "pi pi-times-circle"}
+        className="px-3 py-1"
+      />
+    );
+  };
+
   return (
     <div className="card bg-white p-4 rounded-lg shadow">
       <DataTable
@@ -205,8 +251,8 @@ export default function FeesMasterTable() {
         selectionMode="single"
       >
         <Column field="name" header="Name" />
-        <Column field="amount" header="Amount" body={(row) => `₹${row.amount}`} />
         <Column field="createdAt" header="Created At" body={(row) => formatDate(row.createdAt)} />
+        <Column header="status" body={statusBodyTemplate}/>
         <Column header="Actions" body={actionTemplate} />
       </DataTable>
 
@@ -219,7 +265,7 @@ export default function FeesMasterTable() {
       <Dialog style={{ width: "30vw", }} header={AddfreemasterSettingHeader} onHide={() => setAddFromVisible(false)} visible={addFromVisible}>
         <AddFeeMaster onfetchFees={fetchFees} onClose={() => setAddFromVisible(false)} />
       </Dialog>
-
+      <ConfirmDialog />
       <ToastContainer />
     </div>
   );

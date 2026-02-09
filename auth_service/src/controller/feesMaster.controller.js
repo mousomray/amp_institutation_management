@@ -34,13 +34,18 @@ const addFeesMaster = async (req, res) => {
   } catch (error) {
     if (error instanceof ZodError) {
       return res.status(400).json({
-        message: "Validation error",
-        errors: error.errors,
+        message: "Validation failed",
+        errors: error.issues.map(err => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
       });
     }
 
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 };
 
@@ -96,6 +101,11 @@ const updateFeesMaster = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+    //console.log("|=>", userId)
+     const payload = FeesMasterSchema.parse({
+      ...req.body,
+      userId,
+    });
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid ID" });
@@ -108,7 +118,8 @@ const updateFeesMaster = async (req, res) => {
         isDeleted: false,
       },
       {
-        name: req.body.name,
+        name: payload.name,
+        isActive: payload.isActive
       },
       { new: true }
     );
@@ -122,8 +133,20 @@ const updateFeesMaster = async (req, res) => {
       data,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: error.issues.map(err => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
+    }
+
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 };
 
@@ -147,9 +170,8 @@ const toggleFeesMasterStatus = async (req, res) => {
     await data.save();
 
     res.status(200).json({
-      message: `Fees master ${
-        data.isActive ? "activated" : "deactivated"
-      } successfully`,
+      message: `Fees master ${data.isActive ? "activated" : "deactivated"
+        } successfully`,
       data,
     });
   } catch (error) {

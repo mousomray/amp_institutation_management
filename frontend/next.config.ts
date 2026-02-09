@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/institution/create-student",
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/institution/create-student`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL}/student/create-student`,
       },
     ];
   },

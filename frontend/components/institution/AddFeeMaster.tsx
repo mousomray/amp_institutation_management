@@ -13,7 +13,6 @@ import axiosInstance from "@/service/axios.service";
 const FeesSchema = z.object({
     // disallow names that are only whitespace by checking trimmed length
     name: z.string().refine((s) => s.trim().length > 0, { message: "Name is required" }),
-    amount: z.number().nonnegative("Amount must be >= 0"),
 });
 /** @typedef {import('zod').infer<typeof FeesSchema>} FeesFormData */
 
@@ -44,12 +43,12 @@ export default function AddFeeMaster({ onClose, onfetchFees }: AddFeeMasterProps
 
     /** @param {FeesFormData} data */
     const onSubmit = async (data: any) => {
+        console.log("==>",data)
         setIsSubmitting(true);
         try {
             if (!token) return toast.error("Authentication token missing");
-            // ensure trimmed name is sent
-            const payload = { name: String(data.name).trim(), amount: data.amount };
-            const res = await axiosInstance.post("/institution/add-fees-master", payload, {
+            const payload = { name: String(data.name).trim()};
+            const res = await axiosInstance.post("/fees-master/add-fees-master", payload, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             toast.success(res.data?.message || "Fees master added");
@@ -84,15 +83,6 @@ export default function AddFeeMaster({ onClose, onfetchFees }: AddFeeMasterProps
                             />
                         </div>
                         {errors.name && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.name.message}</small>}
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700">Amount (₹) <span className="text-red-500">*</span></label>
-                        <div className="p-inputgroup">
-                            <span className="p-inputgroup-addon bg-blue-50"><i className="pi pi-money-bill text-blue-600"></i></span>
-                            <InputText type="number" step="0.01" className="w-full" {...register("amount", { valueAsNumber: true })} placeholder="200" />
-                        </div>
-                        {errors.amount && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{String(errors.amount.message)}</small>}
                     </div>
                 </div>
 

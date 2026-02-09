@@ -4,8 +4,10 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { MultiSelect } from "primereact/multiselect";
 import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
 import axiosInstance from "@/service/axios.service";
 import { toast, ToastContainer } from "react-toastify";
+import AddNewStudent from "./AddNewStudent";
 
 type CourseEnrollProps = {
     courseName: string;
@@ -30,6 +32,7 @@ function CourseEnroll({
     const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
     const [enrollmentDate, setEnrollmentDate] = useState<string>("");
     const [loading, setLoading] = useState(false);
+    const [showAddStudentDialog, setShowAddStudentDialog] = useState(false);
 
     // fees masters state
     const [feesMasters, setFeesMasters] = useState<any[]>([]);
@@ -202,77 +205,132 @@ function CourseEnroll({
         }
     };
 
+    const AddStudentDialogHeader = (
+        <div className="text-center mb-8 pb-6 border-b border-gray-200">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+                <i className="pi pi-user-plus text-3xl text-white"></i>
+            </div>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">Student Registration</h2>
+            <p className="text-gray-500">Add new student with complete information</p>
+        </div>
+    );
+
+    const handleStudentCreated = async (newStudent: any) => {
+        console.log("New student created:", newStudent);
+        
+        // Refresh the student list
+        await fetchStudents();
+        
+        // Auto-select the newly created student
+        setSelectedStudents([newStudent]);
+        
+        toast.success("Student added and selected!");
+    };
+
     return (
         <div className="space-y-6">
             {/* COURSE INFO */}
-            <div className="flex gap-4 items-center">
+            <div className="flex gap-4 items-center bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
                 <Image
                     src={courseImage}
                     alt={courseName}
                     width={80}
                     height={80}
-                    className="rounded-xl object-cover"
+                    className="rounded-xl object-cover shadow-md"
                 />
 
                 <div>
-                    <h3 className="text-lg font-semibold">{courseName}</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="text-lg font-semibold text-gray-800">{courseName}</h3>
+                    <p className="text-sm text-gray-600 flex items-center gap-1">
+                        <i className="pi pi-clock text-blue-600"></i>
                         Duration: {courseDuration}
                     </p>
-                    <p className="text-primary font-bold text-lg">
-                        ₹{courseFee}
+                    <p className="text-blue-600 font-bold text-lg flex items-center gap-1">
+                        <i className="pi pi-indian-rupee"></i>
+                        {courseFee}
                     </p>
                 </div>
             </div>
 
-            {/* STUDENTS */}
+            {/* STUDENTS SECTION WITH ADD BUTTON */}
             <div>
-                <label className="text-sm font-medium">Students</label>
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-semibold text-gray-700">
+                        Select Student <span className="text-red-500">*</span>
+                    </label>
+                    <Button
+                        label="Add New Student"
+                        icon="pi pi-user-plus"
+                        onClick={() => setShowAddStudentDialog(true)}
+                        className="p-button-sm"
+                        outlined
+                        severity="success"
+                        size="small"
+                        tooltip="Register a new student"
+                        tooltipOptions={{ position: 'left' }}
+                    />
+                </div>
                 <MultiSelect
                     value={selectedStudents}
                     options={students}
                     selectionLimit={1}
                     optionLabel="name"
                     display="chip"
-                    placeholder="Select students"
-                    className="w-full mt-1"
+                    placeholder="Select a student to enroll"
+                    className="w-full"
                     filter
                     filterBy="name,email,studentId"
-                    filterPlaceholder="Search students..."
+                    filterPlaceholder="Search by name, email or ID..."
                     emptyFilterMessage="No students found"
                     onChange={(e) => setSelectedStudents(e.value)}
                     panelStyle={{ maxHeight: "300px" }}
                     itemTemplate={(student) => (
-                        <div className="flex flex-col">
-                            <span className="font-medium">{student.name}</span>
+                        <div className="flex flex-col py-2">
+                            <span className="font-medium text-gray-800">{student.name}</span>
                             <span className="text-xs text-gray-500">{student.email}</span>
+                            <span className="text-xs text-blue-600">ID: {student.studentId}</span>
                         </div>
                     )}
                 />
+                {selectedStudents.length === 0 && (
+                    <small className="text-gray-500 flex items-center gap-1 mt-1">
+                        <i className="pi pi-info-circle"></i>
+                        Student not in the list? Click "Add New Student" button above
+                    </small>
+                )}
             </div>
 
             {/* ENROLLMENT DATE */}
             <div>
-                <label className="text-sm font-medium">Enrollment Date</label>
-                <input
-                    type="date"
-                    value={enrollmentDate}
-                    onChange={(e) => setEnrollmentDate(e.target.value)}
-                    className="w-full mt-1 p-2 border rounded"
-                    placeholder="dd/mm/yyyy"
-                />
+                <label className="text-sm font-semibold text-gray-700">
+                    Enrollment Date <span className="text-red-500">*</span>
+                </label>
+                <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <i className="pi pi-calendar"></i>
+                    </span>
+                    <input
+                        type="date"
+                        value={enrollmentDate}
+                        onChange={(e) => setEnrollmentDate(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        placeholder="dd/mm/yyyy"
+                    />
+                </div>
             </div>
 
             {/* FEES SELECTION */}
             <div>
-                <label className="text-sm font-medium">Fees</label>
+                <label className="text-sm font-semibold text-gray-700">
+                    Select Fees <span className="text-red-500">*</span>
+                </label>
                 <MultiSelect
                     value={selectedFees}
                     options={feesMasters}
                     optionLabel="name"
                     optionValue="_id"
                     display="chip"
-                    placeholder="Select fees"
+                    placeholder="Select fee items"
                     className="w-full mt-1"
                     onChange={(e) => {
                         const next: string[] = e.value || [];
@@ -291,39 +349,79 @@ function CourseEnroll({
                 />
 
                 {selectedFees.length > 0 && (
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-3 space-y-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                            <i className="pi pi-money-bill text-green-600"></i>
+                            Fee Amounts
+                        </div>
                         {selectedFees.map((id) => {
                             const master = feesMasters.find((f) => f._id === id);
                             return (
-                                <div key={id} className="flex items-center gap-2">
+                                <div key={id} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-200">
                                     <div className="flex-1">
-                                        <div className="text-sm font-medium">{master?.name || id}</div>
+                                        <div className="text-sm font-medium text-gray-800">{master?.name || id}</div>
                                     </div>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={feeAmounts[id] ?? ""}
-                                        onChange={(e) =>
-                                            setFeeAmounts((prev) => ({ ...prev, [id]: Number(e.target.value) }))
-                                        }
-                                        className="w-32 p-2 border rounded"
-                                        placeholder="Amount"
-                                    />
+                                    <div className="relative w-40">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                                            ₹
+                                        </span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={feeAmounts[id] ?? ""}
+                                            onChange={(e) =>
+                                                setFeeAmounts((prev) => ({ ...prev, [id]: Number(e.target.value) }))
+                                            }
+                                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
                                 </div>
                             );
                         })}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-300 mt-3">
+                            <span className="text-sm font-semibold text-gray-700">Total Amount:</span>
+                            <span className="text-lg font-bold text-blue-600">
+                                ₹{Object.values(feeAmounts).reduce((sum, amt) => sum + amt, 0).toFixed(2)}
+                            </span>
+                        </div>
                     </div>
                 )}
             </div>
 
             {/* ACTION */}
             <Button
-                label={loading ? "Enrolling..." : "Enroll Students"}
-                className="w-full"
+                label={loading ? "Processing Enrollment..." : "Enroll Student"}
+                icon={loading ? "pi pi-spin pi-spinner" : "pi pi-check-circle"}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-0 text-white py-3 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300"
                 loading={loading}
                 onClick={handleEnroll}
             />
-            <ToastContainer/>
+
+            {/* ADD STUDENT DIALOG */}
+            <Dialog
+                header={AddStudentDialogHeader}
+                visible={showAddStudentDialog}
+                style={{ width: "50vw" }}
+                onHide={() => setShowAddStudentDialog(false)}
+                modal
+            >
+                <Dialog
+                    header={AddStudentDialogHeader}
+                    visible={showAddStudentDialog}
+                    style={{ width: "60vw", maxHeight: "90vh" }}
+                    onHide={() => setShowAddStudentDialog(false)}
+                    modal
+                    className="overflow-hidden"
+                >
+                    <AddNewStudent
+                        onClose={() => setShowAddStudentDialog(false)}
+                        onSuccess={handleStudentCreated}
+                    />
+                </Dialog>
+            </Dialog>
+
+            <ToastContainer />
         </div>
     );
 }
