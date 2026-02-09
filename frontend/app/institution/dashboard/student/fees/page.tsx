@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "primereact/dialog";
 import SingleStudentFees from "@/components/institution/SingleStudentFees";
 import AddPayment from "@/components/institution/AddPayment";
+import AddOtherFees from "@/components/institution/AddOtherFees";
 import { Menu } from "primereact/menu";
 import SetInstallmentFrom from "@/components/institution/SetInstallmentFrom";
 
@@ -35,6 +36,8 @@ export default function StudentFeesPage() {
 
   const [installmentVisible, setInstallmentVisible] = useState(false)
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string | null>(null)
+  const [otherVisible, setOtherVisible] = useState(false);
+  const [selectedOtherEnrollmentId, setSelectedOtherEnrollmentId] = useState<string | null>(null);
 
   // shared menu ref (useRef must be at top level of component)
   const [menuRow, setMenuRow] = useState<any>(null);
@@ -54,7 +57,7 @@ export default function StudentFeesPage() {
       setLoading(true);
       const headers: any = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await axios.get("http://localhost:8080/api/student-fees-ledger/list-student-fees", {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/student-fees-ledger/list-student-fees`, {
         params: { page, limit: rows },
         headers,
       });
@@ -205,8 +208,6 @@ export default function StudentFeesPage() {
     const menuRef = useRef<Menu | null>(null);
 
     // status flags
-    const isDue = row?.status === "DUE";
-    const isPartial = row?.status === "PARTIAL";
     const isPaid = row?.status === "PAID";
 
     // detect if installments are assigned for this student fees row
@@ -215,12 +216,12 @@ export default function StudentFeesPage() {
     // detect paymentType sent by API
     const isInstallmentType = String(row?.paymentType ?? "").toUpperCase() === "INSTALLMENT";
 
-    // Rules:
-    // - Hide Full Payment if paymentType is INSTALLMENT or if installments already assigned
-    // - PARTIAL: only Installment enabled (Full disabled/hidden)
-    // - PAID: both disabled/hidden
-    const hideFull = isInstallmentType || hasInstallments;
-    const disabledFull = isPartial || isPaid;
+    // Rules updated:
+    // - Hide Full Payment only when paymentType === "INSTALLMENT"
+    // - Do NOT disable Full Payment when status is PARTIAL (removed previous PARTIAL check)
+    // - Full Payment disabled only when already PAID
+    const hideFull = isInstallmentType; // was: isInstallmentType || hasInstallments
+    const disabledFull = isPaid; // removed isPartial check
     const disabledInstallment = isPaid;
 
     const items: any[] = [
@@ -253,6 +254,16 @@ export default function StudentFeesPage() {
       command: () => {
         setSelectedInstallmentId(row._id);
         setInstallmentVisible(true);
+      },
+    });
+
+    // Add Other Payment option (uses enrollment id from row.enrollment._id)
+    items.push({
+      label: "Add Other Payment",
+      icon: "pi pi-plus",
+      command: () => {
+        setSelectedOtherEnrollmentId(row?.enrollment?._id ?? null);
+        setOtherVisible(true);
       },
     });
 
@@ -341,6 +352,23 @@ export default function StudentFeesPage() {
           onSuccess={() => {
             setPaymentVisible(false);
             fetchList(); // refresh list after payment
+          }}
+        />
+      </Dialog>
+
+      {/* Add Other Payment Dialog */}
+      <Dialog
+        header="Add Other Payment"
+        visible={otherVisible}
+        style={{ width: "60vw" }}
+        onHide={() => setOtherVisible(false)}
+      >
+        <AddOtherFees
+          enrollmentId={selectedOtherEnrollmentId}
+          onClose={() => setOtherVisible(false)}
+          onSuccess={() => {
+            setOtherVisible(false);
+            fetchList();
           }}
         />
       </Dialog>

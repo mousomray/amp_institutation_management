@@ -96,14 +96,14 @@ const getAllStudentFees = async (req, res) => {
     const userId = req.user._id;
 
     const ledgers = await StudentFeesLedgerModel.aggregate([
-      // 1️⃣ Filter by user
+      // 1️⃣ User filter
       {
         $match: {
           userId: new mongoose.Types.ObjectId(userId)
         }
       },
 
-      // 2️⃣ Join Enrollment
+      // 2️⃣ Enrollment
       {
         $lookup: {
           from: "studentcourses",
@@ -114,7 +114,7 @@ const getAllStudentFees = async (req, res) => {
       },
       { $unwind: "$enrollment" },
 
-      // 3️⃣ Join Course
+      // 3️⃣ Course
       {
         $lookup: {
           from: "courses",
@@ -125,7 +125,7 @@ const getAllStudentFees = async (req, res) => {
       },
       { $unwind: "$course" },
 
-      // 4️⃣ Join Student
+      // 4️⃣ Student
       {
         $lookup: {
           from: "students",
@@ -136,28 +136,35 @@ const getAllStudentFees = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      // 5️⃣ Join Receipt Master
+      // 5️⃣ 🔥 ALL RECEIPTS OF THIS ENROLLMENT
       {
         $lookup: {
           from: "receiptmasters",
-          localField: "receiptMasterId",
-          foreignField: "_id",
-          as: "receiptMaster"
+          let: { enrollmentId: "$enrollment._id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: ["$enrollmentId", "$$enrollmentId"]
+                }
+              }
+            }
+          ],
+          as: "receipts"
         }
       },
-      { $unwind: "$receiptMaster" },
 
-      // 6️⃣ Join Receipt Details
+      // 6️⃣ Receipt Details
       {
         $lookup: {
           from: "receiptdetails",
-          localField: "receiptMaster._id",
+          localField: "receipts._id",
           foreignField: "receiptId",
           as: "receiptDetails"
         }
       },
 
-      // 7️⃣ Join FeesMasters (for head names)
+      // 7️⃣ Fees Masters
       {
         $lookup: {
           from: "feesmasters",
@@ -167,30 +174,29 @@ const getAllStudentFees = async (req, res) => {
         }
       },
 
-      // 8️⃣ Project final response
+      // 8️⃣ FINAL SHAPE
       {
         $project: {
           student: {
             _id: "$student._id",
-            name: "$student.name"
+            name: "$student.name",
+            photo: "$student.photo"
           },
+
           course: {
             _id: "$course._id",
             name: "$course.name",
             duration: "$course.duration",
-            fees: "$enrollment.totalFees"
+            fees: "$course.fees"
           },
+
           enrollment: {
             _id: "$enrollment._id",
             discountAmount: "$enrollment.discountAmount",
             netPayableAmount: "$enrollment.netPayableAmount"
           },
-          receipt: {
-            _id: "$receiptMaster._id",
-            receiptNo: "$receiptMaster.receiptNo",
-            receiptDate: "$receiptMaster.receiptDate",
-            receiptMode: "$receiptMaster.receiptMode"
-          },
+
+          // ✅ ALL HEADS (ENROLL + OTHER FEES)
           heads: {
             $map: {
               input: "$receiptDetails",
@@ -206,7 +212,9 @@ const getAllStudentFees = async (req, res) => {
                           $filter: {
                             input: "$feesMasters",
                             as: "f",
-                            cond: { $eq: ["$$f._id", "$$d.feesMasterId"] }
+                            cond: {
+                              $eq: ["$$f._id", "$$d.feesMasterId"]
+                            }
                           }
                         },
                         as: "f",
@@ -220,53 +228,52 @@ const getAllStudentFees = async (req, res) => {
             }
           },
 
-          // Ledger fields
-          totalAmount: "$totalAmount",
-          discountAmount: "$discountAmount",
-          paidAmount: "$paidAmount",
-          dueAmount: "$dueAmount",
-          paymentType: "$paymentType",
-          status: "$status",
-          lastPaymentDate: "$lastPaymentDate",
-          userId: "$userId",
-          createdAt: 1,
-          updatedAt: 1
+          totalAmount: 1,
+          paidAmount: 1,
+          dueAmount: 1,
+          status: 1,
+          paymentType: 1,
+          lastPaymentDate: 1,
+          createdAt: 1
         }
       },
 
       { $sort: { createdAt: -1 } }
     ]);
 
-    return res.json({
+    res.json({
       success: true,
       total: ledgers.length,
       data: ledgers
     });
+
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
 
+
 const getSingleStudentFees = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { id } = req.params; // student fees ledger _id
+    const ledgerId = req.params.id;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid ID"
-      });
+    if (!mongoose.Types.ObjectId.isValid(ledgerId)) {
+      return res.status(400).json({ message: "Invalid ledger ID" });
     }
 
-    const ledgerData = await StudentFeesLedgerModel.aggregate([
-      { $match: { _id: new mongoose.Types.ObjectId(id), userId: new mongoose.Types.ObjectId(userId) } },
+    const data = await StudentFeesLedgerModel.aggregate([
+      /* 1️⃣ Match Ledger */
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(ledgerId)
+        }
+      },
 
-      // Join Enrollment
+      /* 2️⃣ Enrollment */
       {
         $lookup: {
           from: "studentcourses",
@@ -277,18 +284,7 @@ const getSingleStudentFees = async (req, res) => {
       },
       { $unwind: "$enrollment" },
 
-      // Join Course
-      {
-        $lookup: {
-          from: "courses",
-          localField: "enrollment.courseId",
-          foreignField: "_id",
-          as: "course"
-        }
-      },
-      { $unwind: "$course" },
-
-      // Join Student
+      /* 3️⃣ Student */
       {
         $lookup: {
           from: "students",
@@ -299,124 +295,99 @@ const getSingleStudentFees = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      // Join ReceiptMaster
+      /* 4️⃣ Course */
       {
         $lookup: {
-          from: "receiptmasters",
-          localField: "receiptMasterId",
+          from: "courses",
+          localField: "enrollment.courseId",
           foreignField: "_id",
-          as: "receiptMaster"
+          as: "course"
         }
       },
-      { $unwind: "$receiptMaster" },
+      { $unwind: "$course" },
 
-      // Join ReceiptDetails
+      /* 5️⃣ Installment Items */
       {
         $lookup: {
-          from: "receiptdetails",
-          localField: "receiptMaster._id",
-          foreignField: "receiptId",
-          as: "receiptDetails"
+          from: "studentinstallmentitems",
+          localField: "_id",              // StudentFeesLedger._id
+          foreignField: "studentFeesId",  // Installment.studentFeesId
+          as: "installments"
         }
       },
 
-      // Join FeesMasters for head names
+      /* 6️⃣ Sort Installments by Due Date */
       {
-        $lookup: {
-          from: "feesmasters",
-          localField: "receiptDetails.feesMasterId",
-          foreignField: "_id",
-          as: "feesMasters"
+        $addFields: {
+          installments: {
+            $sortArray: {
+              input: "$installments",
+              sortBy: { dueDate: 1 }
+            }
+          }
         }
       },
 
-      // Project final response
+      /* 7️⃣ Final Response */
       {
         $project: {
           ledgerId: "$_id",
-          student: {
-            _id: "$student._id",
-            name: "$student.name"
-          },
-          course: {
-            _id: "$course._id",
-            name: "$course.name",
-            duration: "$course.duration",
-            fees: "$enrollment.totalFees"
-          },
-          enrollment: {
-            _id: "$enrollment._id",
-            discountAmount: "$enrollment.discountAmount",
-            netPayableAmount: "$enrollment.netPayableAmount"
-          },
-          receipt: {
-            _id: "$receiptMaster._id",
-            receiptNo: "$receiptMaster.receiptNo",
-            receiptDate: "$receiptMaster.receiptDate",
-            receiptMode: "$receiptMaster.receiptMode"
-          },
-          heads: {
-            $map: {
-              input: "$receiptDetails",
-              as: "d",
-              in: {
-                feesHeadId: "$$d.feesMasterId",
-                amount: "$$d.amount",
-                feesHeadName: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$feesMasters",
-                            as: "f",
-                            cond: { $eq: ["$$f._id", "$$d.feesMasterId"] }
-                          }
-                        },
-                        as: "f",
-                        in: "$$f.name"
-                      }
-                    },
-                    0
-                  ]
-                }
-              }
-            }
-          },
+
           totalAmount: 1,
           paidAmount: 1,
           dueAmount: 1,
           discountAmount: 1,
           paymentType: 1,
           status: 1,
-          lastPaymentDate: 1,
-          userId: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+
+          student: {
+            _id: "$student._id",
+            name: "$student.name",
+            photo: "$student.photo"   
+          },
+
+          course: {
+            _id: "$course._id",
+            name: "$course.name",
+            duration: "$course.duration",
+            fees: "$enrollment.totalFees"
+          },
+
+          enrollment: {
+            _id: "$enrollment._id",
+            discountAmount: "$enrollment.discountAmount",
+            netPayableAmount: "$enrollment.netPayableAmount"
+          },
+
+          installments: {
+            _id: 1,
+            dueDate: 1,
+            amount: 1,
+            paidAmount: 1,
+            status: 1
+          }
         }
       }
     ]);
 
-    if (!ledgerData || ledgerData.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Student fees not found"
-      });
+    if (!data.length) {
+      return res.status(404).json({ message: "Fees record not found" });
     }
 
     return res.json({
       success: true,
-      data: ledgerData[0]
+      data: data[0]
     });
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    console.error("getSingleStudentFees error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
 
-module.exports = { createStudentFees, getAllStudentFees,getSingleStudentFees };
+
+
+module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees };

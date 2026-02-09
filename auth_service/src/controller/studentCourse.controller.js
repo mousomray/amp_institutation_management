@@ -71,13 +71,20 @@ const getAllEnrollments = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const enrollments = await StudentCourseModel.aggregate([
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+
+    const skip = (page - 1) * limit;
+
+    const result = await StudentCourseModel.aggregate([
       {
         $match: {
           userId: new mongoose.Types.ObjectId(userId),
         },
       },
 
+      /* ================= STUDENT ================= */
       {
         $lookup: {
           from: "students",
@@ -88,6 +95,21 @@ const getAllEnrollments = async (req, res) => {
       },
       { $unwind: "$student" },
 
+      /* ================= SEARCH (Student Name) ================= */
+      ...(search
+        ? [
+          {
+            $match: {
+              "student.name": {
+                $regex: search,
+                $options: "i", // case-insensitive
+              },
+            },
+          },
+        ]
+        : []),
+
+      /* ================= COURSE ================= */
       {
         $lookup: {
           from: "courses",
@@ -98,41 +120,122 @@ const getAllEnrollments = async (req, res) => {
       },
       { $unwind: "$course" },
 
+      /* ================= LEDGER SUMMARY ================= */
       {
-        $project: {
-          invoiceNo: 1,
-          enrollmentDate: 1,
-          entryDate: 1,
-          receiptMode: 1,
-          amountPaid: 1,
-          fees: 1,
-          discount: 1,
-
-          student: {
-            _id: "$student._id",
-            name: "$student.name",
-            email: "$student.email",
-            phone: "$student.phone",
-            image: "$student.image", // ✅ student image
-          },
-
-          course: {
-            _id: "$course._id",
-            name: "$course.name",
-            fees: "$course.fees",
-            duration: "$course.duration",
-            image: "$course.image", // ✅ course image
-          },
+        $lookup: {
+          from: "studentfeesledgers",
+          localField: "_id",
+          foreignField: "enrollmentId",
+          as: "ledger",
+        },
+      },
+      {
+        $unwind: {
+          path: "$ledger",
+          preserveNullAndEmptyArrays: true,
         },
       },
 
-      // 🔹 Latest first
+      /* ================= RECEIPTS ================= */
+      {
+        $lookup: {
+          from: "receiptmasters",
+          localField: "_id",
+          foreignField: "enrollmentId",
+          as: "receiptMasters",
+        },
+      },
+      {
+        $lookup: {
+          from: "receiptdetails",
+          let: { receiptIds: "$receiptMasters._id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $in: ["$receiptId", "$$receiptIds"],
+                },
+              },
+            },
+            {
+              $lookup: {
+                from: "feesmasters",
+                localField: "feesMasterId",
+                foreignField: "_id",
+                as: "feesHead",
+              },
+            },
+            { $unwind: "$feesHead" },
+            {
+              $project: {
+                _id: 0,
+                feesHeadName: "$feesHead.name",
+                amount: 1,
+              },
+            },
+          ],
+          as: "receipts",
+        },
+      },
+
+      /* ================= SORT ================= */
       { $sort: { entryDate: -1 } },
+
+      /* ================= FACET (Pagination + Count) ================= */
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                invoiceNo: 1,
+                enrollmentDate: 1,
+                entryDate: 1,
+
+                student: {
+                  _id: "$student._id",
+                  name: "$student.name",
+                  email: "$student.email",
+                  phone: "$student.phone",
+                  image: "$student.image",
+                },
+
+                course: {
+                  _id: "$course._id",
+                  name: "$course.name",
+                  duration: "$course.duration",
+                  image: "$course.image",
+                },
+
+                ledgerSummary: {
+                  _id: "$ledger._id",
+                  totalAmount: "$ledger.totalAmount",
+                  paidAmount: "$ledger.paidAmount",
+                  dueAmount: "$ledger.dueAmount",
+                  status: "$ledger.status",
+                },
+
+                receipts: 1,
+              },
+            },
+          ],
+          totalCount: [{ $count: "count" }],
+        },
+      },
     ]);
+
+    const enrollments = result[0].data;
+    const total = result[0].totalCount[0]?.count || 0;
 
     res.status(200).json({
       message: "All enrollments fetched successfully",
-      total: enrollments.length,
+      pagination: {
+        totalRecords: total,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        limit,
+      },
       data: enrollments,
     });
   } catch (error) {
@@ -140,6 +243,9 @@ const getAllEnrollments = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
 
 const getStudentWiseEnrollments = async (req, res) => {
   try {

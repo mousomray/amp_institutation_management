@@ -29,12 +29,12 @@ router.post("/login", loginInstitution);
 //router.post("/assign-student-fees", verifyJwt, assignStudentFees);
 //router.get("/get-single-student-fees/:studentFeesId", verifyJwt, getSingleStudentFees);
 //router.get("/list-student-fees", verifyJwt, listStudentFees);
-//router.post("/pay-student-fees/:studentFeesId", verifyJwt, payStudentFees);
+router.post("/pay-student-fees/:studentFeesId", verifyJwt, payStudentFees);
 // Install ments Routes
-//router.post("/student-fees/:studentFeesId/installment-preview", verifyJwt,getInstallmentPreview )
+router.post("/student-fees/:studentFeesId/installment-preview", verifyJwt,getInstallmentPreview )
 
-//router.post("/assign-installments-to-student-fees/:studentFeesId", verifyJwt, assignInstallmentsToStudentFees);
-//router.post("/pay-installment/:installmentItemId", verifyJwt, payInstallment);
-//router.get("/list-installment-items/:studentFeesId", verifyJwt, listInstallmentItems);
+router.post("/assign-installments-to-student-fees/:studentFeesId", verifyJwt, assignInstallmentsToStudentFees);
+router.post("/pay-installment/:installmentItemId", verifyJwt, payInstallment);
+router.get("/list-installment-items/:studentFeesId", verifyJwt, listInstallmentItems);
 //router.post("/courses/:courseId/enroll-students", verifyJwt, enrollMultipleStudentsToCourse);
 module.exports = router;

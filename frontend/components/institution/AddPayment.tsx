@@ -75,11 +75,12 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
   const fetchStudentFeesTotal = async () => {
     try {
       setFetchingAmount(true);
-      const res = await axiosInstance.get(`${process.env.NEXT_PUBLIC_API_URL}/institution/get-single-student-fees/${id}`, {
+      const res = await axiosInstance.get(`${process.env.NEXT_PUBLIC_API_URL}/student-fees-ledger/single-student-fees/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const item = res.data?.data || {};
-      const total = Number(item?.summary?.totalAmount ?? item?.summary?.dueAmount ?? 0);
+      console.log("Fetched student fees item:", item);
+      const total = Number(item?.dueAmount ?? 0);
       setAmount(Number.isFinite(total) ? total : 0);
     } catch (err) {
       console.error(err);

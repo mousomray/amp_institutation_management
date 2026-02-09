@@ -1,11 +1,14 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const isValidInstrumentId = require("../helper/Instrument.js")
-const { User, Course, Institution, Student, FeesMaster, StudentFees, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
+const { User, Course, Institution, Student, FeesMaster, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
 const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const mongoose = require("mongoose");
+const StudentFees = require("../model/studentFeesLedger.model.js");
+const StudentCourse = require("../model/studentCourse.model.js");
+
 const loginInstitution = async (req, res) => {
   try {
 
@@ -1606,204 +1609,231 @@ const listStudentFees = async (req, res) => {
 
 const getSingleStudentFees = async (req, res) => {
   try {
-    const { studentFeesId } = req.params;
     const userId = req.user.id;
+    const { id } = req.params; // ledger _id
 
-    const data = await StudentFees.aggregate([
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID"
+      });
+    }
+
+    const data = await StudentFeesLedgerModel.aggregate([
       /* 1️⃣ Match */
       {
         $match: {
-          _id: new mongoose.Types.ObjectId(studentFeesId),
+          _id: new mongoose.Types.ObjectId(id),
           userId: new mongoose.Types.ObjectId(userId)
         }
       },
 
-      /* 2️⃣ Student */
+      /* 2️⃣ Enrollment */
+      {
+        $lookup: {
+          from: "studentcourses",
+          localField: "enrollmentId",
+          foreignField: "_id",
+          as: "enrollment"
+        }
+      },
+      { $unwind: "$enrollment" },
+
+      /* 3️⃣ Course */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "enrollment.courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      { $unwind: "$course" },
+
+      /* 4️⃣ Student */
       {
         $lookup: {
           from: "students",
-          localField: "studentId",
+          localField: "enrollment.studentId",
           foreignField: "_id",
           as: "student"
         }
       },
       { $unwind: "$student" },
 
-      /* 3️⃣ Fee Items */
+      /* 5️⃣ Receipt Master */
       {
         $lookup: {
-          from: "studentfeeitems",
-          localField: "_id",
-          foreignField: "studentFeesId",
-          as: "feeItems"
-        }
-      },
-
-      /* 4️⃣ Courses */
-      {
-        $lookup: {
-          from: "courses",
-          localField: "feeItems.courseId",
+          from: "receiptmasters",
+          localField: "receiptMasterId",
           foreignField: "_id",
-          as: "coursesData"
+          as: "receiptMaster"
+        }
+      },
+      { $unwind: "$receiptMaster" },
+
+      /* 6️⃣ Receipt Details */
+      {
+        $lookup: {
+          from: "receiptdetails",
+          localField: "receiptMaster._id",
+          foreignField: "receiptId",
+          as: "receiptDetails"
         }
       },
 
-      /* 5️⃣ Master Fees */
+      /* 7️⃣ Fees Heads */
       {
         $lookup: {
           from: "feesmasters",
-          localField: "feeItems.feeMasterId",
+          localField: "receiptDetails.feesMasterId",
           foreignField: "_id",
-          as: "masterFeesData"
+          as: "feesMasters"
         }
       },
 
-      /* 6️⃣ Installment Items */
+      /* 8️⃣ Payments */
+      {
+        $lookup: {
+          from: "studentfeepayments",
+          localField: "_id",
+          foreignField: "studentFeesLedgerId",
+          as: "payments"
+        }
+      },
+
+      /* 9️⃣ Installments */
       {
         $lookup: {
           from: "studentinstallmentitems",
           localField: "_id",
-          foreignField: "studentFeesId",
-          as: "installmentItems"
+          foreignField: "studentFeesLedgerId",
+          as: "installments"
         }
       },
 
-      /* 7️⃣ Build structured fields */
+      /* 🔟 Build payment view */
       {
         $addFields: {
-          courses: {
+          paymentDetails: {
             $map: {
-              input: {
-                $filter: {
-                  input: "$feeItems",
-                  as: "item",
-                  cond: { $eq: ["$$item.feeType", "COURSE"] }
-                }
-              },
-              as: "c",
+              input: "$payments",
+              as: "p",
               in: {
-                name: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$coursesData",
-                            as: "cd",
-                            cond: { $eq: ["$$cd._id", "$$c.courseId"] }
-                          }
-                        },
-                        as: "x",
-                        in: "$$x.name"
-                      }
-                    },
-                    0
-                  ]
-                },
-                amount: "$$c.amount"
-              }
-            }
-          },
+                amount: "$$p.amount",
+                paymentMode: "$$p.paymentMode",
+                instrumentId: "$$p.instrumentId",
+                paymentDate: "$$p.createdAt",
 
-          masterFees: {
-            $map: {
-              input: {
-                $filter: {
-                  input: "$feeItems",
-                  as: "item",
-                  cond: { $eq: ["$$item.feeType", "MASTER"] }
-                }
-              },
-              as: "m",
-              in: {
-                name: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$masterFeesData",
-                            as: "mf",
-                            cond: { $eq: ["$$mf._id", "$$m.feeMasterId"] }
-                          }
-                        },
-                        as: "y",
-                        in: "$$y.name"
-                      }
+                installmentInfo: {
+                  $cond: {
+                    if: { $eq: ["$paymentType", "INSTALLMENT"] },
+                    then: {
+                      installmentNo: "$$p.installmentNo",
+                      installmentItemId: "$$p.installmentItemId"
                     },
-                    0
-                  ]
-                },
-                amount: "$$m.amount"
-              }
-            }
-          },
-
-          installments: {
-            $cond: {
-              if: { $eq: ["$paymentType", "INSTALLMENT"] },
-              then: {
-                $map: {
-                  input: "$installmentItems",
-                  as: "ins",
-                  in: {
-                    installmentNo: "$$ins.installmentNo",
-                    amount: "$$ins.amount",
-                    paidAmount: "$$ins.paidAmount",
-                    dueAmount: {
-                      $subtract: ["$$ins.amount", "$$ins.paidAmount"]
-                    },
-                    dueDate: "$$ins.dueDate",
-                    status: "$$ins.status"
+                    else: null
                   }
                 }
-              },
-              else: []
+              }
             }
           }
         }
       },
 
-      /* 8️⃣ Final response */
+      /* 🔚 Final projection */
       {
         $project: {
-          _id: 0,
+          ledgerId: "$_id",
 
           student: {
+            _id: "$student._id",
             name: "$student.name"
           },
 
-          courses: 1,
-          masterFees: 1,
-          installments: 1,
+          course: {
+            name: "$course.name",
+            duration: "$course.duration",
+            fees: "$enrollment.totalFees"
+          },
+
+          enrollment: {
+            _id: "$enrollment._id",
+            discountAmount: "$enrollment.discountAmount",
+            netPayableAmount: "$enrollment.netPayableAmount"
+          },
+
+          receipt: {
+            receiptNo: "$receiptMaster.receiptNo",
+            receiptDate: "$receiptMaster.receiptDate",
+            receiptMode: "$receiptMaster.receiptMode"
+          },
+
+          heads: {
+            $map: {
+              input: "$receiptDetails",
+              as: "d",
+              in: {
+                feesHeadId: "$$d.feesMasterId",
+                amount: "$$d.amount",
+                feesHeadName: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$feesMasters",
+                            as: "f",
+                            cond: { $eq: ["$$f._id", "$$d.feesMasterId"] }
+                          }
+                        },
+                        as: "f",
+                        in: "$$f.name"
+                      }
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          },
+
+          paymentType: 1,
+          paymentDetails: 1,
 
           summary: {
             totalAmount: "$totalAmount",
             paidAmount: "$paidAmount",
             dueAmount: "$dueAmount",
             status: "$status"
-          }
+          },
+
+          createdAt: 1,
+          updatedAt: 1
         }
       }
     ]);
 
     if (!data.length) {
-      return res.status(404).json({ message: "Student fees not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Student fees not found"
+      });
     }
 
     return res.status(200).json({
-      message: "Student fees fetched successfully",
+      success: true,
       data: data[0]
     });
 
   } catch (error) {
-    console.error("getSingleStudentFees error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
-
-
 
 // Pay Student Fees
 const payStudentFees = async (req, res) => {
@@ -1819,12 +1849,21 @@ const payStudentFees = async (req, res) => {
       return res.status(400).json({ message: "Invalid payment amount" });
     }
 
-
     const fees = await StudentFees.findById(studentFeesId).session(session);
 
     if (!fees) {
       return res.status(404).json({ message: "Fees record not found" });
     }
+
+    const enrollment = await StudentCourse.findById(fees.enrollmentId)
+    console.log("Enrollment:", enrollment);
+    if (!enrollment) {
+      return res.status(404).json({
+        message: "Enrollment record not found"
+      });
+    }
+
+    const studentId = enrollment.studentId;
 
     if (!paymentMode) {
       return res.status(400).json({ message: "Payment mode is required" });
@@ -1852,41 +1891,35 @@ const payStudentFees = async (req, res) => {
       });
     }
 
-    // 2️⃣ Over payment check
     if (amount > fees.dueAmount) {
       return res.status(400).json({
-        message: "Payment process is allready running through Installment"
+        message: "Payment process is already running through Installment"
       });
     }
 
-    // 3️⃣ Create payment record
     const payment = await StudentFeePayment.create(
       [
         {
           studentFeesId: fees._id,
-          studentId: fees.studentId,
+          enrollmentId: fees.enrollmentId,
+          studentId: studentId,
           amount,
           paymentMode,
-          userId: userId,
-          instrumentId: isValidInstrumentId(paymentMode, instrumentId) ? instrumentId : null
+          userId,
+          instrumentId:
+            nonCashModes.includes(paymentMode) ? instrumentId : null
         }
       ],
       { session }
     );
 
-    // 4️⃣ Update fees summary
     fees.paidAmount += amount;
     fees.dueAmount -= amount;
 
-    if (fees.dueAmount === 0) {
-      fees.status = "PAID";
-    } else {
-      fees.status = "PARTIAL";
-    }
+    fees.status = fees.dueAmount === 0 ? "PAID" : "PARTIAL";
 
     await fees.save({ session });
 
-    // 5️⃣ Commit transaction
     await session.commitTransaction();
     session.endSession();
 
@@ -1895,6 +1928,8 @@ const payStudentFees = async (req, res) => {
       data: {
         paymentId: payment[0]._id,
         studentFeesId: fees._id,
+        enrollmentId: fees.enrollmentId,
+        studentId: studentId, 
         paidAmount: amount,
         paymentMode,
         updatedSummary: {
@@ -1905,7 +1940,6 @@ const payStudentFees = async (req, res) => {
         }
       }
     });
-
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -1913,6 +1947,7 @@ const payStudentFees = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // Installments Handle Area 
 const normalizeDate = (date) => {
@@ -1933,18 +1968,24 @@ const getInstallmentPreview = async (req, res) => {
       startDate
     } = req.body;
 
+    /* ----------------------------------------
+       0️⃣ BASIC VALIDATION
+    ---------------------------------------- */
     if (
       !installmentCount || installmentCount <= 1 ||
       !monthsGap || monthsGap <= 0 ||
-      !firstInstallmentAmount ||
+      !firstInstallmentAmount || firstInstallmentAmount <= 0 ||
       !startDate
     ) {
       return res.status(400).json({
+        success: false,
         message: "Invalid installment input"
       });
     }
 
-    // 1️⃣ Fetch student fees
+    /* ----------------------------------------
+       1️⃣ FETCH STUDENT FEES / LEDGER
+    ---------------------------------------- */
     const studentFees = await StudentFees.findOne({
       _id: studentFeesId,
       userId
@@ -1952,13 +1993,37 @@ const getInstallmentPreview = async (req, res) => {
 
     if (!studentFees) {
       return res.status(404).json({
+        success: false,
         message: "Student fees not found"
       });
     }
 
-    const totalAmount = studentFees.totalAmount;
+    /* ----------------------------------------
+       2️⃣ 🔥 CORRECT BASE AMOUNT LOGIC
+       - If any payment already done → use DUE
+       - Else → use TOTAL
+    ---------------------------------------- */
+    const baseAmount =
+      studentFees.paidAmount > 0
+        ? studentFees.dueAmount
+        : studentFees.totalAmount;
 
-    // 2️⃣ Validate first installment date (within 1 month)
+    if (baseAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No due amount available for installment"
+      });
+    }
+
+    /* ----------------------------------------
+       3️⃣ DATE VALIDATION (FIRST INSTALLMENT)
+    ---------------------------------------- */
+    const normalizeDate = d => {
+      const date = new Date(d);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+
     const createdAt = normalizeDate(studentFees.createdAt);
     const maxAllowedDate = new Date(createdAt);
     maxAllowedDate.setMonth(maxAllowedDate.getMonth() + 1);
@@ -1967,20 +2032,26 @@ const getInstallmentPreview = async (req, res) => {
 
     if (firstDate < createdAt || firstDate > maxAllowedDate) {
       return res.status(400).json({
+        success: false,
         message:
           "First installment date must be within 1 month of fees creation date"
       });
     }
 
-    // 3️⃣ Validate first installment amount
-    if (firstInstallmentAmount >= totalAmount) {
+    /* ----------------------------------------
+       4️⃣ FIRST INSTALLMENT AMOUNT CHECK
+    ---------------------------------------- */
+    if (firstInstallmentAmount >= baseAmount) {
       return res.status(400).json({
-        message: "First installment amount must be less than total fees"
+        success: false,
+        message: "First installment amount must be less than payable amount"
       });
     }
 
-    // 4️⃣ Calculate remaining
-    const remainingAmount = totalAmount - firstInstallmentAmount;
+    /* ----------------------------------------
+       5️⃣ CALCULATE INSTALLMENTS
+    ---------------------------------------- */
+    const remainingAmount = baseAmount - firstInstallmentAmount;
     const remainingInstallments = installmentCount - 1;
 
     const baseRemainingAmount = Math.floor(
@@ -1991,7 +2062,6 @@ const getInstallmentPreview = async (req, res) => {
       remainingAmount -
       baseRemainingAmount * remainingInstallments;
 
-    // 5️⃣ Generate installments
     const installments = [];
     let currentDate = firstDate;
 
@@ -2001,7 +2071,6 @@ const getInstallmentPreview = async (req, res) => {
       if (i === 1) {
         amount = firstInstallmentAmount;
       } else if (i === installmentCount) {
-        // last installment adjusts rounding difference
         amount = baseRemainingAmount + remainder;
       } else {
         amount = baseRemainingAmount;
@@ -2018,11 +2087,15 @@ const getInstallmentPreview = async (req, res) => {
       currentDate = nextDate;
     }
 
+    /* ----------------------------------------
+       6️⃣ FINAL RESPONSE
+    ---------------------------------------- */
     return res.status(200).json({
+      success: true,
       message: "Installment preview generated successfully",
       data: {
         studentFeesId,
-        totalAmount,          // ✅ EXACT student fees total
+        payableAmount: baseAmount,   // 🔥 IMPORTANT
         installmentCount,
         monthsGap,
         installments
@@ -2032,6 +2105,7 @@ const getInstallmentPreview = async (req, res) => {
   } catch (error) {
     console.error("Installment preview error:", error);
     return res.status(500).json({
+      success: false,
       message: "Internal server error"
     });
   }
@@ -2153,36 +2227,59 @@ const payInstallment = async (req, res) => {
       });
     }
 
-    // Fetch installment item
+    // 1️⃣ Fetch installment item
     const item = await StudentInstallmentItem
       .findById(installmentItemId)
       .session(session);
 
     if (!item) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: "Installment item not found" });
     }
 
+    // 2️⃣ Fetch fees
     const fees = await StudentFees
       .findById(item.studentFeesId)
       .session(session);
 
     if (!fees || String(fees.userId) !== String(userId)) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(403).json({ message: "Unauthorized" });
     }
 
+    // 3️⃣ Fetch enrollment (🔥 SAME LOGIC as normal payment)
+    const enrollment = await StudentCourse.findById(fees.enrollmentId);
+
+    if (!enrollment || !enrollment.studentId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        message: "Enrollment / student not found"
+      });
+    }
+
+    const studentId = enrollment.studentId;
+
+    // 4️⃣ Calculate payable amount
     const remainingItem = item.amount - item.paidAmount;
     const payNow = Math.min(amount, remainingItem);
 
     if (payNow <= 0) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         message: "Installment already fully paid"
       });
     }
 
+    // 5️⃣ Create payment record (studentId included)
     const payment = await StudentFeePayment.create(
       [{
         studentFeesId: fees._id,
-        studentId: fees.studentId,
+        enrollmentId: fees.enrollmentId,
+        studentId: studentId, // ⭐ SAME SOURCE
         amount: payNow,
         paymentMode,
         instrumentId: paymentMode === "CASH" ? null : instrumentId,
@@ -2191,10 +2288,12 @@ const payInstallment = async (req, res) => {
       { session }
     );
 
+    // 6️⃣ Update installment item
     item.paidAmount += payNow;
     item.status = item.paidAmount >= item.amount ? "PAID" : "PARTIAL";
     await item.save({ session });
 
+    // 7️⃣ Update fees summary
     fees.paidAmount += payNow;
     fees.dueAmount = Math.max(0, fees.totalAmount - fees.paidAmount);
     fees.status =
@@ -2213,6 +2312,7 @@ const payInstallment = async (req, res) => {
       message: "Installment payment recorded successfully",
       data: {
         paymentId: payment[0]._id,
+        studentId,
         paidAmount: payNow,
         paymentMode,
         installmentStatus: item.status,
@@ -2227,6 +2327,7 @@ const payInstallment = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 
 // List installment items + status for a StudentFees

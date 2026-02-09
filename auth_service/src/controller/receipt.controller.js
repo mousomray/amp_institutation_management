@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { ZodError } = require("zod");
+const StudentFeesLedgerModel = require("../model/studentFeesLedger.model");
 
 const ReceiptMaster = require("../model/receiptMaster.model");
 const ReceiptDetails = require("../model/receiptDetails.model");
@@ -7,95 +8,121 @@ const ReceiptSchema = require("../schema/receipt.schema");
 const StudentCourseEnrollment = require("../model/studentCourse.model");
 
 const createReceipt = async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    try {
-        const userId = req.user.id;
-        const {
-            enrollmentId,
-            receiptDate,
-            entryDate,
-            isCancelled = false,
-            details
-        } = req.body;
+  try {
+    const userId = req.user._id;
+    const { enrollmentId, details, receiptDate } = req.body;
 
-        // 🔴 Basic validation
-        if (!enrollmentId) {
-            throw new Error("enrollmentId is required");
-        }
-
-        if (!Array.isArray(details) || details.length === 0) {
-            throw new Error("Receipt details are required");
-        }
-
-        // 1️⃣ Find enrollment
-        const enrollment = await StudentCourseEnrollment.findOne({
-            _id: enrollmentId,
-            userId
-        }).session(session);
-
-        if (!enrollment) {
-            throw new Error("Enrollment not found");
-        }
-
-        // 2️⃣ Calculate total amount
-        const totalAmount = details.reduce((sum, item) => {
-            if (!item.amount || item.amount <= 0) {
-                throw new Error("Invalid receipt amount");
-            }
-            return sum + item.amount;
-        }, 0);
-
-        // 3️⃣ Create receipt master
-        const [receipt] = await ReceiptMaster.create(
-            [
-                {
-                    userId,
-                    studentId: enrollment.studentId,
-                    enrollmentId: enrollment._id,
-                    receiptNo: `RCPT-${Date.now()}`,
-                    receiptDate: receiptDate ? new Date(receiptDate) : new Date(),
-                    entryDate: entryDate ? new Date(entryDate) : new Date(),
-                    totalAmount,
-                    isCancelled
-                }
-            ],
-            { session }
-        );
-
-        // 4️⃣ Create receipt details
-        const receiptDetailsPayload = details.map(item => ({
-            receiptId: receipt._id,
-            feesMasterId: item.feesMasterId,
-            amount: item.amount
-        }));
-
-        await ReceiptDetails.insertMany(receiptDetailsPayload, { session });
-
-        // 5️⃣ Commit transaction
-        await session.commitTransaction();
-
-        return res.status(201).json({
-            success: true,
-            message: "Receipt created successfully",
-            data: {
-                receiptId: receipt._id,
-                totalAmount
-            }
-        });
-
-    } catch (error) {
-        await session.abortTransaction();
-
-        return res.status(400).json({
-            success: false,
-            message: error.message
-        });
-
-    } finally {
-        session.endSession();
+    if (!enrollmentId || !Array.isArray(details) || !details.length) {
+      throw new Error("Fees heads required");
     }
+
+    /* ---------------------------------------------------
+       1️⃣ Get Enrollment (FOR studentId)
+    --------------------------------------------------- */
+    const enrollment = await StudentCourseEnrollment.findOne({
+      _id: enrollmentId,
+      userId
+    }).session(session);
+
+    if (!enrollment) {
+      throw new Error("Enrollment not found");
+    }
+
+    /* ---------------------------------------------------
+       2️⃣ Calculate receipt amount
+    --------------------------------------------------- */
+    const receiptAmount = details.reduce(
+      (sum, h) => sum + Number(h.amount || 0),
+      0
+    );
+
+    /* ---------------------------------------------------
+       3️⃣ Create Receipt Master (FIXED)
+    --------------------------------------------------- */
+    const [receiptMaster] = await ReceiptMaster.create(
+      [
+        {
+          userId,
+          studentId: enrollment.studentId,        // ✅ REQUIRED
+          enrollmentId,
+          receiptNo: `RCPT-${Date.now()}`,
+          receiptDate: receiptDate ? new Date(receiptDate) : new Date(),
+          totalAmount: receiptAmount,              // ✅ REQUIRED
+          isCancelled: false
+        }
+      ],
+      { session }
+    );
+
+    /* ---------------------------------------------------
+       4️⃣ Create Receipt Details
+    --------------------------------------------------- */
+    const receiptDetailsPayload = details.map(h => ({
+      receiptId: receiptMaster._id,
+      feesMasterId: h.feesMasterId,
+      amount: h.amount,
+      userId
+    }));
+
+    await ReceiptDetails.insertMany(receiptDetailsPayload, { session });
+
+    /* ---------------------------------------------------
+       5️⃣ Update Student Fees Ledger
+    --------------------------------------------------- */
+    const ledger = await StudentFeesLedgerModel.findOne({
+      enrollmentId,
+      userId
+    }).session(session);
+
+    if (!ledger) {
+      throw new Error("Student fees ledger not found");
+    }
+
+    // 🔥 IMPORTANT: receipt = NEW FEES → increase total ONLY
+    ledger.totalAmount += receiptAmount;
+    ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
+    ledger.lastPaymentDate = new Date();
+
+    // STATUS LOGIC
+    if (ledger.paidAmount === 0) {
+      ledger.status = "DUE";
+    } else if (ledger.dueAmount > 0) {
+      ledger.status = "PARTIAL";
+    } else {
+      ledger.status = "PAID";
+    }
+
+    await ledger.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json({
+      success: true,
+      message: "Receipt added successfully",
+      data: {
+        receiptId: receiptMaster._id,
+        receiptAmount,
+        totalAmount: ledger.totalAmount,
+        paidAmount: ledger.paidAmount,
+        dueAmount: ledger.dueAmount,
+        status: ledger.status
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error(error);
+    return res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 };
 
 
@@ -210,7 +237,7 @@ const getAllReceipts = async (req, res) => {
                                         in: "$$fm.name"
                                     }
                                 },
-                                courseName: "$course.name" // এখানে প্রতিটি head-এ course name add করা হলো
+                                courseName: "$course.name"
                             }
                         }
                     }
@@ -231,8 +258,99 @@ const getAllReceipts = async (req, res) => {
     }
 };
 
+const getReceiptsByEnrollment = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { enrollmentId } = req.params;
+
+        if (!enrollmentId) {
+            return res.status(400).json({ message: "enrollmentId is required" });
+        }
+
+        const receipts = await ReceiptMaster.aggregate([
+            {
+                $match: {
+                    userId: new mongoose.Types.ObjectId(userId),
+                    enrollmentId: new mongoose.Types.ObjectId(enrollmentId),
+                    isCancelled: false
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "receiptdetails",
+                    localField: "_id",
+                    foreignField: "receiptId",
+                    as: "details"
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "feesmasters",
+                    localField: "details.feesMasterId",
+                    foreignField: "_id",
+                    as: "feesMasters"
+                }
+            },
+
+            {
+                $project: {
+                    receiptNo: 1,
+                    receiptDate: 1,
+                    totalAmount: 1,
+                    heads: {
+                        $map: {
+                            input: "$details",
+                            as: "d",
+                            in: {
+                                amount: "$$d.amount",
+                                feesMasterId: "$$d.feesMasterId",
+                                feesHeadName: {
+                                    $let: {
+                                        vars: {
+                                            fm: {
+                                                $arrayElemAt: [
+                                                    {
+                                                        $filter: {
+                                                            input: "$feesMasters",
+                                                            as: "f",
+                                                            cond: {
+                                                                $eq: ["$$f._id", "$$d.feesMasterId"]
+                                                            }
+                                                        }
+                                                    },
+                                                    0
+                                                ]
+                                            }
+                                        },
+                                        in: "$$fm.name"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+
+            { $sort: { receiptDate: -1 } }
+        ]);
+
+        return res.json({
+            totalReceipts: receipts.length,
+            data: receipts
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+
 
 module.exports = {
     createReceipt,
-    getAllReceipts
+    getAllReceipts,
+    getReceiptsByEnrollment
 };
