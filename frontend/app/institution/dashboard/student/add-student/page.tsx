@@ -108,21 +108,16 @@ export default function Page() {
     }
   };
 
-
-
-
-
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-8">
-      <Card className="w-full max-w-4xl shadow-2xl border-0">
-        {/* Header */}
-        <div className="text-center mb-8 pb-6 border-b border-gray-200">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
-            <i className="pi pi-user-plus text-3xl text-white"></i>
+      <Card className="w-full max-w-4xl shadow-md border-0">
+        {/* Header (compact) */}
+        <div className="text-center mb-4 pb-3 border-b border-gray-200">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl mb-2 shadow-sm">
+            <i className="pi pi-user-plus text-2xl text-white"></i>
           </div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">Student Registration</h2>
-          <p className="text-gray-500">Add new student with complete information</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-1">Student Registration</h2>
+          <p className="text-sm text-gray-500">Add new student with complete information</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

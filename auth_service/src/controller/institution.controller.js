@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const isValidInstrumentId = require("../helper/Instrument.js")
-const { User,  Institution, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
+const { User, Institution, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
 const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
@@ -1879,12 +1878,6 @@ const payStudentFees = async (req, res) => {
           message: `${paymentMode} payment requires instrumentId`
         });
       }
-
-      if (!isValidInstrumentId(paymentMode, instrumentId)) {
-        return res.status(400).json({
-          message: `Invalid instrumentId for ${paymentMode} payment`
-        });
-      }
     } else if (paymentMode === "CASH") {
       instrumentId = null;
     } else {
@@ -1931,7 +1924,7 @@ const payStudentFees = async (req, res) => {
         paymentId: payment[0]._id,
         studentFeesId: fees._id,
         enrollmentId: fees.enrollmentId,
-        studentId: studentId, 
+        studentId: studentId,
         paidAmount: amount,
         paymentMode,
         updatedSummary: {
@@ -2213,12 +2206,6 @@ const payInstallment = async (req, res) => {
       if (!instrumentId) {
         return res.status(400).json({
           message: `${paymentMode} payment requires instrumentId`
-        });
-      }
-
-      if (!isValidInstrumentId(paymentMode, instrumentId)) {
-        return res.status(400).json({
-          message: `Invalid instrumentId for ${paymentMode} payment`
         });
       }
     } else if (paymentMode === "CASH") {

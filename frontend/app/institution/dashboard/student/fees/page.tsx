@@ -98,12 +98,26 @@ export default function StudentFeesPage() {
   // student renderer: use row.student and receipt from API
   const studentBody = (row: any) => {
     const student = row.student;
+    const initials = student?.name ? student.name.split(" ").map((s: string) => s[0]).slice(0,2).join("") : "?";
     return (
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-          <span className="text-sm font-semibold text-gray-600">
-            {student?.name?.charAt(0)?.toUpperCase() || "?"}
-          </span>
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+          {student?.photo ? (
+            <img
+              src={student.photo}
+              alt={student?.name ?? "student"}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // hide broken image and fallback to initials
+                const el = e.currentTarget as HTMLImageElement;
+                el.style.display = "none";
+                const parent = el.parentElement;
+                if (parent) parent.classList.add("bg-gray-300", "text-gray-700");
+              }}
+            />
+          ) : (
+            <span className="text-sm font-semibold text-gray-600">{initials}</span>
+          )}
         </div>
 
         <div className="flex flex-col">
