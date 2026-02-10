@@ -17,7 +17,7 @@ router.post("/login", loginInstitution);
 //router.put("/update-course/:id", updateCourse)
 //router.delete("/delete-course/:id", deleteCoures)
 //router.get("/course-detail/:id", courseDetails)
-//router.get("/dashboard", verifyJwt, institutionDashboard)
+router.get("/dashboard", verifyJwt, institutionDashboard)
 //router.post("/logout", verifyJwt, institutionLogOut)
 //router.post("/buy", buyCourse)
 //router.get("/onlyonestudentapi/:id", OnlyOneStudentAPI)
