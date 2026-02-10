@@ -22,6 +22,8 @@ import SetInstallmentFrom from "@/components/institution/SetInstallmentFrom";
 export default function StudentFeesPage() {
   const [data, setData] = useState<any[]>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const searchDebounceRef = React.useRef<any>(null);
   const [loading, setLoading] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -50,15 +52,32 @@ export default function StudentFeesPage() {
 
   useEffect(() => {
     if (token) fetchList();
-  }, [token, page, rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, page, rows, searchTerm]);
+
+  // debounce globalFilter -> searchTerm
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    // reset to first page when user changes search text
+    if (page !== 1) setPage(1);
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchTerm((globalFilter || "").trim());
+    }, 500);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalFilter]);
 
   const fetchList = async () => {
     try {
       setLoading(true);
       const headers: any = {};
       if (token) headers.Authorization = `Bearer ${token}`;
+      const params: any = { page, limit: rows };
+      if (searchTerm) params.search = searchTerm;
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/student-fees-ledger/list-student-fees`, {
-        params: { page, limit: rows },
+        params,
         headers,
       });
 

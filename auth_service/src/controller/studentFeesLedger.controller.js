@@ -95,15 +95,26 @@ const getAllStudentFees = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const ledgers = await StudentFeesLedgerModel.aggregate([
-      // 1️⃣ User filter
-      {
-        $match: {
-          userId: new mongoose.Types.ObjectId(userId)
-        }
-      },
+    // 🔹 Pagination
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-      // 2️⃣ Enrollment
+    // 🔹 Search (student name)
+    const search = req.query.search?.trim();
+
+    const matchUserStage = {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId)
+      }
+    };
+
+    const aggregationPipeline = [
+      matchUserStage,
+
+      /* ---------------------------
+         ENROLLMENT
+      --------------------------- */
       {
         $lookup: {
           from: "studentcourses",
@@ -114,7 +125,9 @@ const getAllStudentFees = async (req, res) => {
       },
       { $unwind: "$enrollment" },
 
-      // 3️⃣ Course
+      /* ---------------------------
+         COURSE
+      --------------------------- */
       {
         $lookup: {
           from: "courses",
@@ -125,7 +138,9 @@ const getAllStudentFees = async (req, res) => {
       },
       { $unwind: "$course" },
 
-      // 4️⃣ Student
+      /* ---------------------------
+         STUDENT
+      --------------------------- */
       {
         $lookup: {
           from: "students",
@@ -136,7 +151,25 @@ const getAllStudentFees = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      // 5️⃣ 🔥 ALL RECEIPTS OF THIS ENROLLMENT
+      /* ---------------------------
+         🔍 SEARCH BY STUDENT NAME
+      --------------------------- */
+      ...(search
+        ? [
+          {
+            $match: {
+              "student.name": {
+                $regex: search,
+                $options: "i"
+              }
+            }
+          }
+        ]
+        : []),
+
+      /* ---------------------------
+         RECEIPTS
+      --------------------------- */
       {
         $lookup: {
           from: "receiptmasters",
@@ -154,7 +187,9 @@ const getAllStudentFees = async (req, res) => {
         }
       },
 
-      // 6️⃣ Receipt Details
+      /* ---------------------------
+         RECEIPT DETAILS
+      --------------------------- */
       {
         $lookup: {
           from: "receiptdetails",
@@ -164,7 +199,9 @@ const getAllStudentFees = async (req, res) => {
         }
       },
 
-      // 7️⃣ Fees Masters
+      /* ---------------------------
+         FEES MASTER
+      --------------------------- */
       {
         $lookup: {
           from: "feesmasters",
@@ -174,77 +211,104 @@ const getAllStudentFees = async (req, res) => {
         }
       },
 
-      // 8️⃣ FINAL SHAPE
+      /* ---------------------------
+         SORT
+      --------------------------- */
+      { $sort: { createdAt: -1 } },
+
+      /* ---------------------------
+         PAGINATION + COUNT
+      --------------------------- */
       {
-        $project: {
-          student: {
-            _id: "$student._id",
-            name: "$student.name",
-            photo: "$student.photo"
-          },
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
 
-          course: {
-            _id: "$course._id",
-            name: "$course.name",
-            duration: "$course.duration",
-            fees: "$course.fees"
-          },
+            {
+              $project: {
+                student: {
+                  _id: "$student._id",
+                  name: "$student.name",
+                  photo: "$student.photo"
+                },
 
-          enrollment: {
-            _id: "$enrollment._id",
-            discountAmount: "$enrollment.discountAmount",
-            netPayableAmount: "$enrollment.netPayableAmount"
-          },
+                course: {
+                  _id: "$course._id",
+                  name: "$course.name",
+                  duration: "$course.duration",
+                  fees: "$course.fees"
+                },
 
-          // ✅ ALL HEADS (ENROLL + OTHER FEES)
-          heads: {
-            $map: {
-              input: "$receiptDetails",
-              as: "d",
-              in: {
-                feesHeadId: "$$d.feesMasterId",
-                amount: "$$d.amount",
-                feesHeadName: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$feesMasters",
-                            as: "f",
-                            cond: {
-                              $eq: ["$$f._id", "$$d.feesMasterId"]
+                enrollment: {
+                  _id: "$enrollment._id",
+                  discountAmount: "$enrollment.discountAmount",
+                  netPayableAmount: "$enrollment.netPayableAmount"
+                },
+
+                heads: {
+                  $map: {
+                    input: "$receiptDetails",
+                    as: "d",
+                    in: {
+                      feesHeadId: "$$d.feesMasterId",
+                      amount: "$$d.amount",
+                      feesHeadName: {
+                        $arrayElemAt: [
+                          {
+                            $map: {
+                              input: {
+                                $filter: {
+                                  input: "$feesMasters",
+                                  as: "f",
+                                  cond: {
+                                    $eq: [
+                                      "$$f._id",
+                                      "$$d.feesMasterId"
+                                    ]
+                                  }
+                                }
+                              },
+                              as: "f",
+                              in: "$$f.name"
                             }
-                          }
-                        },
-                        as: "f",
-                        in: "$$f.name"
+                          },
+                          0
+                        ]
                       }
-                    },
-                    0
-                  ]
-                }
+                    }
+                  }
+                },
+
+                totalAmount: 1,
+                paidAmount: 1,
+                dueAmount: 1,
+                status: 1,
+                paymentType: 1,
+                lastPaymentDate: 1,
+                createdAt: 1
               }
             }
-          },
-
-          totalAmount: 1,
-          paidAmount: 1,
-          dueAmount: 1,
-          status: 1,
-          paymentType: 1,
-          lastPaymentDate: 1,
-          createdAt: 1
+          ]
         }
-      },
+      }
+    ];
 
-      { $sort: { createdAt: -1 } }
-    ]);
+    const result = await StudentFeesLedgerModel.aggregate(
+      aggregationPipeline
+    );
+
+    const total = result[0]?.metadata[0]?.total || 0;
+    const data = result[0]?.data || [];
 
     res.json({
       success: true,
-      total: ledgers.length,
-      data: ledgers
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data
     });
 
   } catch (error) {
@@ -345,7 +409,7 @@ const getSingleStudentFees = async (req, res) => {
           student: {
             _id: "$student._id",
             name: "$student.name",
-            photo: "$student.photo"   
+            photo: "$student.photo"
           },
 
           course: {
