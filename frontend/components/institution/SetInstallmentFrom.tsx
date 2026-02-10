@@ -45,6 +45,10 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showTotal, setShowTotal] = useState<boolean>(false);
 
+  // new states to allow opening config when installments exist and using due amount
+  const [showConfig, setShowConfig] = useState<boolean>(true);
+  const [useDueAmount, setUseDueAmount] = useState<boolean>(false);
+
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
     if (t) setToken(t);
@@ -64,6 +68,10 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
     setStartDate(new Date());
     // hide total on initial load / when studentFeesId changes
     setShowTotal(false);
+
+    // keep config visibility default true when no installments; will be adjusted when items load
+    setShowConfig(true);
+    setUseDueAmount(false);
 
     console.log("Fetching installments for studentFeesId:", studentFeesId);
 
@@ -123,7 +131,10 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
       const res = await axiosInstance.post(url, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setPreview(res.data.data);
+      // normalize server response: map payableAmount -> totalAmount so UI shows payable amount
+      const data = res.data.data || {};
+      const normalized = { ...data, totalAmount: data.totalAmount ?? data.payableAmount ?? 0 };
+      setPreview(normalized);
       // show total after successful preview
       setShowTotal(true);
       toast.success(res.data.message || "Preview generated");
@@ -170,6 +181,18 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
   // use strict check: existingItems === null -> loading/not-loaded, [] -> no installments
   const hasInstallments = existingItems !== null && existingItems.length > 0;
 
+  // Calculate outstanding due amount from existing installments
+  const dueAmount = existingItems?.reduce((sum, item) => sum + (item.amount - (item.paidAmount || 0)), 0) ?? 0;
+
+  // When existingItems change, default showConfig = !hasInstallments (show config by default only when none exist)
+  useEffect(() => {
+    const has = existingItems !== null && existingItems.length > 0;
+    setShowConfig(!has);
+    if (!has) {
+      setUseDueAmount(false);
+    }
+  }, [existingItems]);
+
   console.log("Selected Item ID:", selectedItemId);
 
   return (
@@ -210,6 +233,10 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
               <div className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold">
                 {existingItems.length} items
               </div>
+            </div>
+
+            <div className="text-sm text-gray-600 mb-3">
+              Outstanding due: <span className="font-semibold text-red-700 ml-2">{fmt(dueAmount)}</span>
             </div>
 
             <div className="space-y-3">
@@ -270,11 +297,20 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
             </div>
           </div>
 
-          <Button type="button" label="Close" className="w-full" onClick={onClose} />
+          <div className="flex gap-3">
+            <Button 
+              type="button" 
+              label={showConfig ? "Hide Plan Builder" : "Create New Plan"} 
+              onClick={() => setShowConfig(prev => !prev)} 
+              className="flex-1" 
+            />
+            <Button type="button" label="Close" className="w-40" onClick={onClose} />
+          </div>
         </div>
       )}
 
-      {!itemsLoading && !hasInstallments && (
+      {/* Show config form when showConfig is true (either no installments exist, or user clicked "Create New Plan") */}
+      {!itemsLoading && showConfig && (
         <div className="space-y-6">
           {/* Summary: show Total Amount only after preview generated */}
           {showTotal && preview && (
@@ -359,9 +395,27 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
               </div>
             </div>
 
-            {/* Amount row */}
+            {/* Amount row with 'use due amount' toggle */}
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">First Installment Amount (₹)</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">First Installment Amount (₹)</label>
+                {hasInstallments && (
+                  <div className="text-xs text-gray-600 flex items-center gap-2">
+                    <input
+                      id="useDue"
+                      type="checkbox"
+                      checked={useDueAmount}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setUseDueAmount(val);
+                        if (val) setFirstInstallmentAmount(dueAmount || 0);
+                      }}
+                      className="mr-1"
+                    />
+                    <label htmlFor="useDue" className="select-none cursor-pointer">Use outstanding due ({fmt(dueAmount)})</label>
+                  </div>
+                )}
+              </div>
               <div className="p-inputgroup w-full">
                 <span className="p-inputgroup-addon bg-blue-50 text-blue-600">
                   <i className="pi pi-money-bill" />
@@ -376,6 +430,7 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
                   className="w-full"
                   inputClassName="h-10 font-semibold"
                   placeholder="e.g. 300"
+                  disabled={useDueAmount}
                 />
               </div>
               <small className="text-xs text-gray-500 mt-1 block">
@@ -394,7 +449,18 @@ export default function SetInstallmentSection({ studentFeesId, onClose, onAssign
               />
               <Button
                 label="Cancel"
-                onClick={onClose}
+                onClick={() => {
+                  // if user cancels while config was opened from assigned list, close it; else close dialog
+                  if (hasInstallments) {
+                    setShowConfig(false);
+                    // Reset preview and form when closing config on existing installments
+                    setPreview(null);
+                    setShowTotal(false);
+                    setUseDueAmount(false);
+                  } else {
+                    onClose();
+                  }
+                }}
                 className="h-11 px-5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
               />
             </div>

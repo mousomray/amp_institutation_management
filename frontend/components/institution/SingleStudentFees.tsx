@@ -87,6 +87,12 @@ export default function SingleStudentFees({ id, onClose }: Props) {
     return total > 0 ? Math.round((paid / total) * 100) : 0;
   };
 
+  // compute SVG circle values for accurate progress rendering
+  const percent = calcPercent();
+  const R = 15.9155; // matches the original arc radius used in the SVG path
+  const C = 2 * Math.PI * R; // circumference (~100)
+  const dash = (percent / 100) * C;
+
   if (!id) return <div className="text-sm text-gray-500">No record selected</div>;
 
   // small helpers
@@ -97,209 +103,151 @@ export default function SingleStudentFees({ id, onClose }: Props) {
     s === "PAID" ? "bg-green-100 text-green-800" : s === "PARTIAL" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          {/* Avatar / Photo */}
-          <div className="w-20 h-20 rounded-lg overflow-hidden bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
-            {data?.student?.photo ? (
-              <img src={data.student.photo} alt={data.student.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="text-2xl font-semibold text-indigo-700">{initials(data?.student?.name)}</div>
-            )}
+    <div className="bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto bg-white shadow rounded-lg overflow-hidden print:shadow-none">
+        {/* Receipt header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
+              {data?.institution?.initials ?? "IN"}
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-gray-800">{data?.institution?.name ?? "Institute Name"}</div>
+              <div className="text-sm text-gray-500">{data?.institution?.address ?? "Institute address"}</div>
+            </div>
           </div>
-
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-800">{data?.student?.name ?? "Student"}</h2>
-            <div className="flex items-center gap-3 mt-2">
-              <div className={`px-3 py-1 rounded-full text-sm font-semibold ${statusClass(summary.status)}`}>
-                {summary.status?.toUpperCase() ?? "DUE"}
+          <div className="text-right">
+            <div className="text-sm text-gray-500">Receipt</div>
+            <div className="text-xl font-bold text-gray-800">#{data?._id ?? id}</div>
+            <div className="text-sm text-gray-500">{formatDate(summary.createdAt ?? new Date().toISOString())}</div>
+          </div>
+        </div>
+        
+        {/* Invoice body */}
+        <div className="px-6 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Student / Invoice Info */}
+            <div className="md:col-span-2 bg-gray-50 p-4 rounded">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded bg-white flex items-center justify-center text-indigo-700 font-semibold">
+                  {data?.student?.photo ? <img src={data.student.photo} alt={data.student.name} className="w-full h-full object-cover rounded" /> : initials(data?.student?.name)}
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Student</div>
+                  <div className="text-lg font-semibold text-gray-800">{data?.student?.name ?? "Student"}</div>
+                  <div className="text-sm text-gray-500 mt-1">ID: <span className="font-medium text-gray-700">{data?.student?._id ?? "—"}</span></div>
+                  <div className="text-sm text-gray-500 mt-1">Payment Status: <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${statusClass(summary.status)}`}>{(summary.status ?? "DUE").toUpperCase()}</span></div>
+                </div>
               </div>
-              <div className="text-sm text-gray-500">Payment: <span className="font-medium text-gray-700">{summary.paymentType}</span></div>
-              {data?.enrollment?._id && <div className="text-sm text-gray-500">Enrollment: <span className="font-medium text-gray-700">{data.enrollment._id}</span></div>}
             </div>
-
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {coursesArr.map((c: any, i: number) => (
-                <div key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{c.name}</div>
-              ))}
-              {masterFees.map((m: any, i: number) => (
-                <div key={i} className="text-xs bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded">{m.name}</div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button icon="pi pi-cloud-download" className="p-button-text" onClick={() => window.print()} title="Download/Print" />
-          <Button label="Close" icon="pi pi-times" className="p-button-text" onClick={onClose} />
-        </div>
-      </div>
-
-      {/* Top summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-white border rounded shadow-sm">
-          <div className="text-xs text-gray-500">Total</div>
-          <div className="text-2xl font-bold text-gray-800 mt-1">{fmt(summary.totalAmount)}</div>
-          <div className="text-sm text-gray-500 mt-1">Created: {summary.createdAt ? formatDate(summary.createdAt) : "—"}</div>
-        </div>
-
-        <div className="p-4 bg-white border rounded shadow-sm">
-          <div className="text-xs text-gray-500">Paid</div>
-          <div className="text-2xl font-bold text-green-700 mt-1">{fmt(summary.paidAmount)}</div>
-          <div className="text-sm text-gray-500 mt-1">Discount: <span className="font-medium">{fmt(summary.discountAmount)}</span></div>
-        </div>
-
-        <div className="p-4 bg-white border rounded shadow-sm">
-          <div className="text-xs text-gray-500">Due</div>
-          <div className="text-2xl font-bold text-red-700 mt-1">{fmt(summary.dueAmount)}</div>
-          <div className="text-sm text-gray-500 mt-1">Due count: <span className="font-medium">{installments.filter((it: any) => it.status !== "PAID").length}</span></div>
-        </div>
-
-        <div className="p-4 bg-white border rounded shadow-sm flex items-center gap-4">
-          {/* Simple circular progress */}
-          <div className="w-20 h-20 flex items-center justify-center">
-            <svg viewBox="0 0 36 36" className="w-16 h-16">
-              <path d="M18 2.0845
-                       a 15.9155 15.9155 0 0 1 0 31.831
-                       a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none" stroke="#e6e6e6" strokeWidth="3.5"></path>
-              <path
-                d="M18 2.0845
-                   a 15.9155 15.9155 0 0 1 0 31.831"
-                fill="none"
-                stroke="#16a34a"
-                strokeWidth="3.5"
-                strokeDasharray={`${calcPercent()}, 100`}
-                strokeLinecap="round"
-              ></path>
-              <text x="18" y="20" alignmentBaseline="central" textAnchor="middle" className="text-sm font-semibold" fill="#111827">{calcPercent()}%</text>
-            </svg>
-          </div>
-          <div>
-            <div className="text-sm text-gray-500">Progress</div>
-            <div className="font-semibold text-gray-800">{calcPercent()}% paid</div>
-            <div className="text-sm text-gray-500 mt-1">Method: <span className="font-medium">{summary.paymentType}</span></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main panels: Details & Installments */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: Details */}
-        <div className="lg:col-span-1 bg-white border rounded shadow-sm p-4">
-          <div className="text-sm text-gray-500">Student Details</div>
-          <div className="mt-3 space-y-2">
-            <div className="text-sm text-gray-700"><span className="text-gray-500">Name:</span> {data?.student?.name}</div>
-            <div className="text-sm text-gray-700"><span className="text-gray-500">Student ID:</span> {data?.student?._id ?? "—"}</div>
-            <div className="text-sm text-gray-700"><span className="text-gray-500">Course Fees:</span> {fmt(data?.course?.fees)}</div>
-            <div className="text-sm text-gray-700"><span className="text-gray-500">Net Payable:</span> {fmt(data?.enrollment?.netPayableAmount ?? summary.totalAmount)}</div>
-          </div>
-          <div className="mt-4">
-            <div className="text-sm text-gray-500 mb-2">Payment Summary</div>
-            <div className="flex items-center justify-between text-sm">
-              <div className="text-gray-600">Total</div>
-              <div className="font-medium text-gray-800">{fmt(summary.totalAmount)}</div>
-            </div>
-            <div className="flex items-center justify-between text-sm mt-2">
-              <div className="text-gray-600">Paid</div>
-              <div className="font-medium text-green-700">{fmt(summary.paidAmount)}</div>
-            </div>
-            <div className="flex items-center justify-between text-sm mt-2">
-              <div className="text-gray-600">Due</div>
-              <div className="font-medium text-red-700">{fmt(summary.dueAmount)}</div>
+            
+            {/* Summary totals */}
+            <div className="bg-gray-50 p-4 rounded">
+              <div className="text-sm text-gray-500">Summary</div>
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="text-gray-600">Total</div>
+                  <div className="font-semibold text-gray-800">{fmt(summary.totalAmount)}</div>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <div className="text-gray-600">Paid</div>
+                  <div className="font-semibold text-green-700">{fmt(summary.paidAmount)}</div>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <div className="text-gray-600">Due</div>
+                  <div className="font-semibold text-red-700">{fmt(summary.dueAmount)}</div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Right Top: Course & Fee Breakdown */}
-        <div className="lg:col-span-2 grid grid-cols-1 gap-4">
-          <div className="bg-white border rounded shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-medium text-gray-800">Course & Fee Breakdown</div>
-              <div className="text-sm text-gray-500 font-semibold">Subtotal: {fmt(coursesArr.reduce((s: number, c: any) => s + (c?.fees ?? c?.amount ?? 0), 0) + masterFees.reduce((s: number, m: any) => s + (m?.amount ?? 0), 0))}</div>
+          
+          {/* Charges table */}
+          <div className="mt-6">
+            <div className="text-sm text-gray-500 mb-3">Charges</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 text-left">
+                    <th className="p-3 text-xs text-gray-600">Description</th>
+                    <th className="p-3 text-xs text-gray-600 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coursesArr.map((c: any, i: number) => (
+                    <tr key={`c-${i}`} className="border-b">
+                      <td className="p-3">{c?.name} <div className="text-xs text-gray-500">{c?.duration ?? ""}</div></td>
+                      <td className="p-3 text-right font-semibold">{fmt(c?.fees ?? c?.amount)}</td>
+                    </tr>
+                  ))}
+                  {masterFees.map((m: any, i: number) => (
+                    <tr key={`m-${i}`} className="border-b">
+                      <td className="p-3">{m?.name}</td>
+                      <td className="p-3 text-right font-semibold">{fmt(m?.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="p-3 text-right text-sm text-gray-600">Subtotal</td>
+                    <td className="p-3 text-right font-semibold">{fmt(coursesArr.reduce((s: number, c: any) => s + (c?.fees ?? c?.amount ?? 0), 0) + masterFees.reduce((s: number, m: any) => s + (m?.amount ?? 0), 0))}</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 text-right text-sm text-gray-600">Discount</td>
+                    <td className="p-3 text-right font-semibold">{fmt(summary.discountAmount)}</td>
+                  </tr>
+                  <tr className="bg-gray-50">
+                    <td className="p-3 text-right text-sm font-semibold">Grand Total</td>
+                    <td className="p-3 text-right text-lg font-bold">{fmt(summary.totalAmount)}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            <div className="divide-y max-h-48 overflow-auto">
-              {coursesArr.length ? coursesArr.map((c: any, i: number) => (
-                <div key={i} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    <div className="text-indigo-600 mt-0.5"><i className="pi pi-book" /></div>
+          </div>
+          
+          {/* Installments / Payments */}
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white border rounded p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-medium text-gray-800">Installments ({installments.length})</div>
+                <div className="text-sm text-gray-500 font-semibold">{fmt(installments.reduce((s: number, it: any) => s + (it?.amount ?? 0), 0))}</div>
+              </div>
+              <div className="divide-y max-h-48 overflow-auto">
+                {installments.length ? installments.map((it: any, idx: number) => (
+                  <div key={it._id ?? idx} className="py-3 flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-700">{c?.name}</div>
-                      <div className="text-xs text-gray-500">Duration: {c?.duration ?? "—"}</div>
+                      <div className="text-sm font-medium">{`#${idx + 1} • ${formatDate(it?.dueDate)}`}</div>
+                      <div className="text-xs text-gray-500 mt-1">{it.note ?? ""}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">{fmt(it?.amount)}</div>
+                      <div className="text-xs mt-1"><span className="text-green-700 font-medium">{fmt(it?.paidAmount)}</span> paid</div>
+                      <div className="text-xs mt-1"><span className={`px-2 py-0.5 rounded text-xs ${statusClass(it?.status)}`}>{(it?.status ?? "DUE").toUpperCase()}</span></div>
                     </div>
                   </div>
-                  <div className="text-sm font-semibold text-gray-900"> {fmt(c?.fees ?? c?.amount)}</div>
-                </div>
-              )) : <div className="px-4 py-3 text-sm text-gray-500">No courses</div>}
-              {masterFees.length ? masterFees.map((m: any, i: number) => (
-                <div key={i} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    <div className="text-yellow-600 mt-0.5"><i className="pi pi-money-bill" /></div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-700">{m?.name}</div>
-                    </div>
-                  </div>
-                  <div className="text-sm font-semibold text-gray-900"> {fmt(m?.amount)}</div>
-                </div>
-              )) : null}
+                )) : <div className="py-3 text-sm text-gray-500">No installments set</div>}
+              </div>
             </div>
-          </div>
-
-          {/* Installments timeline */}
-          <div className="bg-white border rounded shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b flex items-center justify-between">
-              <div className="font-medium text-gray-800">Installments ({installments.length})</div>
-              <div className="text-sm text-gray-500 font-semibold">{fmt(installments.reduce((s: number, it: any) => s + (it?.amount ?? 0), 0))}</div>
-            </div>
-
-            <div className="divide-y max-h-64 overflow-auto">
-              {installments.length ? installments.map((it: any, idx: number) => (
-                <div key={it._id ?? idx} className="px-4 py-4 flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center border ${it.status === "PAID" ? "bg-green-50 border-green-300 text-green-700" : "bg-white border-gray-200 text-gray-500"}`}>
-                      {it.status === "PAID" ? <i className="pi pi-check" /> : idx + 1}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-800">Installment {idx + 1}</div>
-                        <div className="text-xs text-gray-500">Due: {formatDate(it?.dueDate)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-600">Amount</div>
-                        <div className="font-semibold text-gray-900">{fmt(it?.amount)}</div>
-                        <div className="text-xs mt-1">
-                          <span className="text-green-700 font-medium">{fmt(it?.paidAmount)}</span>
-                          <span className="text-gray-500"> paid</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusClass(it?.status)}`}>{(it?.status ?? "DUE").toUpperCase()}</div>
-                      <div className="text-xs text-gray-500">Ledger: {it._id ?? "—"}</div>
-                    </div>
-                  </div>
-                </div>
-              )) : <div className="px-4 py-3 text-sm text-gray-500">No installments set</div>}
-            </div>
-
-            <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between">
-              <div className="text-sm text-gray-600">Next due</div>
-              <div className="text-sm font-medium text-gray-800">
-                {(() => {
-                  const next = installments.find((x: any) => x?.status !== "PAID");
-                  return next ? `${formatDate(next.dueDate)} • ${fmt(next.dueAmount ?? (next.amount - (next.paidAmount ?? 0)))}` : "All paid";
-                })()}
+            
+            <div className="bg-white border rounded p-4">
+              <div className="text-sm text-gray-500 mb-3">Payment Details</div>
+              <div className="text-sm"><span className="text-gray-600">Method:</span> <span className="font-medium">{summary.paymentType}</span></div>
+              <div className="text-sm mt-2"><span className="text-gray-600">Next Due:</span>
+                <span className="font-medium ml-2">
+                  {(() => {
+                    const next = installments.find((x: any) => x?.status !== "PAID");
+                    return next ? `${formatDate(next.dueDate)} • ${fmt(next.dueAmount ?? (next.amount - (next.paidAmount ?? 0)))}` : "All paid";
+                  })()}
+                </span>
+              </div>
+              
+              <div className="mt-6 flex gap-3">
+                <Button icon="pi pi-print" label="Print" className="flex-1" onClick={() => window.print()} />
+                <Button label="Close" className="p-button-text" onClick={onClose} />
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {loading && <div className="text-sm text-gray-500">Loading...</div>}
     </div>
   );
 }

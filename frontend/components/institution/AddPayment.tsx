@@ -165,7 +165,7 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
             <InputNumber
               value={amount}
               onValueChange={(e: any) => {
-                // keep numeric value; allow edits for installments, show read-only for full-fees
+                // keep numeric value; amount is read-only for installment payments
                 setAmount(e.value ?? null);
               }}
               mode="currency"
@@ -176,7 +176,7 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
               inputClassName="p-2"
               placeholder="Enter amount"
               disabled={loading || fetchingAmount}
-              readOnly={!isInstallment} // non-installment (full fees) read-only
+              readOnly={isInstallment} // installment payments are read-only (show remaining amount)
             />
           )}
         </div>

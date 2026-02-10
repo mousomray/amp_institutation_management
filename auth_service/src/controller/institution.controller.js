@@ -2030,13 +2030,13 @@ const getInstallmentPreview = async (req, res) => {
 
     const firstDate = normalizeDate(startDate);
 
-    if (firstDate < createdAt || firstDate > maxAllowedDate) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "First installment date must be within 1 month of fees creation date"
-      });
-    }
+    // if (firstDate < createdAt || firstDate > maxAllowedDate) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "First installment date must be within 1 month of fees creation date"
+    //   });
+    // }
 
     /* ----------------------------------------
        4️⃣ FIRST INSTALLMENT AMOUNT CHECK
@@ -2141,11 +2141,11 @@ const assignInstallmentsToStudentFees = async (req, res) => {
 
     const total = installments.reduce((sum, i) => sum + i.amount, 0);
 
-    if (total !== fees.totalAmount) {
+    if (total !== fees.dueAmount) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
-        message: "Installment total does not match fees total amount"
+        message: "Installment total does not match fees due amount"
       });
     }
 
