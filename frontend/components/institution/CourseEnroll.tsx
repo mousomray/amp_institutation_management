@@ -420,8 +420,6 @@ function CourseEnroll({
                     />
                 </Dialog>
             </Dialog>
-
-            <ToastContainer />
         </div>
     );
 }
