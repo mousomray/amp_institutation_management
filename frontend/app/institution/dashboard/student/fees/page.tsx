@@ -285,106 +285,109 @@ export default function StudentFeesPage() {
   };
 
   return (
-    <div className="card bg-white p-4 rounded-lg shadow-md">
-      <div className="mb-4">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 rounded-lg">
-          {header}
+    <div className="w-full">
+      <div className="card bg-white p-4 rounded-lg shadow-md">
+        <div className="mb-4">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 rounded-lg">
+            {header}
+          </div>
         </div>
+
+        <div className="w-full overflow-auto">
+          <DataTable
+            value={data}
+            loading={loading}
+            paginator
+            lazy
+            first={(page - 1) * rows}
+            rows={rows}
+            totalRecords={totalRecords}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            onPage={(e) => {
+              if (e.page !== undefined) setPage(e.page + 1);
+              if (e.rows !== undefined) setRows(e.rows);
+            }}
+            className="shadow-sm rounded-lg"
+            rowHover
+            stripedRows
+            globalFilter={globalFilter}
+            emptyMessage="No student fees found"
+            selectionMode="single"
+            rowClassName={(data) => "odd:bg-white even:bg-gray-50"}
+          >
+            <Column header="Student" body={studentBody} style={{ width: "15%" }} />
+            <Column header="Course" body={coursesBody} style={{ width: "15%" }} />
+            <Column header="Heads" body={headsBody} style={{ width: "20%" }} />
+            <Column field="totalAmount" header="Total" body={totalBody} style={{ width: "10%" }} />
+            <Column field="paidAmount" header="Paid" body={paidBody} style={{ width: "10%" }} />
+            <Column field="dueAmount" header="Due" body={dueBody} style={{ width: "10%" }} />
+            <Column header="Type" body={paymentTypeBody} style={{ width: "10%" }} />
+            <Column header="Status" body={statusBody} style={{ width: "10%" }} />
+            <Column header="" body={actionTemplate} style={{ width: "5%" }} />
+          </DataTable>
+        </div>
+
+        <Dialog
+          header="Student Fees Details"
+          visible={detailVisible}
+          style={{ width: "90vw", maxWidth: "1400px" }}
+          onHide={() => setDetailVisible(false)}
+          maximizable
+        >
+          <SingleStudentFees id={selectedFeesId} onClose={() => setDetailVisible(false)} />
+        </Dialog>
+
+        <Dialog
+          header="Add Payment"
+          visible={paymentVisible}
+          style={{ width: "90vw", maxWidth: "500px" }}
+          onHide={() => setPaymentVisible(false)}
+        >
+          <AddPayment
+            id={selectedPaymentId}
+            studentFeesId={selectedPaymentId}
+            onClose={() => setPaymentVisible(false)}
+            onSuccess={() => {
+              setPaymentVisible(false);
+              fetchList();
+            }}
+          />
+        </Dialog>
+
+        <Dialog
+          header="Add Other Payment"
+          visible={otherVisible}
+          style={{ width: "90vw", maxWidth: "800px" }}
+          onHide={() => setOtherVisible(false)}
+        >
+          <AddOtherFees
+            enrollmentId={selectedOtherEnrollmentId}
+            onClose={() => setOtherVisible(false)}
+            onSuccess={() => {
+              setOtherVisible(false);
+              fetchList();
+            }}
+          />
+        </Dialog>
+
+        <Dialog 
+          header="Set Installment"
+          style={{ width: "90vw", maxWidth: "500px" }} 
+          onHide={() => setInstallmentVisible(false)} 
+          visible={installmentVisible}
+        >
+          <SetInstallmentFrom
+            studentFeesId={selectedInstallmentId}
+            onClose={() => setInstallmentVisible(false)}
+            onAssign={() => {
+              setInstallmentVisible(false);
+              fetchList();
+            }}
+          />
+        </Dialog>
+
+        <ToastContainer position="top-right" autoClose={3000} />
       </div>
-
-      <DataTable
-        value={data}
-        loading={loading}
-        paginator
-        lazy
-        first={(page - 1) * rows}
-        rows={rows}
-        totalRecords={totalRecords}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        onPage={(e) => {
-          if (e.page !== undefined) setPage(e.page + 1);
-          if (e.rows !== undefined) setRows(e.rows);
-        }}
-        className="shadow-sm rounded-lg overflow-hidden"
-        tableStyle={{ minWidth: "900px" }}
-        rowHover
-        stripedRows
-        responsiveLayout="scroll"
-        globalFilter={globalFilter}
-        emptyMessage="No student fees found"
-        selectionMode="single"
-        rowClassName={(data) => "odd:bg-white even:bg-gray-50"} // subtle zebra
-      >
-        <Column
-          header="Student"
-          body={studentBody}
-          style={{ minWidth: "260px" }}
-        />
-        <Column header="Course" body={coursesBody} style={{ minWidth: "300px" }} />
-        <Column header="Heads" body={headsBody} style={{ minWidth: "300px" }} />
-        <Column field="totalAmount" header="Total" body={totalBody} style={{ width: "120px" }} />
-        <Column field="paidAmount" header="Paid" body={paidBody} style={{ width: "120px" }} />
-        <Column field="dueAmount" header="Due" body={dueBody} style={{ width: "120px" }} />
-        <Column header="Payment Type" body={paymentTypeBody} style={{ width: "160px" }} />
-        <Column header="Status" body={statusBody} style={{ width: "160px" }} />
-        <Column header="Actions" body={actionTemplate} style={{ width: "80px" }} />
-      </DataTable>
-
-      <Dialog
-        header="Student Fees Details"
-        visible={detailVisible}
-        style={{ width: "100vw" }}
-        onHide={() => setDetailVisible(false)}
-      >
-        <SingleStudentFees id={selectedFeesId} onClose={() => setDetailVisible(false)} />
-      </Dialog>
-
-      <Dialog
-        header="Add Payment"
-        visible={paymentVisible}
-        style={{ width: "30vw" }}
-        onHide={() => setPaymentVisible(false)}
-      >
-        <AddPayment
-          id={selectedPaymentId}
-          studentFeesId={selectedPaymentId}
-          onClose={() => setPaymentVisible(false)}
-          onSuccess={() => {
-            setPaymentVisible(false);
-            fetchList(); // refresh list after payment
-          }}
-        />
-      </Dialog>
-
-      {/* Add Other Payment Dialog */}
-      <Dialog
-        header="Add Other Payment"
-        visible={otherVisible}
-        style={{ width: "60vw" }}
-        onHide={() => setOtherVisible(false)}
-      >
-        <AddOtherFees
-          enrollmentId={selectedOtherEnrollmentId}
-          onClose={() => setOtherVisible(false)}
-          onSuccess={() => {
-            setOtherVisible(false);
-            fetchList();
-          }}
-        />
-      </Dialog>
-
-      <Dialog style={{ width: "30vw" }} onHide={() => setInstallmentVisible(false)} visible={installmentVisible}>
-        <SetInstallmentFrom
-          studentFeesId={selectedInstallmentId}
-          onClose={() => setInstallmentVisible(false)}
-          onAssign={() => {
-            setInstallmentVisible(false);
-            fetchList(); // refresh list after assignment
-          }}
-        />
-      </Dialog>
-
-      <ToastContainer />
     </div>
   );
 }
