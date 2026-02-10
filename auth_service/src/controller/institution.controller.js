@@ -1,10 +1,12 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const isValidInstrumentId = require("../helper/Instrument.js")
-const { User, Course, Institution, Student, FeesMaster, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
+const { User,  Institution, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
 const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
+const CourseModel = require("../model/course.model.js")
+const StudentModel = require("../model/student.model.js")
 const mongoose = require("mongoose");
 const StudentFees = require("../model/studentFeesLedger.model.js");
 const StudentCourse = require("../model/studentCourse.model.js");
@@ -861,7 +863,7 @@ const institutionDashboard = async (req, res) => {
     const institutionId = institution._id;
 
     // 📘 COURSES
-    const courseData = await Course.aggregate([
+    const courseData = await CourseModel.aggregate([
       {
         $match: {
           institution: new mongoose.Types.ObjectId(institutionId),
@@ -899,7 +901,7 @@ const institutionDashboard = async (req, res) => {
     ]);
 
     // 🎓 STUDENTS
-    const studentData = await Student.aggregate([
+    const studentData = await StudentModel.aggregate([
       {
         $match: {
           institution: new mongoose.Types.ObjectId(institutionId),

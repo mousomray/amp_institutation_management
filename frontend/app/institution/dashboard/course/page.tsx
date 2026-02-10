@@ -250,7 +250,6 @@ function Page() {
           <Column header="Image" body={imageTemplate} />
           <Column field="duration" header="Duration" />
           <Column field="fee" header="Fee" />
-          <Column field="description" header="Description" />
           <Column header="Created" body={(row: any) => formatDate(row.createdAt)} />
           <Column header="Actions" body={actionTemplate} />
         </DataTable>
