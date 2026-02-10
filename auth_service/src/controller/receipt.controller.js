@@ -8,121 +8,122 @@ const ReceiptSchema = require("../schema/receipt.schema");
 const StudentCourseEnrollment = require("../model/studentCourse.model");
 
 const createReceipt = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-  try {
-    const userId = req.user._id;
-    const { enrollmentId, details, receiptDate } = req.body;
+    try {
+        const userId = req.user._id;
+        const { enrollmentId, details, receiptDate } = req.body;
 
-    if (!enrollmentId || !Array.isArray(details) || !details.length) {
-      throw new Error("Fees heads required");
-    }
-
-    /* ---------------------------------------------------
-       1️⃣ Get Enrollment (FOR studentId)
-    --------------------------------------------------- */
-    const enrollment = await StudentCourseEnrollment.findOne({
-      _id: enrollmentId,
-      userId
-    }).session(session);
-
-    if (!enrollment) {
-      throw new Error("Enrollment not found");
-    }
-
-    /* ---------------------------------------------------
-       2️⃣ Calculate receipt amount
-    --------------------------------------------------- */
-    const receiptAmount = details.reduce(
-      (sum, h) => sum + Number(h.amount || 0),
-      0
-    );
-
-    /* ---------------------------------------------------
-       3️⃣ Create Receipt Master (FIXED)
-    --------------------------------------------------- */
-    const [receiptMaster] = await ReceiptMaster.create(
-      [
-        {
-          userId,
-          studentId: enrollment.studentId,        // ✅ REQUIRED
-          enrollmentId,
-          receiptNo: `RCPT-${Date.now()}`,
-          receiptDate: receiptDate ? new Date(receiptDate) : new Date(),
-          totalAmount: receiptAmount,              // ✅ REQUIRED
-          isCancelled: false
+        /* -----------------------------
+           1️⃣ BASIC VALIDATION
+        ----------------------------- */
+        if (!enrollmentId || !Array.isArray(details) || details.length === 0) {
+            throw new Error("Fees heads required");
         }
-      ],
-      { session }
-    );
 
-    /* ---------------------------------------------------
-       4️⃣ Create Receipt Details
-    --------------------------------------------------- */
-    const receiptDetailsPayload = details.map(h => ({
-      receiptId: receiptMaster._id,
-      feesMasterId: h.feesMasterId,
-      amount: h.amount,
-      userId
-    }));
+        /* -----------------------------
+           2️⃣ GET ENROLLMENT
+        ----------------------------- */
+        const enrollment = await StudentCourseEnrollment.findOne({
+            _id: enrollmentId,
+            userId
+        }).session(session);
 
-    await ReceiptDetails.insertMany(receiptDetailsPayload, { session });
+        if (!enrollment) {
+            throw new Error("Enrollment not found");
+        }
 
-    /* ---------------------------------------------------
-       5️⃣ Update Student Fees Ledger
-    --------------------------------------------------- */
-    const ledger = await StudentFeesLedgerModel.findOne({
-      enrollmentId,
-      userId
-    }).session(session);
+        /* -----------------------------
+           3️⃣ CALCULATE AMOUNT
+        ----------------------------- */
+        const receiptAmount = details.reduce(
+            (sum, h) => sum + Number(h.amount || 0),
+            0
+        );
 
-    if (!ledger) {
-      throw new Error("Student fees ledger not found");
+        if (receiptAmount <= 0) {
+            throw new Error("Invalid receipt amount");
+        }
+
+        /* -----------------------------
+           4️⃣ CREATE RECEIPT MASTER
+        ----------------------------- */
+        const [receiptMaster] = await ReceiptMaster.create(
+            [
+                {
+                    userId,
+                    studentId: enrollment.studentId,
+                    enrollmentId,
+                    receiptNo: `RCPT-${Date.now()}`,
+                    receiptDate: receiptDate ? new Date(receiptDate) : new Date(),
+                    totalAmount: receiptAmount,
+                    isCancelled: false
+                }
+            ],
+            { session }
+        );
+
+        /* -----------------------------
+           5️⃣ CREATE RECEIPT DETAILS
+        ----------------------------- */
+        const receiptDetailsPayload = details.map(h => ({
+            receiptId: receiptMaster._id,
+            feesMasterId: h.feesMasterId,
+            amount: h.amount,
+            userId
+        }));
+
+        await ReceiptDetails.insertMany(receiptDetailsPayload, { session });
+
+        /* -----------------------------
+           6️⃣ LEDGER UPDATE (ONLY IF EXISTS)
+        ----------------------------- */
+        const ledger = await StudentFeesLedgerModel.findOne({
+            enrollmentId,
+            userId
+        }).session(session);
+
+        // 🔥 IMPORTANT: First time enrollment → ledger NOT EXISTS
+        // So DO NOTHING
+        if (ledger) {
+            ledger.totalAmount += receiptAmount;
+            ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
+            ledger.lastPaymentDate = new Date();
+
+            if (ledger.paidAmount === 0) {
+                ledger.status = "DUE";
+            } else if (ledger.dueAmount > 0) {
+                ledger.status = "PARTIAL";
+            } else {
+                ledger.status = "PAID";
+            }
+
+            await ledger.save({ session });
+        }
+        await session.commitTransaction();
+        session.endSession();
+        return res.status(201).json({
+            success: true,
+            message: ledger
+                ? "Receipt added & ledger updated"
+                : "Receipt added successfully",
+            data: {
+                receiptId: receiptMaster._id,
+                receiptAmount
+            }
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error(error);
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
     }
-
-    // 🔥 IMPORTANT: receipt = NEW FEES → increase total ONLY
-    ledger.totalAmount += receiptAmount;
-    ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
-    ledger.lastPaymentDate = new Date();
-
-    // STATUS LOGIC
-    if (ledger.paidAmount === 0) {
-      ledger.status = "DUE";
-    } else if (ledger.dueAmount > 0) {
-      ledger.status = "PARTIAL";
-    } else {
-      ledger.status = "PAID";
-    }
-
-    await ledger.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(201).json({
-      success: true,
-      message: "Receipt added successfully",
-      data: {
-        receiptId: receiptMaster._id,
-        receiptAmount,
-        totalAmount: ledger.totalAmount,
-        paidAmount: ledger.paidAmount,
-        dueAmount: ledger.dueAmount,
-        status: ledger.status
-      }
-    });
-
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
-    console.error(error);
-    return res.status(400).json({
-      success: false,
-      message: error.message
-    });
-  }
 };
 
 
