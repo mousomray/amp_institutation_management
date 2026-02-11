@@ -22,6 +22,8 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
   const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [token, setToken] = useState<string | null>(null);
   const [receiptAmounts, setReceiptAmounts] = useState<Record<string, Record<string, number>>>({});
+  // keep IDs of receipts to be deleted on submit
+  const [receiptsToDelete, setReceiptsToDelete] = useState<string[]>([]);
 
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
@@ -44,10 +46,12 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
       const recs = receiptsRes?.data?.data ?? [];
       const allMasters = mastersRes?.data?.data ?? [];
 
-      setReceipts(recs);
+      // hide receipts that were already marked for deletion in this session
+      const visibleReceipts = recs.filter((r: any) => !receiptsToDelete.includes(r._id));
+      setReceipts(visibleReceipts);
 
       const initReceiptAmounts: Record<string, Record<string, number>> = {};
-      recs.forEach((r: any) => {
+      visibleReceipts.forEach((r: any) => {
         initReceiptAmounts[r._id] = {};
         (r.heads || []).forEach((h: any, idx: number) => {
           initReceiptAmounts[r._id][`head-${idx}`] = h.amount || 0;
@@ -56,7 +60,7 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
       setReceiptAmounts(initReceiptAmounts);
 
       const existingHeadNames = new Set<string>();
-      recs.forEach((r: any) => {
+      visibleReceipts.forEach((r: any) => {
         (r.heads || []).forEach((h: any) => existingHeadNames.add(h.feesHeadName));
       });
 
@@ -64,7 +68,9 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
       setMasters(filteredMasters);
 
       const init: Record<string, number> = {};
-      filteredMasters.forEach((m: any) => { init[m._id] = 0; });
+      filteredMasters.forEach((m: any) => {
+        init[m._id] = 0;
+      });
       setAmounts(init);
     } catch (err: any) {
       if (axios.isAxiosError(err)) toast.error(err.response?.data?.message || "Failed to load data");
@@ -93,28 +99,21 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
     }));
   };
 
+  // mark receipt for deletion (UI only) – actual delete happens on submit
   const handleDeleteReceipt = (receiptId: string, receiptNo: string) => {
     confirmDialog({
-      message: `Are you sure you want to delete receipt "${receiptNo}"? This action cannot be undone.`,
-      header: "Delete Receipt",
+      message: `Receipt "${receiptNo}" will be removed from this list and deleted permanently after you submit. Continue?`,
+      header: "Mark Receipt for Deletion",
       icon: "pi pi-exclamation-triangle",
       acceptClassName: "p-button-danger",
-      accept: async () => {
-        try {
-          setLoading(true);
-          const headers = { Authorization: `Bearer ${token}` };
-         const res =  await axiosInstance.delete(`/receipt/delete/receipt/${receiptId}`, { headers });
-          toast.success(res.data.message || "Receipt deleted successfully");
-          fetchData();
-        } catch (err: any) {
-          if (axios.isAxiosError(err)) {
-            toast.error(err.response?.data?.message || "Failed to delete receipt");
-          } else {
-            toast.error("Unexpected error");
-          }
-        } finally {
-          setLoading(false);
-        }
+      accept: () => {
+        setReceiptsToDelete((prev) => (prev.includes(receiptId) ? prev : [...prev, receiptId]));
+        setReceipts((prev) => prev.filter((r) => r._id !== receiptId));
+        setReceiptAmounts((prev) => {
+          const { [receiptId]: _removed, ...rest } = prev;
+          return rest;
+        });
+        toast.info("Receipt marked for deletion. Click Submit to apply changes.");
       },
     });
   };
@@ -166,18 +165,41 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
       amount: Number(m.amount),
     }));
 
-    if (!details.length) {
-      toast.warn("Please enter amount for at least one fee head");
+    if (!details.length && receiptsToDelete.length === 0) {
+      toast.warn("Please add at least one fee head or mark a receipt for deletion");
       return;
     }
-
-    const payload = { enrollmentId, details };
 
     try {
       setLoading(true);
       const headers = { Authorization: token ? `Bearer ${token}` : "" };
-      await axiosInstance.post("/receipt/create-receipt", payload, { headers });
-      toast.success("Other payment(s) added successfully!");
+
+      // first apply deletions for receipts marked for delete
+      if (receiptsToDelete.length) {
+        await Promise.all(
+          receiptsToDelete.map((id) =>
+            axiosInstance.delete(`/receipt/delete/receipt/${id}`, { headers }).catch((err) => {
+              // surface per-receipt error but continue others
+              if (axios.isAxiosError(err)) {
+                toast.error(err.response?.data?.message || `Failed to delete receipt ${id}`);
+              } else {
+                toast.error("Unexpected error while deleting receipt");
+              }
+            })
+          )
+        );
+      }
+
+      // then create new receipt for additional heads, if any
+      if (details.length) {
+        const payload = { enrollmentId, details };
+        await axiosInstance.post("/receipt/create-receipt", payload, { headers });
+        toast.success("Other payment(s) added successfully!");
+      } else if (receiptsToDelete.length) {
+        toast.success("Receipt deletions applied successfully!");
+      }
+
+      setReceiptsToDelete([]);
       onSuccess();
     } catch (err: any) {
       if (axios.isAxiosError(err)) toast.error(err.response?.data?.message || "Failed to submit");
@@ -195,9 +217,9 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
 
   return (
     <div className="w-full max-w-full overflow-hidden">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6  -m-6 mb-6  ">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 ">
+      {/* Header Section (slight polish) */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 -mx-6 -mt-6 mb-4 rounded-t-2xl shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h3 className="text-2xl font-bold mb-1 flex items-center gap-3">
               <i className="pi pi-wallet text-3xl"></i>
@@ -206,8 +228,8 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
             <p className="text-blue-100 text-sm">Review existing receipts or add additional fee heads</p>
           </div>
           {enrollmentId && (
-            <Chip 
-              label={`ID: ${enrollmentId.substring(0, 8)}...`} 
+            <Chip
+              label={`ID: ${enrollmentId.substring(0, 8)}...`}
               className="bg-white/20 text-white border-0"
               icon="pi pi-id-card"
             />
@@ -460,18 +482,30 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
       {/* Footer Actions */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4">
         <div className="flex items-center gap-3 text-sm overflow-hidden">
-          {selectedHeads.length > 0 ? (
+          {selectedHeads.length > 0 || receiptsToDelete.length > 0 ? (
             <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg min-w-0">
               <i className="pi pi-info-circle text-blue-600 flex-shrink-0"></i>
               <span className="text-gray-700 truncate">
-                <span className="font-semibold">{selectedHeads.length}</span> fee head{selectedHeads.length > 1 ? 's' : ''} • 
-                <span className="font-bold text-green-600 ml-1">{fmt(selectedTotal)}</span>
+                {selectedHeads.length > 0 && (
+                  <>
+                    <span className="font-semibold">{selectedHeads.length}</span> fee head
+                    {selectedHeads.length > 1 ? "s" : ""} •
+                    <span className="font-bold text-green-600 ml-1">{fmt(selectedTotal)}</span>
+                  </>
+                )}
+                {receiptsToDelete.length > 0 && (
+                  <>
+                    {selectedHeads.length > 0 && " • "}
+                    <span className="font-semibold">{receiptsToDelete.length}</span> receipt
+                    {receiptsToDelete.length > 1 ? "s" : ""} marked for delete
+                  </>
+                )}
               </span>
             </div>
           ) : (
             <div className="text-gray-400 bg-gray-50 px-4 py-2 rounded-lg">
               <i className="pi pi-info-circle mr-2"></i>
-              Select fee heads to proceed
+              Select fee heads or mark receipts for deletion to proceed
             </div>
           )}
         </div>
@@ -487,11 +521,17 @@ export default function AddOtherFees({ enrollmentId, onClose, onSuccess }: Props
             className="w-full sm:w-auto order-2 sm:order-1"
           />
           <Button
-            label={loading ? "Processing..." : "Submit Payment"}
+            label={
+              loading
+                ? "Processing..."
+                : receiptsToDelete.length > 0 && selectedTotal <= 0
+                ? "Submit Changes"
+                : "Submit Payment"
+            }
             icon={loading ? "pi pi-spin pi-spinner" : "pi pi-check-circle"}
             onClick={handleSubmit}
             loading={loading}
-            disabled={loading || selectedTotal <= 0}
+            disabled={loading || (selectedTotal <= 0 && receiptsToDelete.length === 0)}
             className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow order-1 sm:order-2 whitespace-nowrap"
           />
         </div>

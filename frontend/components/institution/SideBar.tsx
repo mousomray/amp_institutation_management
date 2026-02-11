@@ -127,21 +127,15 @@ const sidebarItems = [
     children: [
       {
         id: "5-1",
-        label: "Other Payment List",
+        label: "Payment",
         path: "/institution/dashboard/other",
-        icon: <ViewListIcon />,
+        icon: <PaymentIcon />,
       },
       {
         id: "5-2",
         label: "Student List",
         path: "/institution/dashboard/other/student-list",
         icon: <ViewListIcon />,
-      },
-      {
-        id: "4-5",
-        label: "Library Setting",
-        path: "/institution/dashboard/book/setting",
-        icon: <SettingsIcon />,
       },
     ],
   },

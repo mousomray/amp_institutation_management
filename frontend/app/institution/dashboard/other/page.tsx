@@ -185,7 +185,15 @@ export default function OtherPaymentsTable() {
         selectionMode="single"
       >
         <Column field="name" header="Name" />
-        <Column field="amount" header="Amount" body={(row) => (row.amount != null ? `$${row.amount}` : "-")} />
+        <Column
+          field="amount"
+          header="Amount"
+          body={(row) =>
+            row.amount != null
+              ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(row.amount)
+              : "-"
+          }
+        />
         <Column field="description" header="Description" />
         <Column field="createdAt" header="Created At" body={(row) => formatDate(row.createdAt)} />
         <Column header="Status" body={statusBodyTemplate} />

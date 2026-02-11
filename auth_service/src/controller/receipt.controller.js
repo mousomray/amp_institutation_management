@@ -360,9 +360,9 @@ const deleteReceipt = async (req, res) => {
             throw new Error("receiptId is required");
         }
 
-        /* -----------------------------
-           1️⃣ FIND RECEIPT
-        ----------------------------- */
+        /* ----------------------------------
+           1️⃣ FIND RECEIPT MASTER
+        ----------------------------------- */
         const receipt = await ReceiptMaster.findOne({
             _id: receiptId,
             userId,
@@ -373,78 +373,106 @@ const deleteReceipt = async (req, res) => {
             throw new Error("Receipt not found or already cancelled");
         }
 
-        const receiptAmount = receipt.totalAmount;
+        /* ----------------------------------
+           2️⃣ GET RECEIPT DETAILS
+        ----------------------------------- */
+        const receiptDetails = await ReceiptDetails.find({
+            receiptId: receipt._id
+        }).session(session);
 
-        /* -----------------------------
-           2️⃣ UPDATE LEDGER (CORRECT WAY)
-        ----------------------------- */
+        if (!receiptDetails.length) {
+            throw new Error("Receipt details not found");
+        }
+
+        const receiptAmount = receiptDetails.reduce(
+            (sum, item) => sum + item.amount,
+            0
+        );
+
+        /* ----------------------------------
+           3️⃣ FIND LEDGER
+        ----------------------------------- */
         const ledger = await StudentFeesLedgerModel.findOne({
             enrollmentId: receipt.enrollmentId,
             userId
         }).session(session);
 
-        if (ledger) {
-            // 🔥 IMPORTANT: Reduce paid amount (NOT totalAmount)
-            ledger.paidAmount -= receiptAmount;
-
-            if (ledger.paidAmount < 0) ledger.paidAmount = 0;
-
-            ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
-
-            // Status calculation
-            if (ledger.paidAmount === 0) {
-                ledger.status = "DUE";
-            } else if (ledger.dueAmount > 0) {
-                ledger.status = "PARTIAL";
-            } else {
-                ledger.status = "PAID";
-            }
-
-            ledger.lastPaymentDate = new Date();
-
-            await ledger.save({ session });
+        if (!ledger) {
+            throw new Error("Ledger not found");
         }
 
-        /* -----------------------------
-           3️⃣ DELETE RECEIPT DETAILS
-        ----------------------------- */
+        /* ----------------------------------
+           4️⃣ ADJUST LEDGER (CORRECT WAY)
+        ----------------------------------- */
+
+        // 🔥 Receipt = Fees Add হয়েছিল
+        // তাই এখন totalAmount কমবে
+
+        ledger.totalAmount -= receiptAmount;
+
+        if (ledger.totalAmount < 0) {
+            ledger.totalAmount = 0;
+        }
+
+        // Recalculate due
+        ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
+
+        if (ledger.dueAmount < 0) {
+            ledger.dueAmount = 0;
+        }
+
+        // Status update
+        if (ledger.paidAmount === 0) {
+            ledger.status = "DUE";
+        } else if (ledger.dueAmount > 0) {
+            ledger.status = "PARTIAL";
+        } else {
+            ledger.status = "PAID";
+        }
+
+        await ledger.save({ session });
+
+        /* ----------------------------------
+           5️⃣ DELETE RECEIPT DETAILS
+        ----------------------------------- */
         await ReceiptDetails.deleteMany(
-            { receiptId: receipt._id, userId },
+            { receiptId: receipt._id },
             { session }
         );
 
-        /* -----------------------------
-           4️⃣ SOFT DELETE MASTER
-        ----------------------------- */
+        /* ----------------------------------
+           6️⃣ SOFT DELETE MASTER
+        ----------------------------------- */
         receipt.isCancelled = true;
         await receipt.save({ session });
 
-        /* -----------------------------
-           5️⃣ COMMIT
-        ----------------------------- */
+        /* ----------------------------------
+           7️⃣ COMMIT
+        ----------------------------------- */
         await session.commitTransaction();
         session.endSession();
 
         return res.json({
             success: true,
-            message: "Receipt deleted & ledger updated successfully"
+            message: "Receipt deleted & ledger adjusted properly",
+            data: {
+                totalAmount: ledger.totalAmount,
+                paidAmount: ledger.paidAmount,
+                dueAmount: ledger.dueAmount,
+                status: ledger.status
+            }
         });
 
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
 
-        console.error(error);
         return res.status(400).json({
             success: false,
             message: error.message
         });
     }
 };
-
-
-
-
 
 module.exports = {
     createReceipt,
