@@ -72,7 +72,7 @@ const sidebarItems = [
         id: "3-3",
         label: "Payment",
         path: "/institution/dashboard/student/fees",
-        icon: <PaymentIcon/>,
+        icon: <PaymentIcon />,
       },
       {
         id: "3-4",
@@ -110,6 +110,31 @@ const sidebarItems = [
         id: "4-4",
         label: "Issued Books",
         path: "/institution/dashboard/book/issued-books",
+        icon: <ViewListIcon />,
+      },
+      {
+        id: "4-5",
+        label: "Library Setting",
+        path: "/institution/dashboard/book/setting",
+        icon: <SettingsIcon />,
+      },
+    ],
+  },
+  {
+    id: "5",
+    label: "Other Payments",
+    icon: <PaymentIcon />,
+    children: [
+      {
+        id: "5-1",
+        label: "Other Payment List",
+        path: "/institution/dashboard/other",
+        icon: <ViewListIcon />,
+      },
+      {
+        id: "5-2",
+        label: "Student List",
+        path: "/institution/dashboard/other/student-list",
         icon: <ViewListIcon />,
       },
       {
