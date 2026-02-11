@@ -5,6 +5,7 @@ const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const { AdminRegisterSchema, AdminLoginSchema, institutionSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js");
 const sendPasswordEmail = require("../helper/mail.service.js")
+const FeesMaster = require("../model/feesmaster.model.js")
 
 const registerAdmin = async (req, res) => {
   try {
@@ -206,10 +207,23 @@ const addInstitution = async (req, res) => {
       adminUser: institutionUser._id,
     });
 
+    
+     const feeNames = [
+      "Admission Fees",
+      "Library Fees",
+      "Examination Fees"
+    ];
+
+    const feePayload = feeNames.map(name => ({
+      name,
+      institutionId: institutionUser._id  
+    }));
+
+    await FeesMaster.insertMany(feePayload, { session });
+
 
     institutionUser.institution = institution._id;
     await institutionUser.save();
-
 
     await sendPasswordEmail(institutionUser.email, plainPassword)
 
