@@ -388,9 +388,8 @@ export default function StudentFeesPage() {
         </Dialog>
 
         <Dialog
-          header="Add Other Payment"
           visible={otherVisible}
-          style={{ width: "90vw", maxWidth: "800px" }}
+          style={{ width: "90vw" }}
           onHide={() => setOtherVisible(false)}
         >
           <AddOtherFees

@@ -348,10 +348,107 @@ const getReceiptsByEnrollment = async (req, res) => {
     }
 };
 
+const deleteReceipt = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const userId = req.user._id;
+        const { receiptId } = req.params;
+
+        if (!receiptId) {
+            throw new Error("receiptId is required");
+        }
+
+        /* -----------------------------
+           1️⃣ FIND RECEIPT
+        ----------------------------- */
+        const receipt = await ReceiptMaster.findOne({
+            _id: receiptId,
+            userId,
+            isCancelled: false
+        }).session(session);
+
+        if (!receipt) {
+            throw new Error("Receipt not found or already cancelled");
+        }
+
+        const receiptAmount = receipt.totalAmount;
+
+        /* -----------------------------
+           2️⃣ UPDATE LEDGER (CORRECT WAY)
+        ----------------------------- */
+        const ledger = await StudentFeesLedgerModel.findOne({
+            enrollmentId: receipt.enrollmentId,
+            userId
+        }).session(session);
+
+        if (ledger) {
+            // 🔥 IMPORTANT: Reduce paid amount (NOT totalAmount)
+            ledger.paidAmount -= receiptAmount;
+
+            if (ledger.paidAmount < 0) ledger.paidAmount = 0;
+
+            ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
+
+            // Status calculation
+            if (ledger.paidAmount === 0) {
+                ledger.status = "DUE";
+            } else if (ledger.dueAmount > 0) {
+                ledger.status = "PARTIAL";
+            } else {
+                ledger.status = "PAID";
+            }
+
+            ledger.lastPaymentDate = new Date();
+
+            await ledger.save({ session });
+        }
+
+        /* -----------------------------
+           3️⃣ DELETE RECEIPT DETAILS
+        ----------------------------- */
+        await ReceiptDetails.deleteMany(
+            { receiptId: receipt._id, userId },
+            { session }
+        );
+
+        /* -----------------------------
+           4️⃣ SOFT DELETE MASTER
+        ----------------------------- */
+        receipt.isCancelled = true;
+        await receipt.save({ session });
+
+        /* -----------------------------
+           5️⃣ COMMIT
+        ----------------------------- */
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.json({
+            success: true,
+            message: "Receipt deleted & ledger updated successfully"
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error(error);
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+
+
 
 
 module.exports = {
     createReceipt,
     getAllReceipts,
-    getReceiptsByEnrollment
+    getReceiptsByEnrollment,
+    deleteReceipt,
 };
