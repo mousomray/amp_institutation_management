@@ -27,7 +27,6 @@ export default function StudentTable() {
   const [token, setToken] = useState<string | null>(null);
   const [globalFilter, setGlobalFilter] = useState<string>("");
 
-  // ✅ Server pagination
   const [pagination, setPagination] = useState({
     page: 1,
     rows: 5,
@@ -111,6 +110,7 @@ export default function StudentTable() {
   };
 
   /* ================= COLUMN TEMPLATES ================= */
+
   const photoTemplate = (rowData: any) =>
     rowData.photo ? (
       <img
@@ -124,8 +124,15 @@ export default function StudentTable() {
       </div>
     );
 
-  const signatureTemplate = (rowData: any) => (
-    <img src={rowData.signature} className="h-8 object-contain" />
+  const signatureTemplate = (rowData: any) =>
+    rowData.signature ? (
+      <img src={rowData.signature} className="h-8 object-contain" />
+    ) : (
+      "-"
+    );
+
+  const textTemplate = (value: string) => (
+    <span className="truncate block max-w-[150px]">{value}</span>
   );
 
   const actionTemplate = (rowData: any) => (
@@ -147,21 +154,26 @@ export default function StudentTable() {
     </div>
   );
 
-  const EditHEader = (
-    <div className="text-center mb-8 pb-6 border-b border-gray-200">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
-            <i className="pi pi-pencil text-3xl text-white"></i>
-          </div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">Edit Student Registration</h2>
-          <p className="text-gray-500">Edit student with complete information</p>
-        </div>
-  )
-
+  const editHeader = (
+    <div className="text-center mb-6 pb-4 border-b border-gray-200">
+      <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-500 rounded-xl mb-3 shadow">
+        <i className="pi pi-pencil text-2xl text-white"></i>
+      </div>
+      <h2 className="text-2xl font-bold text-gray-800">
+        Edit Student Registration
+      </h2>
+      <p className="text-gray-500 text-sm">
+        Edit student with complete information
+      </p>
+    </div>
+  );
 
   const header = (
     <div className="flex justify-between items-center bg-primary p-3 rounded-lg">
       <div>
-        <h2 className="text-lg font-semibold text-white">Student Details</h2>
+        <h2 className="text-lg font-semibold text-white">
+          Student Details
+        </h2>
         <p className="text-sm text-black">Registered students list</p>
       </div>
 
@@ -176,75 +188,87 @@ export default function StudentTable() {
       </IconField>
     </div>
   );
-  console.log("selected student", selectedStudent)
 
   /* ================= RENDER ================= */
   return (
-    <div className="card bg-white p-4 rounded-lg shadow">
-      <DataTable
-        value={students}
-        loading={loading}
-        lazy
-        paginator
-        first={(pagination.page - 1) * pagination.rows}
-        rows={pagination.rows}
-        totalRecords={pagination.total}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        onPage={(e) =>
-          setPagination((prev) => ({
-            ...prev,
-            page: (e.page ?? 0) + 1,
-            rows: e.rows ?? 5,
-          }))
-        }
-        stripedRows
-        responsiveLayout="scroll"
-        header={header}
-        emptyMessage="No students found"
-        onRowClick={onRowClick}
-        selectionMode="single"
-        globalFilter={globalFilter}
-        globalFilterFields={[
-          "studentId",
-          "name",
-          "email",
-          "phone",
-          "fatherName",
-          "bloodGroup",
-        ]}
-      >
-        <Column field="studentId" header="Student ID" />
-        <Column header="Photo" body={photoTemplate} />
-        <Column field="name" header="Name" />
-        <Column field="email" header="Email" />
-        <Column field="phone" header="Phone" />
-        <Column header="DOB" body={(rowData) => formatDate(rowData.dob)} />
-        <Column field="fatherName" header="Father Name" />
-        <Column field="bloodGroup" header="Blood Group" />
-        <Column
-          header="Admission Date"
-          body={(rowData) => formatDate(rowData.admissionDate)}
-        />
-        <Column header="Signature" body={signatureTemplate} />
-        <Column header="Actions" body={actionTemplate} />
-      </DataTable>
+    <div className="w-full overflow-x-hidden">
+      <div className="card bg-white p-4 rounded-lg shadow max-w-full overflow-hidden">
+        <DataTable
+          value={students}
+          loading={loading}
+          lazy
+          paginator
+          className="w-full"
+          tableStyle={{ width: "100%" }}
+          first={(pagination.page - 1) * pagination.rows}
+          rows={pagination.rows}
+          totalRecords={pagination.total}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          onPage={(e) =>
+            setPagination((prev) => ({
+              ...prev,
+              page: (e.page ?? 0) + 1,
+              rows: e.rows ?? 5,
+            }))
+          }
+          stripedRows
+          header={header}
+          emptyMessage="No students found"
+          onRowClick={onRowClick}
+          selectionMode="single"
+          globalFilter={globalFilter}
+          globalFilterFields={[
+            "studentId",
+            "name",
+            "email",
+            "phone",
+            "fatherName",
+            "bloodGroup",
+          ]}
+        >
+          <Column field="studentId" header="Student ID" />
+          <Column header="Photo" body={photoTemplate} />
+          <Column
+            field="name"
+            header="Name"
+            body={(rowData) => textTemplate(rowData.name)}
+          />
+          <Column
+            field="email"
+            header="Email"
+            body={(rowData) => textTemplate(rowData.email)}
+          />
+          <Column field="phone" header="Phone" />
+          <Column
+            header="DOB"
+            body={(rowData) => formatDate(rowData.dob)}
+          />
+          <Column field="fatherName" header="Father Name" />
+          <Column field="bloodGroup" header="Blood Group" />
+          <Column
+            header="Admission Date"
+            body={(rowData) => formatDate(rowData.admissionDate)}
+          />
+          <Column header="Signature" body={signatureTemplate} />
+          <Column header="Actions" body={actionTemplate} />
+        </DataTable>
 
-      <Dialog
-        header={EditHEader}
-        visible={visible}
-        style={{ width: "40vw" }}
-        onHide={() => setVisible(false)}
-        
-      >
-        <EditStudent
-          onClose={() => setVisible(false)}
-          student={selectedStudent}
-          refetch={fetchStudents}
-        />
-      </Dialog>
+        <Dialog
+          header={editHeader}
+          visible={visible}
+          style={{ width: "90vw", maxWidth: "600px" }}
+          onHide={() => setVisible(false)}
+        >
+          <EditStudent
+            onClose={() => setVisible(false)}
+            student={selectedStudent}
+            refetch={fetchStudents}
+          />
+        </Dialog>
 
-      <ConfirmDialog />
-      <ToastContainer />
+        <ConfirmDialog />
+        <ToastContainer />
+      </div>
     </div>
   );
 }

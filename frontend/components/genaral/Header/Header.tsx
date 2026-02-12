@@ -53,9 +53,9 @@ export default function Header() {
           
           {!isAdminPage && (
             <div className="hidden md:flex">
-              <Link href="/doctor/sign-in">
+              <Link href="/institution/login">
                 <button className="bg-primary text-white hover:bg-primaryHover px-4 py-2 rounded-md font-medium">
-                  Sign In
+                  Login
                 </button>
               </Link>
             </div>
