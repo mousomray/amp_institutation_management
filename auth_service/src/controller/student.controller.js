@@ -331,9 +331,20 @@ const StudentDropDown = async (req, res) => {
 }
 
 
+const OnlyOneStudentAPI = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const data = await StudentModel.findById(id);
+    return res.status(200).json({ message: "Single Student Fetched Successfully", data });
+  } catch (error) {
+    console.error("Get single student error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
 
 
 
 
 
-module.exports = { createStudent, getMyStudents, updateStudent, deleteStudent, StudentDropDown };
+
+module.exports = {OnlyOneStudentAPI, createStudent, getMyStudents, updateStudent, deleteStudent, StudentDropDown };

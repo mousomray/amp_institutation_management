@@ -57,7 +57,7 @@ export default function BookIssuePage() {
     const fetchStudents = async () => {
       try {
         setLoadingStudents(true);
-        const res = await axiosInstance.get("/institution/all-students");
+        const res = await axiosInstance.get("/student/student-dropdown");
         setStudents(res.data.data || res.data || []);
       } catch (err) {
         toast.error(axios.isAxiosError(err) ? err.response?.data?.message || "Failed to load students" : "Failed to load students");

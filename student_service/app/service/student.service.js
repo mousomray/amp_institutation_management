@@ -6,10 +6,10 @@ const STUDENT_SERVICE_URL = process.env.STUDENT_SERVICE_URL
 async function getStudentFromStudentService(studentId, req) {
   try {
     const response = await axios.get(
-      `${STUDENT_SERVICE_URL}/api/institution/onlyonestudentapi/${studentId}`,
+      `${STUDENT_SERVICE_URL}/api/student/onlyonestudentapi/${studentId}`,
       {
         headers: {
-          Authorization: req.headers.authorization // token pass
+          Authorization: req.headers.authorization 
         }
       }
     )
