@@ -451,7 +451,255 @@ const getSingleStudentFees = async (req, res) => {
   }
 };
 
+const getStudentFinancialReport = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { year, month, date, week, page = 1, search } = req.query;
+
+    const limit = 5;
+    const skip = (Number(page) - 1) * limit;
+
+    let startDate, endDate;
+
+    /* ===============================
+       DATE FILTER LOGIC
+    =============================== */
+
+    if (date) {
+      startDate = new Date(date);
+      endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+    } 
+    else if (week) {
+      const current = new Date(week);
+      const firstDay = current.getDate() - current.getDay();
+      startDate = new Date(current.setDate(firstDay));
+      startDate.setHours(0, 0, 0, 0);
+
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } 
+    else if (year && month) {
+      startDate = new Date(year, month - 1, 1);
+      endDate = new Date(year, month, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } 
+    else if (year) {
+      startDate = new Date(year, 0, 1);
+      endDate = new Date(year, 11, 31);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    const match = {
+      userId: new mongoose.Types.ObjectId(userId)
+    };
+
+    if (startDate && endDate) {
+      match.createdAt = { $gte: startDate, $lte: endDate };
+    }
+
+    const result = await StudentFeesLedgerModel.aggregate([
+
+      { $match: match },
+
+      /* Enrollment */
+      {
+        $lookup: {
+          from: "studentcourses",
+          localField: "enrollmentId",
+          foreignField: "_id",
+          as: "enrollment"
+        }
+      },
+      { $unwind: "$enrollment" },
+
+      /* Student */
+      {
+        $lookup: {
+          from: "students",
+          localField: "enrollment.studentId",
+          foreignField: "_id",
+          as: "student"
+        }
+      },
+      { $unwind: "$student" },
+
+      /* Search Filter */
+      ...(search ? [{
+        $match: {
+          "student.name": { $regex: search, $options: "i" }
+        }
+      }] : []),
+
+      /* Course */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "enrollment.courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      { $unwind: "$course" },
+
+      /* Installments */
+      {
+        $lookup: {
+          from: "studentinstallmentitems",
+          localField: "_id",
+          foreignField: "studentFeesId",
+          as: "installments"
+        }
+      },
+
+      /* Receipt */
+      {
+        $lookup: {
+          from: "receiptmasters",
+          localField: "receiptMasterId",
+          foreignField: "_id",
+          as: "receipt"
+        }
+      },
+      { $unwind: { path: "$receipt", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "receiptdetails",
+          localField: "receipt._id",
+          foreignField: "receiptId",
+          as: "receiptDetails"
+        }
+      },
+
+      {
+        $lookup: {
+          from: "feesmasters",
+          localField: "receiptDetails.feesMasterId",
+          foreignField: "_id",
+          as: "feesHeads"
+        }
+      },
+
+      /* Other Fees Breakdown */
+      {
+        $addFields: {
+          otherFees: {
+            $map: {
+              input: "$receiptDetails",
+              as: "d",
+              in: {
+                headName: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$feesHeads",
+                            as: "f",
+                            cond: { $eq: ["$$f._id", "$$d.feesMasterId"] }
+                          }
+                        },
+                        as: "f",
+                        in: "$$f.name"
+                      }
+                    },
+                    0
+                  ]
+                },
+                amount: "$$d.amount"
+              }
+            }
+          }
+        }
+      },
+
+      {
+        $facet: {
+
+          summary: [
+            {
+              $group: {
+                _id: null,
+                totalAmount: { $sum: "$totalAmount" },
+                totalPaidAmount: { $sum: "$paidAmount" },
+                totalDueAmount: { $sum: "$dueAmount" }
+              }
+            }
+          ],
+
+          totalCount: [
+            { $count: "count" }
+          ],
+
+          data: [
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+
+            {
+              $project: {
+
+                student: {
+                  _id: "$student._id",
+                  name: "$student.name",
+                  email: "$student.email",
+                  photo: "$student.photo"
+                },
+
+                course: {
+                  _id: "$course._id",
+                  name: "$course.name",
+                  image: "$course.image"   // ✅ Course Image Added
+                },
+
+                enrollmentDate: "$enrollment.createdAt",
+
+                totalAmount: 1,
+                paidAmount: 1,
+                dueAmount: 1,
+                paymentType: 1,
+                status: 1,
+
+                otherFees: 1,
+                installments: 1,
+
+                createdAt: 1
+              }
+            }
+          ]
+        }
+      }
+
+    ]);
+
+    const total = result[0].totalCount[0]?.count || 0;
+
+    res.json({
+      success: true,
+      summary: result[0].summary[0] || {
+        totalAmount: 0,
+        totalPaidAmount: 0,
+        totalDueAmount: 0
+      },
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / limit),
+        totalRecords: total,
+        perPage: limit
+      },
+      data: result[0].data
+    });
+
+  } catch (error) {
+    console.error("Report Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
 
 
-
-module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees };
+module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees,getStudentFinancialReport };

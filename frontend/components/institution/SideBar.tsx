@@ -8,6 +8,7 @@ import { Stack, Collapse } from "@mui/material";
 import AddHomeIcon from "@mui/icons-material/AddHome";
 import AddBoxIcon from "@mui/icons-material/AddBox";
 import NoteAltIcon from "@mui/icons-material/NoteAlt";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -49,6 +50,12 @@ const sidebarItems = [
         path: "/institution/dashboard/course/enroll-student",
         icon: <NoteAltIcon />,
       },
+      {
+        id: "2-4",
+        label: "Report",
+        path: "/institution/dashboard/course/report",
+        icon: <AssessmentIcon />,
+      }
     ],
   },
   {
