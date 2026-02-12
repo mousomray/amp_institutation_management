@@ -16,6 +16,8 @@ import { formatDate } from "@/helper/DateTime";
 import { Tag } from "primereact/tag";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import AddOtherMaster from "@/components/institution/AddOtherMaster";
+import ShowOtherMaster from "@/components/institution/ShowOtherMaster";
+import EditOtherMaster from "@/components/institution/EditOtherMaster";
 
 export default function OtherPaymentsTable() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -32,10 +34,12 @@ export default function OtherPaymentsTable() {
   // dialog / edit state
   const [editVisible, setEditVisible] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
+  const [viewVisible, setViewVisible] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
 
   // ContextMenu ref
   const cm = useRef<any>(null);
+  const searchDebounce = useRef<number | null>(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -43,20 +47,42 @@ export default function OtherPaymentsTable() {
   }, []);
 
   useEffect(() => {
-    if (token) fetchPayments();
+    if (!token) return;
+    // clear any previous debounce
+    if (searchDebounce.current) {
+      clearTimeout(searchDebounce.current);
+      searchDebounce.current = null;
+    }
+    // debounce when there's a search term
+    if (globalFilter && globalFilter.trim().length > 0) {
+      searchDebounce.current = window.setTimeout(() => {
+        fetchPayments();
+      }, 500);
+      return () => {
+        if (searchDebounce.current) clearTimeout(searchDebounce.current);
+      };
+    }
+    // no search -> fetch immediately (also when search cleared)
+    fetchPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, page, rows]);
+  }, [token, page, rows, globalFilter]);
 
   const fetchPayments = async () => {
     try {
       setLoading(true);
       const res = await axiosInstance.get("/other-payment/all-other-payment-master", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { page, limit: rows },
+        params: {
+          page,
+          limit: rows,
+          // send search query param only when non-empty
+          search: globalFilter && globalFilter.trim() !== "" ? globalFilter.trim() : undefined,
+        },
       });
       const data = res.data?.data ?? [];
       setPayments(data);
-      setTotalRecords(res.data?.totalCount ?? data.length);
+      // support multiple possible server field names
+      setTotalRecords(res.data?.totalRecords ?? res.data?.totalCount ?? res.data?.total ?? data.length);
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to load other payments");
@@ -92,6 +118,13 @@ export default function OtherPaymentsTable() {
 
   const menuItems = useMemo(
     () => [
+      {
+        label: "View",
+        icon: "pi pi-eye",
+        command: () => {
+          if (selectedRow) setViewVisible(true);
+        },
+      },
       {
         label: "Edit",
         icon: "pi pi-pencil",
@@ -137,7 +170,14 @@ export default function OtherPaymentsTable() {
       <div className="flex flex-row gap-4 it">
         <IconField iconPosition="left">
           <InputIcon className="pi pi-search" />
-          <InputText value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder="Search payments..." />
+          <InputText
+            value={globalFilter}
+            onChange={(e) => {
+              setGlobalFilter(e.target.value);
+              setPage(1); // reset to page 1 when searching
+            }}
+            placeholder="Search payments..."
+          />
         </IconField>
         <Button
           onClick={() => setAddVisible(true)}
@@ -202,14 +242,15 @@ export default function OtherPaymentsTable() {
 
       <ContextMenu model={menuItems} ref={cm} />
 
-      <Dialog header="Edit Other Payment" visible={editVisible} style={{ width: "30vw" }} onHide={() => setEditVisible(false)}>
-        {/* lightweight placeholder edit UI (no external component required) */}
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-gray-600">Edit is not implemented in this view. Selected: {selectedRow?.name}</p>
-          <div className="flex justify-end gap-2">
-            <Button label="Close" onClick={() => setEditVisible(false)} />
-          </div>
-        </div>
+      <Dialog header="Edit Other Payment" visible={editVisible} style={{ width: "40vw", maxWidth: "95vw" }} onHide={() => setEditVisible(false)}>
+        <EditOtherMaster
+          id={selectedRow?._id ?? null}
+          onClose={() => setEditVisible(false)}
+          onSuccess={async () => {
+            await fetchPayments();
+            setEditVisible(false);
+          }}
+        />
       </Dialog>
 
       <Dialog
@@ -225,6 +266,15 @@ export default function OtherPaymentsTable() {
             setAddVisible(false);
           }}
         />
+      </Dialog>
+
+      <Dialog
+        header="Other Payment Details"
+        visible={viewVisible}
+        style={{ width: "40vw", maxWidth: "95vw" }}
+        onHide={() => setViewVisible(false)}
+      >
+        <ShowOtherMaster id={selectedRow?._id ?? null} onClose={() => setViewVisible(false)} />
       </Dialog>
 
       <ConfirmDialog />

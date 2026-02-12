@@ -36,8 +36,8 @@ export default function OverdueBooks({ overdueBooks }: OverdueBooksProps) {
 
   const studentTemplate = (rowData: OverdueBookType) => (
     <div>
-      <div className="font-semibold text-gray-800">{rowData.student.name}</div>
-      <div className="text-xs text-gray-500">{rowData.student.phone}</div>
+      <div className="font-semibold text-gray-800">{rowData?.student?.name}</div>
+      <div className="text-xs text-gray-500">{rowData?.student?.phone}</div>
     </div>
   );
 

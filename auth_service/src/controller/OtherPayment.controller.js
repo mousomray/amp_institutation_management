@@ -50,10 +50,27 @@ const createOtherPayment = async (req, res) => {
 
 const getAllOtherPayments = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5;
+    const search = req.query.search || "";
+
+    const skip = (page - 1) * limit;
+
+    /* -------------------------------
+       1️⃣ Match Stage (Only Search)
+    -------------------------------- */
+    const matchStage = {};
+
+    if (search) {
+      matchStage.name = { $regex: search, $options: "i" };
+    }
+
+    /* -------------------------------
+       2️⃣ Aggregate Data
+    -------------------------------- */
     const payments = await OtherPaymentMaster.aggregate([
-      {
-        $match: { isActive: true }
-      },
+      { $match: matchStage },
+
       {
         $lookup: {
           from: "users",
@@ -73,22 +90,139 @@ const getAllOtherPayments = async (req, res) => {
           name: 1,
           amount: 1,
           description: 1,
-          isActive: 1,
+          isActive: 1,   // 🔥 এখন false হলেও show করবে
+          isDeleted: 1,  // চাইলে এটা রাখতেও পারো
           createdAt: 1,
           updatedAt: 1,
           "createdByUser.name": 1,
           "createdByUser.email": 1
         }
       },
-      {
-        $sort: { createdAt: -1 }
-      }
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit }
     ]);
+
+    const totalCount = await OtherPaymentMaster.countDocuments(matchStage);
+    const totalPages = Math.ceil(totalCount / limit);
 
     res.status(200).json({
       success: true,
+      currentPage: page,
+      totalPages,
+      totalRecords: totalCount,
       data: payments
     });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+
+const getSingleOtherPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment ID"
+      });
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(id)
+        }
+      },
+
+      // 🔹 Join createdBy user
+      {
+        $lookup: {
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "createdByUser"
+        }
+      },
+      {
+        $unwind: {
+          path: "$createdByUser",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      // 🔹 Join student payments
+      {
+        $lookup: {
+          from: "studentotherpayments",
+          localField: "_id",
+          foreignField: "otherPaymentId",
+          as: "studentPayments"
+        }
+      },
+
+      // 🔹 Summary calculation (NO isActive / isDeleted filter)
+      {
+        $addFields: {
+          totalStudentsAssigned: { $size: "$studentPayments" },
+
+          totalAmount: {
+            $sum: "$studentPayments.amount"
+          },
+
+          totalPaid: {
+            $sum: "$studentPayments.paidAmount"
+          },
+
+          totalDue: {
+            $sum: "$studentPayments.dueAmount"
+          }
+        }
+      },
+
+      {
+        $project: {
+          name: 1,
+          amount: 1,
+          description: 1,
+          isActive: 1,
+          isDeleted: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          createdBy: {
+            name: "$createdByUser.name",
+            email: "$createdByUser.email"
+          },
+          totalStudentsAssigned: 1,
+          totalAmount: 1,
+          totalPaid: 1,
+          totalDue: 1
+        }
+      }
+    ];
+
+    const result = await OtherPaymentMaster.aggregate(pipeline);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Other payment not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result[0]
+    });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -98,40 +232,157 @@ const getAllOtherPayments = async (req, res) => {
 };
 
 const updateOtherPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { id } = req.params;
-    const { name, amount, description, isActive } = req.body;
+    let { name, amount, description, isActive } = req.body;
 
-    const otherPayment = await OtherPaymentMaster.findByIdAndUpdate(
-      id,
-      { name, amount, description, isActive },
-      { new: true }
-    );
+    const existingPayment = await OtherPaymentMaster.findById(id).session(session);
 
-    if (!otherPayment) {
+    if (!existingPayment) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: "Other payment not found"
       });
     }
 
-    // If amount changed, update all student payments
-    if (amount) {
+    if (amount !== undefined) {
+      amount = Number(amount);
+    }
+
+    const oldAmount = existingPayment.amount;
+    const oldName = existingPayment.name;
+    const oldIsActive = existingPayment.isActive;
+
+    /* ===============================
+       1️⃣ Update Master
+    =============================== */
+
+    if (name !== undefined) existingPayment.name = name;
+    if (amount !== undefined) existingPayment.amount = amount;
+    if (description !== undefined) existingPayment.description = description;
+    if (isActive !== undefined) existingPayment.isActive = isActive;
+
+    await existingPayment.save({ session });
+
+    /* ===============================
+       2️⃣ Name Update
+    =============================== */
+
+    if (name !== undefined && name !== oldName) {
       await StudentOtherPayment.updateMany(
-        { otherPaymentId: mongoose.Types.ObjectId(id), status: "pending" },
-        {
-          amount: amount,
-          dueAmount: amount
-        }
+        { otherPaymentId: id },
+        { $set: { feeName: name } },
+        { session }
       );
     }
+
+    /* ===============================
+       3️⃣ Amount Update
+    =============================== */
+
+    if (amount !== undefined && amount !== oldAmount) {
+
+      const difference = amount - oldAmount;
+
+      const studentPayments = await StudentOtherPayment.find({
+        otherPaymentId: id
+      }).session(session);
+
+      for (let payment of studentPayments) {
+
+        payment.amount = amount;
+        const paid = payment.paidAmount || 0;
+        payment.dueAmount = amount - paid;
+
+        await payment.save({ session });
+
+        await StudentModel.findByIdAndUpdate(
+          payment.studentId,
+          { $inc: { totalFees: difference } },
+          { session }
+        );
+      }
+    }
+
+    /* ===============================
+       4️⃣ Deactivate (isActive false)
+    =============================== */
+
+    if (isActive === false && oldIsActive === true) {
+
+      const studentPayments = await StudentOtherPayment.find({
+        otherPaymentId: id
+      }).session(session);
+
+      for (let payment of studentPayments) {
+
+        await StudentModel.findByIdAndUpdate(
+          payment.studentId,
+          {
+            $inc: {
+              totalFees: -payment.amount
+            }
+          },
+          { session }
+        );
+
+        await StudentOtherPayment.findByIdAndDelete(payment._id, { session });
+      }
+    }
+
+    /* ===============================
+       5️⃣ Reactivate (isActive true)
+    =============================== */
+
+    if (isActive === true && oldIsActive === false) {
+
+      // 🔥 সব active student খুঁজে বের করো
+      const students = await StudentModel.find({ isActive: true }).session(session);
+
+      for (let student of students) {
+
+        // Create new payment record
+        await StudentOtherPayment.create([{
+          studentId: student._id,
+          otherPaymentId: id,
+          feeName: existingPayment.name,
+          amount: existingPayment.amount,
+          paidAmount: 0,
+          dueAmount: existingPayment.amount
+        }], { session });
+
+        // Increase student totalFees
+        await StudentModel.findByIdAndUpdate(
+          student._id,
+          {
+            $inc: {
+              totalFees: existingPayment.amount
+            }
+          },
+          { session }
+        );
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(200).json({
       success: true,
       message: "Other payment updated successfully",
-      data: otherPayment
+      data: existingPayment
     });
+
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.log("Error in updateOtherPayment:", error);
+
     res.status(500).json({
       success: false,
       message: error.message
@@ -139,27 +390,67 @@ const updateOtherPayment = async (req, res) => {
   }
 };
 
+
 const deleteOtherPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { id } = req.params;
 
-    await OtherPaymentMaster.findByIdAndUpdate(id, { isActive: false });
-    await StudentOtherPayment.updateMany(
-      { otherPaymentId: mongoose.Types.ObjectId(id) },
-      { isActive: false }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment ID"
+      });
+    }
+
+    const studentPayments = await StudentOtherPayment.find({
+      otherPaymentId: id
+    }).session(session);
+
+    for (let payment of studentPayments) {
+
+      await StudentModel.findByIdAndUpdate(
+        payment.studentId,
+        {
+          $inc: {
+            totalFees: -payment.amount,
+            totalDue: -payment.dueAmount,
+            totalPaid: -payment.paidAmount
+          }
+        },
+        { session }
+      );
+    }
+
+    await StudentOtherPayment.deleteMany(
+      { otherPaymentId: id },
+      { session }
     );
+
+    await OtherPaymentMaster.findByIdAndDelete(id).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(200).json({
       success: true,
-      message: "Other payment deleted successfully"
+      message: "Other payment permanently deleted and student balances adjusted"
     });
+
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.log("Error in deleteOtherPayment:", error);
     res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
+
 
 const getStudentOtherPaymentList = async (req, res) => {
   try {
@@ -611,6 +902,7 @@ const getPaymentStatistics = async (req, res) => {
 module.exports = {
   createOtherPayment,
   getAllOtherPayments,
+  getSingleOtherPayment,
   updateOtherPayment,
   deleteOtherPayment,
   getStudentOtherPaymentList,
