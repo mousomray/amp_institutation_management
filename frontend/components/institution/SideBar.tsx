@@ -154,11 +154,11 @@ const sidebarItems = [
   },
 ];
 
-const settingsItem = {
-  label: "Settings",
-  path: "/admin/settings",
-  icon: <SettingsIcon />,
-};
+// const settingsItem = {
+//   label: "Settings",
+//   path: "/admin/settings",
+//   icon: <SettingsIcon />,
+// };
 
 
 
@@ -312,7 +312,7 @@ export default function SideBar() {
       </Stack>
 
       {/* ---------- BOTTOM SETTINGS ---------- */}
-      <Link href={settingsItem.path}>
+      {/* <Link href={settingsItem.path}>
         <Stack
           direction="row"
           gap={1}
@@ -336,7 +336,7 @@ export default function SideBar() {
           {settingsItem.icon}
           <span>{settingsItem.label}</span>
         </Stack>
-      </Link>
+      </Link> */}
     </Stack>
   );
 }
