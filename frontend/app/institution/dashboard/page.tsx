@@ -126,7 +126,7 @@ function page() {
   const totalAmount = overall?.totalAmount || 0;
 
   return (
-    <>
+    <div className="w-full">
       <div className='sm:px-6 px-2 sm:py-3 py-1'>
         <InstutionDataCart Courses={allCourse} student={allStudents} />
       </div>
@@ -263,13 +263,13 @@ function page() {
       </div>
 
       {/* Courses and Students */}
-      <div className='sm:px-6 px-2 sm:py-3 py-1 flex flex-row gap-4'>
+      <div className='flex flex-row '>
         <RecentCourse courses={recntCourse} />
         <RecntStudentTable students={recntStudents} />
       </div>
 
       <ToastContainer />
-    </>
+    </div>
   )
 }
 

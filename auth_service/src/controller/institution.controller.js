@@ -2461,7 +2461,7 @@ const enrollMultipleStudentsToCourse = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Students enrolled & fees assigned successfully",
       courseId,
       totalStudents: studentIds.length
@@ -2471,8 +2471,46 @@ const enrollMultipleStudentsToCourse = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     console.error(error);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-module.exports = { buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
+
+const getInstitution = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser);
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+    return res.status(200).json(
+      {
+        message: "Institution Fetch successfully",
+        data: institution
+      }
+    )
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+module.exports = {getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
