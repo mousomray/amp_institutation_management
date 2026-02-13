@@ -125,6 +125,12 @@ const sidebarItems = [
         path: "/institution/dashboard/book/setting",
         icon: <SettingsIcon />,
       },
+      {
+        id: "4-6",
+        label: "Report",
+        path: "/institution/dashboard/book/report",
+        icon: <AssessmentIcon />,
+      }
     ],
   },
   {

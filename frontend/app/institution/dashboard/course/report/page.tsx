@@ -85,6 +85,7 @@ const EmptyState = () => (
 
 export default function ReportPage() {
 	const [data, setData] = useState<RecordItem[]>([]);
+	const [allData, setAllData] = useState<RecordItem[]>([]);
 	const [summary, setSummary] = useState<{ totalAmount: number; totalPaidAmount: number; totalDueAmount: number } | null>(null);
 
 	const [token, setToken] = useState<string | null>(null);
@@ -198,6 +199,7 @@ export default function ReportPage() {
 				const pag = json.pagination ?? {};
 
 				setData(json.data || []);
+				setAllData(json.allData || []);
 				setSummary(json.summary || null);
 
 				setPagination((prev) => ({
@@ -244,6 +246,9 @@ export default function ReportPage() {
 	const chartData = useMemo(() => {
 		const paid = summary?.totalPaidAmount ?? 0;
 		const due = summary?.totalDueAmount ?? 0;
+		
+		// Use allData for charts so they don't change with pagination
+		const chartSource = allData.length > 0 ? allData : data;
 
 		return {
 			doughnut: {
@@ -257,15 +262,15 @@ export default function ReportPage() {
 				]
 			},
 			bar: {
-				labels: data.map((d) => d.course?.name ?? 'Unknown'),
+				labels: chartSource.map((d) => d.course?.name ?? 'Unknown'),
 				datasets: [
-					{ label: 'Total', backgroundColor: chartTheme.purple, data: data.map((d) => d.totalAmount) },
-					{ label: 'Paid', backgroundColor: chartTheme.primary, data: data.map((d) => d.paidAmount) },
-					{ label: 'Due', backgroundColor: chartTheme.warn, data: data.map((d) => d.dueAmount) }
+					{ label: 'Total', backgroundColor: chartTheme.purple, data: chartSource.map((d) => d.totalAmount) },
+					{ label: 'Paid', backgroundColor: chartTheme.primary, data: chartSource.map((d) => d.paidAmount) },
+					{ label: 'Due', backgroundColor: chartTheme.warn, data: chartSource.map((d) => d.dueAmount) }
 				]
 			}
 		};
-	}, [summary, data, chartTheme]);
+	}, [summary, allData, data, chartTheme]);
 
 	const statusSeverity = (s?: string) => (s === 'PAID' ? 'success' : s === 'PARTIAL' ? 'warning' : 'danger');
 	const typeSeverity = (t?: string) => (t === 'INSTALLMENT' ? 'info' : 'secondary');
@@ -343,17 +348,21 @@ export default function ReportPage() {
 	};
 
 	const exportCSV = () => {
+		// Use allData for CSV export to get all records, not just current page
+		const exportData = allData.length > 0 ? allData : data;
 		const rows = [
-			['Student', 'Course', 'Type', 'Total', 'Paid', 'Due', 'Status', 'EnrollmentDate'],
-			...data.map((r) => [
+			['Student', 'Email', 'Course', 'Type', 'Total', 'Paid', 'Due', 'Status', 'EnrollmentDate', 'CreatedAt'],
+			...exportData.map((r) => [
 				r.student?.name ?? '',
+				r.student?.email ?? '',
 				r.course?.name ?? '',
 				r.paymentType ?? '',
 				String(r.totalAmount ?? 0),
 				String(r.paidAmount ?? 0),
 				String(r.dueAmount ?? 0),
 				r.status ?? '',
-				formatDateTimeUTC(r.enrollmentDate)
+				formatDateUTC(r.enrollmentDate),
+				formatDateTimeUTC(r.createdAt)
 			])
 		];
 		const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -361,7 +370,7 @@ export default function ReportPage() {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `financial_report_page_${pagination.page}.csv`;
+		a.download = `financial_report_all_data_${new Date().toISOString().split('T')[0]}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	};
@@ -480,7 +489,7 @@ export default function ReportPage() {
 								<Chart type="doughnut" data={chartData.doughnut} options={chartOptions} />
 							</div>
 							<div className="border rounded-lg p-3 lg:col-span-2">
-								<div className="font-semibold mb-2">Amounts by Course (current page)</div>
+						<div className="font-semibold mb-2">Amounts by Course (all records)</div>
 								<Chart type="bar" data={chartData.bar} options={chartOptions} style={{ height: 260 }} />
 							</div>
 						</>

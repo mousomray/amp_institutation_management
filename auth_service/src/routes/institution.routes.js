@@ -20,7 +20,7 @@ router.post("/login", loginInstitution);
 router.get("/dashboard", verifyJwt, institutionDashboard)
 //router.post("/logout", verifyJwt, institutionLogOut)
 //router.post("/buy", buyCourse)
-//router.get("/onlyonestudentapi/:id", OnlyOneStudentAPI)
+router.get("/onlyonestudentapi/:id", OnlyOneStudentAPI)
 //router.post("/add-fees-master", verifyJwt, AddFeesMasterAPI)
 //router.get("/get-all-fees-master", verifyJwt, GetAllFeesMasterAPI)
 //router.get("/get-single-fees-master/:id", verifyJwt, GetSingleFeesMasterAPI)

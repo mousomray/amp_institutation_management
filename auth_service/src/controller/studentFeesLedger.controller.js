@@ -461,9 +461,7 @@ const getStudentFinancialReport = async (req, res) => {
 
     let startDate, endDate;
 
-    /* ===============================
-       DATE FILTER LOGIC
-    =============================== */
+    /* ================= DATE FILTER ================= */
 
     if (date) {
       startDate = new Date(date);
@@ -499,11 +497,10 @@ const getStudentFinancialReport = async (req, res) => {
       match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
-    const result = await StudentFeesLedgerModel.aggregate([
+    const basePipeline = [
 
       { $match: match },
 
-      /* Enrollment */
       {
         $lookup: {
           from: "studentcourses",
@@ -514,7 +511,6 @@ const getStudentFinancialReport = async (req, res) => {
       },
       { $unwind: "$enrollment" },
 
-      /* Student */
       {
         $lookup: {
           from: "students",
@@ -525,14 +521,12 @@ const getStudentFinancialReport = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      /* Search Filter */
       ...(search ? [{
         $match: {
           "student.name": { $regex: search, $options: "i" }
         }
       }] : []),
 
-      /* Course */
       {
         $lookup: {
           from: "courses",
@@ -543,81 +537,77 @@ const getStudentFinancialReport = async (req, res) => {
       },
       { $unwind: "$course" },
 
-      /* Installments */
       {
-        $lookup: {
-          from: "studentinstallmentitems",
-          localField: "_id",
-          foreignField: "studentFeesId",
-          as: "installments"
+        $group: {
+          _id: "$_id",
+          doc: { $first: "$$ROOT" }
         }
       },
+      { $replaceRoot: { newRoot: "$doc" } }
+    ];
 
-      /* Receipt */
-      {
-        $lookup: {
-          from: "receiptmasters",
-          localField: "receiptMasterId",
-          foreignField: "_id",
-          as: "receipt"
-        }
-      },
-      { $unwind: { path: "$receipt", preserveNullAndEmptyArrays: true } },
-
-      {
-        $lookup: {
-          from: "receiptdetails",
-          localField: "receipt._id",
-          foreignField: "receiptId",
-          as: "receiptDetails"
-        }
-      },
-
-      {
-        $lookup: {
-          from: "feesmasters",
-          localField: "receiptDetails.feesMasterId",
-          foreignField: "_id",
-          as: "feesHeads"
-        }
-      },
-
-      /* Other Fees Breakdown */
-      {
-        $addFields: {
-          otherFees: {
-            $map: {
-              input: "$receiptDetails",
-              as: "d",
-              in: {
-                headName: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$feesHeads",
-                            as: "f",
-                            cond: { $eq: ["$$f._id", "$$d.feesMasterId"] }
-                          }
-                        },
-                        as: "f",
-                        in: "$$f.name"
-                      }
-                    },
-                    0
-                  ]
-                },
-                amount: "$$d.amount"
-              }
-            }
-          }
-        }
-      },
+    const result = await StudentFeesLedgerModel.aggregate([
+      ...basePipeline,
 
       {
         $facet: {
 
+          /* ✅ FULL DATA (No Pagination) */
+          allData: [
+            {
+              $project: {
+                student: {
+                  _id: "$student._id",
+                  name: "$student.name",
+                  email: "$student.email",
+                  photo: "$student.photo"
+                },
+                course: {
+                  _id: "$course._id",
+                  name: "$course.name",
+                  image: "$course.image"
+                },
+                enrollmentDate: "$enrollment.createdAt",
+                totalAmount: 1,
+                paidAmount: 1,
+                dueAmount: 1,
+                paymentType: 1,
+                status: 1,
+                createdAt: 1
+              }
+            }
+          ],
+
+          /* ✅ PAGINATED DATA */
+          data: [
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                student: {
+                  _id: "$student._id",
+                  name: "$student.name",
+                  email: "$student.email",
+                  photo: "$student.photo"
+                },
+                course: {
+                  _id: "$course._id",
+                  name: "$course.name",
+                  image: "$course.image"
+                },
+                enrollmentDate: "$enrollment.createdAt",
+                totalAmount: 1,
+                paidAmount: 1,
+                dueAmount: 1,
+                paymentType: 1,
+                status: 1,
+                createdAt: 1
+              }
+            }
+          ],
+
+          /* ✅ SUMMARY */
           summary: [
             {
               $group: {
@@ -629,49 +619,12 @@ const getStudentFinancialReport = async (req, res) => {
             }
           ],
 
+          /* ✅ TOTAL COUNT */
           totalCount: [
             { $count: "count" }
-          ],
-
-          data: [
-            { $sort: { createdAt: -1 } },
-            { $skip: skip },
-            { $limit: limit },
-
-            {
-              $project: {
-
-                student: {
-                  _id: "$student._id",
-                  name: "$student.name",
-                  email: "$student.email",
-                  photo: "$student.photo"
-                },
-
-                course: {
-                  _id: "$course._id",
-                  name: "$course.name",
-                  image: "$course.image"   // ✅ Course Image Added
-                },
-
-                enrollmentDate: "$enrollment.createdAt",
-
-                totalAmount: 1,
-                paidAmount: 1,
-                dueAmount: 1,
-                paymentType: 1,
-                status: 1,
-
-                otherFees: 1,
-                installments: 1,
-
-                createdAt: 1
-              }
-            }
           ]
         }
       }
-
     ]);
 
     const total = result[0].totalCount[0]?.count || 0;
@@ -689,7 +642,8 @@ const getStudentFinancialReport = async (req, res) => {
         totalRecords: total,
         perPage: limit
       },
-      data: result[0].data
+      data: result[0].data,       // pagination wise
+      allData: result[0].allData  // full dataset
     });
 
   } catch (error) {

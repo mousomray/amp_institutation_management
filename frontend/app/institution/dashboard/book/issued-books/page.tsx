@@ -15,6 +15,17 @@ import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { useRouter } from "next/navigation";
 import { Menu } from "primereact/menu"; // added
 
+function getInitials(name?: string) {
+  if (!name) return "";
+  return name
+    .split(" ")
+    .map((s) => s.charAt(0))
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export default function IssuedBooksTable() {
   const [allIssues, setAllIssues] = useState<any[]>([]); // full dataset from backend
   const [globalFilter, setGlobalFilter] = useState("");
@@ -141,8 +152,63 @@ export default function IssuedBooksTable() {
     });
   };
 
+  const collectMoney = (issue: any) => {
+    if (!issue) return;
+    // prevent collecting twice
+    const alreadyPaid = (issue.payment_status ?? issue.paymentStatus ?? "").toString().toLowerCase() === "paid";
+    if (alreadyPaid) {
+      toast.info("Payment already collected");
+      return;
+    }
+
+    confirmDialog({
+      message: `Collect payment for "${issue.book?.name || issue.bookName || 'book'}" from "${issue.student?.name || issue.studentName || 'student'}"?`,
+      header: "Collect Payment",
+      icon: "pi pi-money-bill",
+      acceptClassName: "p-button-success",
+      accept: async () => {
+        try {
+          const res = await microInstance.patch(`/api/collect-library-payment/${issue._id}`, {}, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const payload = res.data || {};
+          // backend returns { success, message, data: { issueId, paid_amount, payment_date, payment_status }}
+          const updated = payload.data || payload;
+
+          // update local list for immediate UX
+          setAllIssues((prev) =>
+            prev.map((it) =>
+              it._id === (updated.issueId || updated._id || issue._id)
+                ? { ...it, payment_status: updated.payment_status ?? updated.paymentStatus, paid_amount: updated.paid_amount ?? it.paid_amount, payment_date: updated.payment_date ?? it.payment_date }
+                : it
+            )
+          );
+
+          toast.success(payload.message || "Library payment collected successfully");
+        } catch (err: any) {
+          if (axios.isAxiosError(err)) {
+            toast.error(err.response?.data?.message || "Failed to collect payment");
+          } else {
+            toast.error("Unexpected error occurred");
+          }
+        }
+      },
+      reject: () => {
+        toast.info("Payment collection cancelled");
+      },
+    });
+  };
+
   const openRowMenu = (row: any, event: any) => {
+    const isPaid = (row.payment_status ?? row.paymentStatus ?? "").toString().toLowerCase() === "paid";
     const items = [
+      {
+        label: isPaid ? "Already Paid" : "Collect Money",
+        icon: "pi pi-money-bill",
+        disabled: isPaid,
+        command: () => collectMoney(row),
+      },
       {
         label: row.status === "returned" ? "Already Returned" : "Return",
         icon: "pi pi-check",
@@ -158,12 +224,12 @@ export default function IssuedBooksTable() {
   const menu = useRef<any>(null);
   const [menuModel, setMenuModel] = useState<any[]>([]);
 
-  const imageSrc = (img?: string) =>
+  const imageSrc = (img?: string): string | undefined =>
     img
       ? img.startsWith("http")
         ? img
         : `${(process.env.NEXT_PUBLIC_LIBRARY_API || "").replace(/\/+$/, "")}/${img.replace(/^\/+/, "").replace(/\\/g, "/")}`
-      : null;
+      : undefined;
 
   const bookTemplate = (row: any) => {
     const src = imageSrc(row.book?.image);
@@ -218,7 +284,37 @@ export default function IssuedBooksTable() {
   );
 
   const studentTemplate = (row: any) =>
-    row.student ? `${row.student.name || row.student.fullName || ""}${row.student.studentId ? ` (${row.student.studentId})` : ""}` : (row.studentName || "-");
+    row.student ? (
+      <div className="flex items-center gap-3">
+        {row.student.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageSrc(row.student.photo)} alt={row.student.name} className="w-10 h-10 object-cover rounded" />
+        ) : (
+          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-700">{getInitials(row.student.name)}</div>
+        )}
+        <div className="min-w-0">
+          <div className="font-semibold truncate">{row.student.name || row.student.fullName || "-"}</div>
+          <div className="text-xs text-gray-500 truncate">{row.student.email ?? ''}{row.student.studentId ? ` • ${row.student.studentId}` : ''}</div>
+        </div>
+      </div>
+    ) : (
+      row.studentName || "-"
+    );
+
+  const paymentTemplate = (row: any) => {
+    const status = row.payment_status ?? row.paymentStatus ?? 'pending';
+    const sev = status === 'paid' ? 'success' : status === 'pending' ? 'warning' : 'info';
+    return (
+      <div className="flex flex-col">
+        <div>
+          <span className={`p-tag p-component p-tag-${sev} p-tag-rounded`}>
+            {status?.toString()?.toUpperCase?.() ?? status}
+          </span>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">{row.payment_date ? formatDate(row.payment_date) : '-'}</div>
+      </div>
+    );
+  };
 
   const actualReturnTemplate = (row: any) =>
     row.actual_return_date ? formatDate(row.actual_return_date) : <span className="text-gray-400">null</span>;
@@ -253,10 +349,17 @@ export default function IssuedBooksTable() {
         <Column header="Late Fine" body={lateFineBody} />
         <Column header="Total" body={totalBody} />
         {/* Dates */}
+        <Column header="Issued" body={(r) => formatDate(r.issue_date)} />
         <Column field="return_date" header="Return Date" body={(r) => formatDate(r.return_date)} />
         <Column header="Actual Return" body={actualReturnTemplate} />
+        {/* Payment info */}
+        <Column header="Payment" body={paymentTemplate} />
         {/* Status + actions */}
-        <Column field="status" header="Status" />
+        <Column header="Status" body={(r) => {
+          const s = r.status || r.state || '';
+          const sev = s === 'returned' ? 'success' : s === 'issued' ? 'info' : 'warning';
+          return <span className={`p-tag p-component p-tag-${sev} p-tag-rounded`}>{s?.toString?.().toUpperCase?.() ?? s}</span>;
+        }} />
         <Column header="Actions" body={actionTemplate} style={{ width: "4rem" }} />
       </DataTable>
 

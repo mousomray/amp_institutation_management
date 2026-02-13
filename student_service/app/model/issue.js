@@ -97,7 +97,15 @@ const IssueSchema = new Schema({
     type: String,
     enum: ['issued', 'returned'],
     default: 'issued'
-  }
+  },
+  payment_status: {
+    type: String,
+    enum: ['due', 'paid'],
+    default: 'due'
+  },
+  payment_date: {
+    type: Date
+  },
 
 }, {
   timestamps: true,

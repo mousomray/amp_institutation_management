@@ -1047,7 +1047,7 @@ const buyCourse = async (req, res) => {
 const OnlyOneStudentAPI = async (req, res) => {
   try {
     const id = req.params.id;
-    const data = await Student.findById(id);
+    const data = await StudentModel.findById(id);
     return res.status(200).json({ message: "Single Student Fetched Successfully", data });
   } catch (error) {
     console.error("Get single student error:", error);
