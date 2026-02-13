@@ -19,7 +19,7 @@ type RecentStudentTableProps = {
 
 const RecentStudentTable: React.FC<RecentStudentTableProps> = ({ students }) => {
   return (
-    <div className="card w-[70%] bg-white p-4 rounded-lg shadow">
+    <div className="card  bg-white p-4 rounded-lg shadow">
       {/* TABLE HEADER */}
       <div className="mb-4 bg-primary p-3 rounded-lg">
         <h2 className="text-lg font-semibold text-white">

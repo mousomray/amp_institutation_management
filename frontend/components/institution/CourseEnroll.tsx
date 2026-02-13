@@ -409,7 +409,7 @@ function CourseEnroll({
                 <Dialog
                     header={AddStudentDialogHeader}
                     visible={showAddStudentDialog}
-                    style={{ width: "60vw", maxHeight: "90vh" }}
+                    style={{ width: "60vw", maxHeight: "100vh" }}
                     onHide={() => setShowAddStudentDialog(false)}
                     modal
                     className="overflow-hidden"

@@ -19,7 +19,7 @@ export default function RecentCourse({courses}: RecentCourseProps) {
   );
 
   return (
-    <div className="card w-[70%] bg-white p-5 rounded-xl shadow-md border border-gray-100">
+    <div className="card  bg-white p-5 rounded-xl shadow-md border border-gray-100">
       {/* TABLE HEADER */}
       <div className="mb-4 bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-xl shadow-lg">
         <h2 className="text-xl font-bold text-white">
@@ -42,7 +42,6 @@ export default function RecentCourse({courses}: RecentCourseProps) {
       >
         <Column field="name" header="Course Name" style={{ minWidth: '200px' }} />
         <Column header="Course Fee" body={feeTemplate} />
-        <Column field="duration" header="Duration" />
       </DataTable>
     </div>
   );

@@ -116,6 +116,7 @@ function AddNewStudent({ onClose, onSuccess }: AddNewStudentProps) {
 
   return (
     <div className="px-6 py-4">
+      
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Photo & Student ID Section */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
