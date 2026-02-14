@@ -40,6 +40,11 @@ const studentOtherPaymentSchema = new Schema(
         isActive: {
             type: Boolean,
             default: true
+        },
+        createdBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true
         }
     },
     {

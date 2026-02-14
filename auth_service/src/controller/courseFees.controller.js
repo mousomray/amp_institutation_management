@@ -59,13 +59,12 @@ const createCourseFee = async (req, res) => {
         });
 
     } catch (error) {
-
+        console.error("Error in createCourseFee:", error);
         if (error.code === 11000) {
             return res.status(400).json({
                 message: "Duplicate fee type found for this course"
             });
         }
-
         return res.status(500).json({
             message: "Something went wrong",
             error: error.message
@@ -111,13 +110,14 @@ const getCourseFeesByCourse = async (req, res) => {
             },
             { $unwind: "$fees" },
 
-            // Group result
+            // Group
             {
                 $group: {
                     _id: "$course._id",
                     courseName: { $first: "$course.name" },
                     fees: {
                         $push: {
+                            feesMasterId: "$fees._id",   // 🔥 Added ID
                             feesName: "$fees.name",
                             amount: "$amount"
                         }
@@ -147,4 +147,80 @@ const getCourseFeesByCourse = async (req, res) => {
     }
 };
 
-module.exports = { createCourseFee, getCourseFeesByCourse };
+const updateCourseFees = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { courseId, fees } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: "Invalid course ID" });
+    }
+
+    if (!Array.isArray(fees)) {
+      return res.status(400).json({ message: "Fees array is required" });
+    }
+
+    // Existing DB fees
+    const existingFees = await CourseFees.find({ courseId });
+
+    const existingMap = new Map();
+    existingFees.forEach(fee => {
+      existingMap.set(fee.feesMasterId.toString(), fee);
+    });
+
+    const requestMap = new Map();
+    fees.forEach(fee => {
+      requestMap.set(fee.feesMasterId, fee);
+    });
+
+    /* ========================
+       1️⃣ UPDATE + INSERT
+    ======================== */
+
+    for (let fee of fees) {
+
+      if (existingMap.has(fee.feesMasterId)) {
+        // UPDATE
+        await CourseFees.updateOne(
+          {
+            courseId,
+            feesMasterId: fee.feesMasterId
+          },
+          { amount: fee.amount }
+        );
+      } else {
+        // INSERT
+        await CourseFees.create({
+          courseId,
+          feesMasterId: fee.feesMasterId,
+          amount: fee.amount,
+          userId
+        });
+      }
+    }
+
+    /* ========================
+       2️⃣ DELETE Missing Fees
+    ======================== */
+
+    for (let existing of existingFees) {
+      if (!requestMap.has(existing.feesMasterId.toString())) {
+        await CourseFees.deleteOne({
+          _id: existing._id
+        });
+      }
+    }
+
+    return res.status(200).json({
+      message: "Course fees updated successfully"
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+};
+
+module.exports = { createCourseFee, getCourseFeesByCourse,updateCourseFees };

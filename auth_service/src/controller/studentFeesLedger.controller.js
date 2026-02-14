@@ -454,7 +454,17 @@ const getSingleStudentFees = async (req, res) => {
 const getStudentFinancialReport = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { year, month, date, week, page = 1, search } = req.query;
+
+    const {
+      year,
+      month,
+      date,
+      week,
+      page = 1,
+      search,
+      course,
+      paymentType
+    } = req.query;
 
     const limit = 5;
     const skip = (Number(page) - 1) * limit;
@@ -467,8 +477,7 @@ const getStudentFinancialReport = async (req, res) => {
       startDate = new Date(date);
       endDate = new Date(date);
       endDate.setHours(23, 59, 59, 999);
-    } 
-    else if (week) {
+    } else if (week) {
       const current = new Date(week);
       const firstDay = current.getDate() - current.getDay();
       startDate = new Date(current.setDate(firstDay));
@@ -477,13 +486,11 @@ const getStudentFinancialReport = async (req, res) => {
       endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 6);
       endDate.setHours(23, 59, 59, 999);
-    } 
-    else if (year && month) {
+    } else if (year && month) {
       startDate = new Date(year, month - 1, 1);
       endDate = new Date(year, month, 0);
       endDate.setHours(23, 59, 59, 999);
-    } 
-    else if (year) {
+    } else if (year) {
       startDate = new Date(year, 0, 1);
       endDate = new Date(year, 11, 31);
       endDate.setHours(23, 59, 59, 999);
@@ -497,10 +504,14 @@ const getStudentFinancialReport = async (req, res) => {
       match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
-    const basePipeline = [
+    if (paymentType) {
+      match.paymentType = paymentType.toUpperCase();
+    }
 
+    const pipeline = [
       { $match: match },
 
+      /* ================= ENROLLMENT ================= */
       {
         $lookup: {
           from: "studentcourses",
@@ -511,6 +522,7 @@ const getStudentFinancialReport = async (req, res) => {
       },
       { $unwind: "$enrollment" },
 
+      /* ================= STUDENT ================= */
       {
         $lookup: {
           from: "students",
@@ -521,12 +533,15 @@ const getStudentFinancialReport = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      ...(search ? [{
-        $match: {
-          "student.name": { $regex: search, $options: "i" }
-        }
-      }] : []),
+      ...(search
+        ? [{
+            $match: {
+              "student.name": { $regex: search, $options: "i" }
+            }
+          }]
+        : []),
 
+      /* ================= COURSE ================= */
       {
         $lookup: {
           from: "courses",
@@ -537,77 +552,75 @@ const getStudentFinancialReport = async (req, res) => {
       },
       { $unwind: "$course" },
 
+      ...(course
+        ? [{
+            $match: {
+              "course.name": { $regex: course, $options: "i" }
+            }
+          }]
+        : []),
+
+      /* ================= INSTALLMENTS ================= */
       {
-        $group: {
-          _id: "$_id",
-          doc: { $first: "$$ROOT" }
+        $lookup: {
+          from: "studentinstallmentitems",
+          localField: "_id",
+          foreignField: "studentFeesId",
+          as: "installments"
         }
       },
-      { $replaceRoot: { newRoot: "$doc" } }
-    ];
 
-    const result = await StudentFeesLedgerModel.aggregate([
-      ...basePipeline,
+      /* ================= RECEIPT MASTER ================= */
+      {
+        $lookup: {
+          from: "receiptmasters",
+          localField: "receiptMasterId",
+          foreignField: "_id",
+          as: "receiptMaster"
+        }
+      },
+      {
+        $unwind: {
+          path: "$receiptMaster",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      /* ================= RECEIPT DETAILS ================= */
+      {
+        $lookup: {
+          from: "receiptdetails",
+          localField: "receiptMaster._id",
+          foreignField: "receiptId",
+          as: "receiptDetails"
+        }
+      },
+
+      /* ================= FEES MASTER ================= */
+      {
+        $lookup: {
+          from: "feesmasters",
+          localField: "receiptDetails.feesMasterId",
+          foreignField: "_id",
+          as: "feesMasters"
+        }
+      },
+
+      { $sort: { createdAt: -1 } },
 
       {
         $facet: {
 
-          /* ✅ FULL DATA (No Pagination) */
-          allData: [
-            {
-              $project: {
-                student: {
-                  _id: "$student._id",
-                  name: "$student.name",
-                  email: "$student.email",
-                  photo: "$student.photo"
-                },
-                course: {
-                  _id: "$course._id",
-                  name: "$course.name",
-                  image: "$course.image"
-                },
-                enrollmentDate: "$enrollment.createdAt",
-                totalAmount: 1,
-                paidAmount: 1,
-                dueAmount: 1,
-                paymentType: 1,
-                status: 1,
-                createdAt: 1
-              }
-            }
-          ],
-
-          /* ✅ PAGINATED DATA */
-          data: [
-            { $sort: { createdAt: -1 } },
+          /* ================= PAGINATED DATA ================= */
+          paginatedData: [
             { $skip: skip },
-            { $limit: limit },
-            {
-              $project: {
-                student: {
-                  _id: "$student._id",
-                  name: "$student.name",
-                  email: "$student.email",
-                  photo: "$student.photo"
-                },
-                course: {
-                  _id: "$course._id",
-                  name: "$course.name",
-                  image: "$course.image"
-                },
-                enrollmentDate: "$enrollment.createdAt",
-                totalAmount: 1,
-                paidAmount: 1,
-                dueAmount: 1,
-                paymentType: 1,
-                status: 1,
-                createdAt: 1
-              }
-            }
+            { $limit: limit }
           ],
 
-          /* ✅ SUMMARY */
+          /* ================= ALL DATA (NO PAGINATION) ================= */
+          allData: [],
+
+          /* ================= SUMMARY ================= */
           summary: [
             {
               $group: {
@@ -619,31 +632,89 @@ const getStudentFinancialReport = async (req, res) => {
             }
           ],
 
-          /* ✅ TOTAL COUNT */
-          totalCount: [
-            { $count: "count" }
-          ]
+          /* ================= COURSE vs OTHER ================= */
+          courseAndOtherSummary: [
+            {
+              $group: {
+                _id: null,
+                courseFeesTotal: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ["$paymentType", "INSTALLMENT"] },
+                      "$totalAmount",
+                      0
+                    ]
+                  }
+                },
+                otherFeesTotal: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ["$paymentType", "NORMAL"] },
+                      "$totalAmount",
+                      0
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+
+          /* ================= HEAD WISE TOTAL ================= */
+          otherFeesHeadSummary: [
+            { $match: { paymentType: "NORMAL" } },
+            { $unwind: "$receiptDetails" },
+            {
+              $lookup: {
+                from: "feesmasters",
+                localField: "receiptDetails.feesMasterId",
+                foreignField: "_id",
+                as: "feesMaster"
+              }
+            },
+            { $unwind: "$feesMaster" },
+            {
+              $group: {
+                _id: "$feesMaster.name",
+                totalAmount: { $sum: "$receiptDetails.amount" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                feesHeadName: "$_id",
+                totalAmount: 1
+              }
+            }
+          ],
+
+          totalCount: [{ $count: "count" }]
         }
       }
-    ]);
+    ];
 
-    const total = result[0].totalCount[0]?.count || 0;
+    const result = await StudentFeesLedgerModel.aggregate(pipeline);
+
+    const total = result[0]?.totalCount[0]?.count || 0;
 
     res.json({
       success: true,
-      summary: result[0].summary[0] || {
-        totalAmount: 0,
-        totalPaidAmount: 0,
-        totalDueAmount: 0
-      },
+
+      summary: result[0]?.summary[0] || {},
+
+      breakdown: result[0]?.courseAndOtherSummary[0] || {},
+
+      otherFeesHeadSummary: result[0]?.otherFeesHeadSummary || [],
+
       pagination: {
         currentPage: Number(page),
         totalPages: Math.ceil(total / limit),
         totalRecords: total,
         perPage: limit
       },
-      data: result[0].data,       // pagination wise
-      allData: result[0].allData  // full dataset
+
+      paginatedData: result[0]?.paginatedData || [],
+
+      allData: result[0]?.allData || []   
     });
 
   } catch (error) {
@@ -656,4 +727,4 @@ const getStudentFinancialReport = async (req, res) => {
 };
 
 
-module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees,getStudentFinancialReport };
+module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport };

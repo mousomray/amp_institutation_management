@@ -8,7 +8,14 @@ const createOtherPayment = async (req, res) => {
     const userId = req.user.id;
     const { name, amount, description } = req.body;
 
-    // Create other payment master entry
+    // Validation
+    if (!name || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and amount are required"
+      });
+    }
+
     const otherPayment = await OtherPaymentMaster.create({
       name,
       amount,
@@ -17,10 +24,17 @@ const createOtherPayment = async (req, res) => {
       isActive: true
     });
 
-    // Get all active students (isDeleted: false)
     const activeStudents = await StudentModel.find({ isDeleted: false });
 
-    // Create student other payment entries for all active students
+    if (activeStudents.length === 0) {
+      return res.status(201).json({
+        success: true,
+        message: "Other payment created but no active students found",
+        data: otherPayment,
+        assignedToStudents: 0
+      });
+    }
+
     const studentPayments = activeStudents.map(student => ({
       studentId: student._id,
       otherPaymentId: otherPayment._id,
@@ -28,10 +42,10 @@ const createOtherPayment = async (req, res) => {
       paidAmount: 0,
       dueAmount: amount,
       status: "pending",
-      isActive: true
+      isActive: true,
+      createdBy: userId
     }));
 
-    // Bulk insert
     await StudentOtherPayment.insertMany(studentPayments);
 
     res.status(201).json({
@@ -40,7 +54,9 @@ const createOtherPayment = async (req, res) => {
       data: otherPayment,
       assignedToStudents: activeStudents.length
     });
+
   } catch (error) {
+    console.error("Error in createOtherPayment:", error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -48,26 +64,24 @@ const createOtherPayment = async (req, res) => {
   }
 };
 
+
 const getAllOtherPayments = async (req, res) => {
   try {
+    const userId = req.user.id;
     const page = parseInt(req.query.page) || 1;
     const limit = 5;
     const search = req.query.search || "";
 
     const skip = (page - 1) * limit;
 
-    /* -------------------------------
-       1️⃣ Match Stage (Only Search)
-    -------------------------------- */
-    const matchStage = {};
+    const matchStage = {
+      createdBy: new mongoose.Types.ObjectId(userId)
+    };
 
     if (search) {
       matchStage.name = { $regex: search, $options: "i" };
     }
 
-    /* -------------------------------
-       2️⃣ Aggregate Data
-    -------------------------------- */
     const payments = await OtherPaymentMaster.aggregate([
       { $match: matchStage },
 
@@ -90,8 +104,7 @@ const getAllOtherPayments = async (req, res) => {
           name: 1,
           amount: 1,
           description: 1,
-          isActive: 1,   // 🔥 এখন false হলেও show করবে
-          isDeleted: 1,  // চাইলে এটা রাখতেও পারো
+          isActive: 1,
           createdAt: 1,
           updatedAt: 1,
           "createdByUser.name": 1,
@@ -121,8 +134,6 @@ const getAllOtherPayments = async (req, res) => {
     });
   }
 };
-
-
 
 
 const getSingleOtherPayment = async (req, res) => {
@@ -257,20 +268,12 @@ const updateOtherPayment = async (req, res) => {
     const oldName = existingPayment.name;
     const oldIsActive = existingPayment.isActive;
 
-    /* ===============================
-       1️⃣ Update Master
-    =============================== */
-
     if (name !== undefined) existingPayment.name = name;
     if (amount !== undefined) existingPayment.amount = amount;
     if (description !== undefined) existingPayment.description = description;
     if (isActive !== undefined) existingPayment.isActive = isActive;
 
     await existingPayment.save({ session });
-
-    /* ===============================
-       2️⃣ Name Update
-    =============================== */
 
     if (name !== undefined && name !== oldName) {
       await StudentOtherPayment.updateMany(
@@ -279,10 +282,6 @@ const updateOtherPayment = async (req, res) => {
         { session }
       );
     }
-
-    /* ===============================
-       3️⃣ Amount Update
-    =============================== */
 
     if (amount !== undefined && amount !== oldAmount) {
 
@@ -454,68 +453,72 @@ const deleteOtherPayment = async (req, res) => {
 
 const getStudentOtherPaymentList = async (req, res) => {
   try {
+
+    const userId = new mongoose.Types.ObjectId(req.user.id);
     const { status, search, page = 1, limit = 5 } = req.query;
 
-    // Convert to numbers
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build match conditions
-    let matchConditions = {
+    /* ============================
+       1️⃣ Student Match (NO createdBy here)
+    ============================ */
+
+    let studentMatch = {
       isDeleted: false
     };
 
     if (search) {
-      matchConditions.$or = [
+      studentMatch.$or = [
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
         { phone: { $regex: search, $options: "i" } }
       ];
     }
 
-    // Count total documents pipeline
-    const countPipeline = [
-      {
-        $match: matchConditions
-      },
-      {
-        $count: "total"
-      }
-    ];
+    /* ============================
+       2️⃣ Aggregation Pipeline
+    ============================ */
 
     const pipeline = [
-      // Match active students
-      {
-        $match: matchConditions
-      },
-      // Lookup student payments
+
+      { $match: studentMatch },
+
       {
         $lookup: {
           from: "studentotherpayments",
-          localField: "_id",
-          foreignField: "studentId",
+          let: { studentId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$studentId", "$$studentId"] },
+                    { $eq: ["$createdBy", userId] }, // ✅ correct filtering here
+                    { $eq: ["$isActive", true] }
+                  ]
+                }
+              }
+            }
+          ],
           as: "payments"
         }
       },
-      // Unwind payments array
-      {
-        $unwind: {
-          path: "$payments",
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      // Filter active payments and status
+
+      // 🔥 only show students who have payment for this user
       {
         $match: {
-          $or: [
-            { "payments.isActive": true },
-            { "payments": { $exists: false } }
-          ],
-          ...(status && { "payments.status": status })
+          "payments.0": { $exists: true }
         }
       },
-      // Lookup payment master details
+
+      { $unwind: "$payments" },
+
+      ...(status ? [{
+        $match: { "payments.status": status }
+      }] : []),
+
       {
         $lookup: {
           from: "otherpaymentmasters",
@@ -524,88 +527,34 @@ const getStudentOtherPaymentList = async (req, res) => {
           as: "paymentDetails"
         }
       },
-      // Unwind payment details
-      {
-        $unwind: {
-          path: "$paymentDetails",
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      // Group back by student
+      { $unwind: "$paymentDetails" },
+
       {
         $group: {
           _id: "$_id",
           studentName: { $first: "$name" },
           email: { $first: "$email" },
           phone: { $first: "$phone" },
-          studentId: { $first: "$studentId" },
           photo: { $first: "$photo" },
-          signature: { $first: "$signature" },
-          dob: { $first: "$dob" },
-          fatherName: { $first: "$fatherName" },
-          bloodGroup: { $first: "$bloodGroup" },
           admissionDate: { $first: "$admissionDate" },
+
           fees: {
             $push: {
-              $cond: [
-                { $ifNull: ["$payments._id", false] },
-                {
-                  paymentId: "$payments._id",
-                  name: "$paymentDetails.name",
-                  amount: "$payments.amount",
-                  paidAmount: "$payments.paidAmount",
-                  dueAmount: "$payments.dueAmount",
-                  status: "$payments.status"
-                },
-                "$$REMOVE"
-              ]
+              paymentId: "$payments._id",
+              name: "$paymentDetails.name",
+              amount: "$payments.amount",
+              paidAmount: "$payments.paidAmount",
+              dueAmount: "$payments.dueAmount",
+              status: "$payments.status"
             }
           },
-          totalAmount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ifNull: ["$payments.amount", false] },
-                    { $eq: ["$payments.isActive", true] }
-                  ]
-                },
-                "$payments.amount",
-                0
-              ]
-            }
-          },
-          totalPaid: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ifNull: ["$payments.paidAmount", false] },
-                    { $eq: ["$payments.isActive", true] }
-                  ]
-                },
-                "$payments.paidAmount",
-                0
-              ]
-            }
-          },
-          totalDue: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ifNull: ["$payments.dueAmount", false] },
-                    { $eq: ["$payments.isActive", true] }
-                  ]
-                },
-                "$payments.dueAmount",
-                0
-              ]
-            }
-          }
+
+          totalAmount: { $sum: "$payments.amount" },
+          totalPaid: { $sum: "$payments.paidAmount" },
+          totalDue: { $sum: "$payments.dueAmount" }
         }
       },
-      // Project final structure
+
       {
         $project: {
           _id: 0,
@@ -614,44 +563,55 @@ const getStudentOtherPaymentList = async (req, res) => {
           email: 1,
           phone: 1,
           photo: 1,
-          signature: 1,
-          dob: 1,
-          fatherName: 1,
-          bloodGroup: 1,
           admissionDate: 1,
-          fees: {
-            $cond: [
-              { $eq: [{ $size: "$fees" }, 0] },
-              [],
-              "$fees"
-            ]
-          },
+          fees: 1,
           totalAmount: 1,
           totalPaid: 1,
           totalDue: 1
         }
       },
-      // Sort by student name
-      {
-        $sort: { studentName: 1 }
-      },
-      // Pagination - Skip
-      {
-        $skip: skip
-      },
-      // Pagination - Limit
-      {
-        $limit: limitNum
-      }
+
+      { $sort: { studentName: 1 } },
+      { $skip: skip },
+      { $limit: limitNum }
     ];
 
-    // Execute both pipelines
+    /* ============================
+       Count (Correct Way)
+    ============================ */
+
+    const countPipeline = [
+      { $match: studentMatch },
+      {
+        $lookup: {
+          from: "studentotherpayments",
+          let: { studentId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$studentId", "$$studentId"] },
+                    { $eq: ["$createdBy", userId] },
+                    { $eq: ["$isActive", true] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: "payments"
+        }
+      },
+      { $match: { "payments.0": { $exists: true } } },
+      { $count: "total" }
+    ];
+
     const [result, countResult] = await Promise.all([
       StudentModel.aggregate(pipeline),
       StudentModel.aggregate(countPipeline)
     ]);
 
-    const totalDocuments = countResult.length > 0 ? countResult[0].total : 0;
+    const totalDocuments = countResult.length ? countResult[0].total : 0;
     const totalPages = Math.ceil(totalDocuments / limitNum);
 
     res.status(200).json({
@@ -660,21 +620,23 @@ const getStudentOtherPaymentList = async (req, res) => {
       data: result,
       pagination: {
         currentPage: pageNum,
-        totalPages: totalPages,
-        totalDocuments: totalDocuments,
+        totalPages,
+        totalDocuments,
         limit: limitNum,
         hasNextPage: pageNum < totalPages,
         hasPrevPage: pageNum > 1
       }
     });
+
   } catch (error) {
-    console.error("Error in getStudentOtherPaymentList:", error);
+    console.error("Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Internal server error"
+      message: error.message
     });
   }
 };
+
 
 const getStudentOtherPayments = async (req, res) => {
   try {
@@ -832,9 +794,19 @@ const makePayment = async (req, res) => {
 
 const getPaymentStatistics = async (req, res) => {
   try {
+
+    const userId = new mongoose.Types.ObjectId(req.user.id);
+
+    /* =========================
+       1️⃣ Status Wise Statistics
+    ========================== */
+
     const stats = await StudentOtherPayment.aggregate([
       {
-        $match: { isActive: true }
+        $match: {
+          isActive: true,
+          createdBy: userId   // ✅ user isolation
+        }
       },
       {
         $group: {
@@ -857,10 +829,16 @@ const getPaymentStatistics = async (req, res) => {
       }
     ]);
 
-    // Overall statistics
+    /* =========================
+       2️⃣ Overall Statistics
+    ========================== */
+
     const overall = await StudentOtherPayment.aggregate([
       {
-        $match: { isActive: true }
+        $match: {
+          isActive: true,
+          createdBy: userId   // ✅ user isolation
+        }
       },
       {
         $group: {
@@ -888,16 +866,25 @@ const getPaymentStatistics = async (req, res) => {
       success: true,
       data: {
         byStatus: stats,
-        overall: overall[0] || {}
+        overall: overall[0] || {
+          totalStudents: 0,
+          totalPayments: 0,
+          totalAmount: 0,
+          totalPaid: 0,
+          totalDue: 0
+        }
       }
     });
+
   } catch (error) {
+    console.error("Error in getPaymentStatistics:", error);
     res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
+
 
 module.exports = {
   createOtherPayment,
