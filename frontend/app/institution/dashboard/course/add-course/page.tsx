@@ -124,7 +124,7 @@ export default function AddCourseForm() {
               { courseId: createdCourseId, fees: feesPayload },
               { headers: { Authorization: `Bearer ${token}` } }
             );
-            // toast.success("Course fees attached successfully");
+            //  toast.success("Course fees attached successfully");
           } catch (err: any) {
             if (axios.isAxiosError(err)) {
               toast.error(err.response?.data?.message || "Failed to attach course fees");

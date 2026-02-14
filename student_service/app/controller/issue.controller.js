@@ -516,12 +516,9 @@ class IssueController {
         try {
 
             const userId = req.user.id
-
             const page = parseInt(req.query.page) || 1
             const limit = parseInt(req.query.limit) || 5
             const skip = (page - 1) * limit
-
-            /* ================= BASE PIPELINE ================= */
 
             const basePipeline = [
 
@@ -537,8 +534,11 @@ class IssueController {
                 },
                 { $unwind: { path: "$book", preserveNullAndEmptyArrays: true } },
 
+                /* ✅ Correct Payment Calculation */
+
                 {
                     $addFields: {
+
                         calculatedFine: {
                             $multiply: [
                                 { $ifNull: ["$delay_days", 0] },
@@ -561,11 +561,25 @@ class IssueController {
 
                 {
                     $addFields: {
-                        paid_amount: { $ifNull: ["$paid_amount", 0] },
-                        due_amount: {
-                            $subtract: [
+
+                        paid_amount: {
+                            $cond: [
+                                { $eq: ["$payment_status", "paid"] },
                                 "$calculatedTotal",
                                 { $ifNull: ["$paid_amount", 0] }
+                            ]
+                        },
+
+                        due_amount: {
+                            $cond: [
+                                { $eq: ["$payment_status", "paid"] },
+                                0,
+                                {
+                                    $subtract: [
+                                        "$calculatedTotal",
+                                        { $ifNull: ["$paid_amount", 0] }
+                                    ]
+                                }
                             ]
                         }
                     }
@@ -607,25 +621,20 @@ class IssueController {
                 { $sort: { totalAmount: -1 } }
             ]
 
-            /* ================= AGGREGATION WITH FACET ================= */
-
             const result = await IssueModel.aggregate([
                 ...basePipeline,
                 {
                     $facet: {
 
-                        /* ✅ PAGINATED DATA */
                         paginatedData: [
                             { $skip: skip },
                             { $limit: limit }
                         ],
 
-                        /* ✅ FULL DATA (NO PAGINATION) */
                         allData: [
                             { $match: {} }
                         ],
 
-                        /* ✅ TOTAL COUNT */
                         totalCount: [
                             { $count: "count" }
                         ]
@@ -634,10 +643,6 @@ class IssueController {
             ])
 
             const totalStudents = result[0].totalCount[0]?.count || 0
-            const paginated = result[0].paginatedData
-            const allData = result[0].allData
-
-            /* ================= FETCH STUDENT SERVICE ================= */
 
             const processStudents = async (students) => {
 
@@ -685,7 +690,6 @@ class IssueController {
                         totalPaid: studentIssue.totalPaid,
                         totalDue: studentIssue.totalDue,
                         paymentStatus: overallStatus,
-
                         books: studentIssue.books
                     })
                 }
@@ -693,22 +697,19 @@ class IssueController {
                 return finalResult
             }
 
-            const paginatedFinal = await processStudents(paginated)
-            const allFinal = await processStudents(allData)
+            const paginatedFinal = await processStudents(result[0].paginatedData)
+            const allFinal = await processStudents(result[0].allData)
 
             return res.status(200).json({
                 success: true,
-
                 totalStudents,
-
                 pagination: {
                     page,
                     limit,
                     pages: Math.ceil(totalStudents / limit)
                 },
-
-                data: paginatedFinal,   // ✅ pagination wise
-                allData: allFinal       // ✅ full dataset
+                data: paginatedFinal,
+                allData: allFinal
             })
 
         } catch (error) {
@@ -719,6 +720,7 @@ class IssueController {
             })
         }
     }
+
 
     async collectLibraryPayment(req, res) {
         try {

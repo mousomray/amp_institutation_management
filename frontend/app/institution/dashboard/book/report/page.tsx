@@ -219,13 +219,17 @@ export default function ReportPage() {
 					setTotalsFetched(true);
 				}
 
-				setPagination((prev) => ({
-					...prev,
-					total: Number(json.totalStudents ?? prev.total),
-					page: Number(json.page ?? prev.page),
-					rows: Number(json.limit ?? prev.rows),
-					totalPages: Number(json.pages ?? prev.totalPages)
-				}));
+				setPagination((prev) => {
+					const next = {
+						...prev,
+						total: Number(json.totalStudents ?? prev.total),
+						page: Number(json.page ?? prev.page),
+						rows: Number(json.limit ?? prev.rows),
+						totalPages: Number(json.pages ?? prev.totalPages)
+					};
+					if (prev.total === next.total && prev.page === next.page && prev.rows === next.rows && prev.totalPages === next.totalPages) return prev;
+					return next;
+				});
 			} catch (err: any) {
 				if (!active) return;
 				console.error(err);
@@ -262,13 +266,17 @@ export default function ReportPage() {
 			setAllData(json.allData || []);
 			setTotalStudents(Number(json.totalStudents ?? (json.total ?? 0)));
 
-			setPagination((prev) => ({
-				...prev,
-				total: Number(json.totalStudents ?? prev.total),
-				page: Number(json.page ?? prev.page),
-				rows: Number(json.limit ?? prev.rows),
-				totalPages: Number(json.pages ?? prev.totalPages)
-			}));
+			setPagination((prev) => {
+				const next = {
+					...prev,
+					total: Number(json.totalStudents ?? prev.total),
+					page: Number(json.page ?? prev.page),
+					rows: Number(json.limit ?? prev.rows),
+					totalPages: Number(json.pages ?? prev.totalPages)
+				};
+				if (prev.total === next.total && prev.page === next.page && prev.rows === next.rows && prev.totalPages === next.totalPages) return prev;
+				return next;
+			});
 
 			// Compute global totals from allData if not already done
 			if (json.allData && json.allData.length > 0 && !totalsFetched) {
@@ -296,20 +304,9 @@ export default function ReportPage() {
 		}
 	};
 
-	// Polling effect to refresh data periodically so payment status updates appear
-	useEffect(() => {
-		let mountedFlag = true;
-		if (!mounted) return;
-		const id = setInterval(() => {
-			if (!mountedFlag) return;
-			refreshData();
-		}, POLL_INTERVAL);
-		return () => {
-			mountedFlag = false;
-			clearInterval(id);
-		};
-	// include debouncedSearch and pagination so polling fetches correct page
-	}, [mounted, debouncedSearch, pagination.page, pagination.rows]);
+	// Polling was causing repeated reloads; disabled by default to avoid
+	// continuous table refreshes. If you need polling, re-enable and ensure
+	// it does not cause state updates when values are unchanged.
 
 	const chartOptions = useMemo(
 		() => ({
@@ -406,6 +403,123 @@ export default function ReportPage() {
 		URL.revokeObjectURL(url);
 	};
 
+	const escapeHtml = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+	const printReport = () => {
+		const exportData = allData.length > 0 ? allData : data;
+		if (!exportData || exportData.length === 0) {
+			toast.info('No data to print.');
+			return;
+		}
+
+		const totals = {
+			totalStudents: totalStudents,
+			totalBooks: exportData.reduce((s, r) => s + Number(r.totalBooks ?? 0), 0),
+			totalAmount: exportData.reduce((s, r) => s + Number(r.totalAmount ?? 0), 0),
+			totalFine: exportData.reduce((s, r) => s + Number(r.totalFine ?? 0), 0)
+		};
+
+		const win = window.open('', '_blank');
+		if (!win) {
+			toast.error('Popup blocked. Please allow popups.');
+			return;
+		}
+
+		const rowsHtml = exportData
+			.map((r) => {
+				const booksHtml = (r.books || [])
+					.map(
+						(b: any) => `
+							<tr>
+								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(b.book_name)}</td>
+								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(formatDateUTC(b.issue_date))}</td>
+								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(formatDateUTC(b.return_date))}</td>
+								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(formatDateUTC(b.actual_return_date))}</td>
+								<td style="padding:6px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(b.total_amount ?? b.totalAmount))}</td>
+								<td style="padding:6px;border:1px solid #e5e7eb;text-align:center">${escapeHtml((b.status || '').toString().toUpperCase())}</td>
+							</tr>`
+					)
+					.join('');
+
+				return `
+					<tr>
+						<td style="padding:8px;border:1px solid #e5e7eb;vertical-align:top">
+							<div style="font-weight:700">${escapeHtml(r.student?.name)}</div>
+							<div style="font-size:12px;color:#6b7280">${escapeHtml(r.student?.email)} • ${escapeHtml(r.student?.phone)}</div>
+						</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(String(r.totalBooks ?? 0))}</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(r.totalBookFee))}</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(r.totalFine))}</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(r.totalAmount))}</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR((r as any).totalPaid ?? 0))}</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR((r as any).totalDue ?? 0))}</td>
+						<td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${escapeHtml(((r as any).paymentStatus ?? (r as any).payment_status ?? '').toString().toUpperCase())}</td>
+					</tr>
+					${booksHtml ? `
+					<tr><td colspan="8" style="padding:0;background:#fafafa"><table style="width:100%;border-collapse:collapse;margin:8px 0">${booksHtml}</table></td></tr>
+					` : ''}
+				`;
+			})
+			.join('');
+
+		const html = `<!doctype html>
+		<html>
+		<head>
+		<meta charset="utf-8" />
+		<title>Library Report</title>
+		<style>
+		body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;color:#111;padding:20px}
+		.header{border-bottom:3px solid #3B82F6;padding-bottom:12px;margin-bottom:16px}
+		.header h1{font-size:20px}
+		.table{width:100%;border-collapse:collapse;margin-top:12px}
+		.table th{background:#f3f4f6;padding:8px;border:1px solid #e5e7eb;text-align:left}
+		.table td{padding:8px;border:1px solid #e5e7eb}
+		.summary{display:flex;gap:12px;margin-top:12px}
+		.summary .card{padding:10px;border:1px solid #e5e7eb;border-radius:6px}
+		.small{font-size:12px;color:#6b7280}
+		</style>
+		</head>
+		<body>
+		<div class="header">
+			<h1>📚 Library Report</h1>
+			<div class="small">Generated: ${escapeHtml(new Date().toLocaleString('en-IN'))}</div>
+		</div>
+		<div class="summary">
+			<div class="card"><div class="small">Students</div><div style="font-weight:700">${escapeHtml(String(totals.totalStudents))}</div></div>
+			<div class="card"><div class="small">Total Books Issued</div><div style="font-weight:700">${escapeHtml(String(totals.totalBooks))}</div></div>
+			<div class="card"><div class="small">Total Amount Collected</div><div style="font-weight:700">${escapeHtml(fmtINR(totals.totalAmount))}</div></div>
+			<div class="card"><div class="small">Total Fine</div><div style="font-weight:700">${escapeHtml(fmtINR(totals.totalFine))}</div></div>
+		</div>
+		<table class="table" style="margin-top:18px">
+		<thead>
+		<tr>
+		<th>Student</th>
+		<th style="text-align:right">Books</th>
+		<th style="text-align:right">Book Fee</th>
+		<th style="text-align:right">Fine</th>
+		<th style="text-align:right">Total</th>
+		<th style="text-align:right">Paid</th>
+		<th style="text-align:right">Due</th>
+		<th>Payment Status</th>
+		</tr>
+		</thead>
+		<tbody>
+		${rowsHtml}
+		</tbody>
+		</table>
+		<div style="margin-top:18px;text-align:center;color:#6b7280;font-size:12px">Total Records: ${escapeHtml(String(exportData.length))}</div>
+		</body>
+		</html>`;
+
+		win.document.open();
+		win.document.write(html);
+		win.document.close();
+
+		win.onload = () => {
+			try { win.focus(); win.print(); } catch (err) { console.error('Print failed', err); }
+		};
+	};
+
 	return (
 		<div className="w-full flex justify-center items-center">
 			<div className="w-full card bg-white p-4 rounded-lg shadow">
@@ -425,22 +539,22 @@ export default function ReportPage() {
 					<div className="flex items-center gap-2">
 						<button className="p-button p-component p-button-help p-button-sm" onClick={exportCSV}>Download CSV</button>
 						<button className="p-button p-component p-button-secondary p-button-sm" onClick={() => refreshData()}>Refresh</button>
-						<button className="p-button p-component p-button-warning p-button-sm" onClick={() => window.print()}>Print / PDF</button>
+						<button className="p-button p-component p-button-warning p-button-sm" onClick={printReport}>Print / PDF</button>
 					</div>
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
 					<div className="border rounded-lg p-3">
-						<div className="text-sm text-gray-600">Total Students</div>
+						<div className="text-sm text-gray-600">Total Students Issued Books</div>
 						<div className="text-xl font-semibold">{totalStudents}</div>
 					</div>
 					<div className="border rounded-lg p-3">
-						<div className="text-sm text-gray-600">Total Books</div>
+						<div className="text-sm text-gray-600">Total Books Issued</div>
 						<div className="text-xl font-semibold">{globalTotals ? globalTotals.totalBooks : data.reduce((s, d) => s + (d.totalBooks ?? 0), 0)}</div>
 						<div className="text-xs text-gray-500 mt-1">{globalTotals ? 'Across all records' : 'Current page'}</div>
 					</div>
 					<div className="border rounded-lg p-3">
-						<div className="text-sm text-gray-600">Total Amount</div>
+						<div className="text-sm text-gray-600">Total Amount Collected</div>
 						<div className="text-xl font-semibold">{globalTotals ? fmtINR(globalTotals.totalAmount) : fmtINR(data.reduce((s, d) => s + (d.totalAmount ?? 0), 0))}</div>
 						<div className="text-xs text-gray-500 mt-1">{globalTotals ? 'Across all records' : 'Current page'}</div>
 					</div>
