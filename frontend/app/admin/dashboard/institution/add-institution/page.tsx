@@ -152,6 +152,7 @@ export default function InstitutionForm() {
       formData.append("name", data.name);
       formData.append("email", data.email);
       if (data.phone) formData.append("phone", data.phone);
+      if(data.whatsAppNo) formData.append("whatsAppNo",data.whatsAppNo)
       if (data.website) formData.append("website", data.website);
       if (data.establishDate) formData.append("establishDate", data.establishDate);
       if (data.registrationNo) formData.append("registrationNo", data.registrationNo);
@@ -296,6 +297,7 @@ export default function InstitutionForm() {
           <div>
             <label className="text-sm font-medium">Institution Name <span className=" text-red-500 text-xl">*</span></label>
             <InputText
+            placeholder="Enter institution name"
               className="w-full mt-1"
               {...register("name", { required: "Institution name is required" })}
             />
@@ -306,6 +308,7 @@ export default function InstitutionForm() {
           <div>
             <label className="text-sm font-medium">Email Address <span className=" text-red-500 text-xl">*</span></label>
             <InputText
+             placeholder="Enter email address"
               className="w-full mt-1"
               {...register("email", { required: "Email is required" })}
             />
@@ -316,16 +319,29 @@ export default function InstitutionForm() {
           <div>
             <label className="text-sm font-medium">Phone No <span className=" text-red-500 text-xl">*</span></label>
             <InputText
+              placeholder="Enter phone number"
               className="w-full mt-1"
               {...register("phone", { required: "Phone number is required" })}
             />
             {errors.phone && <p className="text-red-500 text-xs">{errors.phone.message}</p>}
           </div>
 
+
+          <div>
+            <label className="text-sm font-medium">WhatsApp No <span className=" text-red-500 text-xl">*</span></label>
+            <InputText
+             placeholder="Enter WhatsApp number"
+              className="w-full mt-1"
+              {...register("whatsAppNo", { required: "WhatsApp number is required" })}
+            />
+            {errors.whatsAppNo && <p className="text-red-500 text-xs">{errors.whatsAppNo.message}</p>}
+          </div>
+
           {/* Website */}
           <div>
             <label className="text-sm font-medium">Website</label>
             <InputText
+             placeholder="https://example.com"
               className="w-full mt-1"
               {...register("website")}
             />
@@ -338,6 +354,7 @@ export default function InstitutionForm() {
               type="date"
               className="w-full mt-1"
               {...register("establishDate", { required: true })}
+               placeholder="Select establishment date"
             />
             {errors.establishDate && <p className="text-red-500 text-xs">{errors.establishDate.message}</p>}
           </div>
@@ -346,17 +363,19 @@ export default function InstitutionForm() {
           <div>
             <label className="text-sm font-medium">Registration No</label>
             <InputText
+             placeholder="Enter registration number"
               className="w-full mt-1"
               {...register("registrationNo", { required: true })}
             />
             {errors.registrationNo && <p className="text-red-500 text-xs">{errors.registrationNo.message}</p>}
           </div>
 
-          <div className="md:col-span-2">
+          <div >
             <label className="text-sm font-medium">Address</label>
             <InputText
               className="w-full mt-1"
               {...register("address")}
+              placeholder="Enter full address"
             />
             {errors.address && (
               <p className="text-red-500 text-xs">

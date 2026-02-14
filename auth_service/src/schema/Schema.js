@@ -20,6 +20,10 @@ const institutionSchema = zod.object({
     .string()
     .min(10, "Phone must be at least 10 digits")
     .max(10, "Phone number too long"),
+  whatsAppNo: zod
+      .string()
+      .min(10, "Phone must be at least 10 digits")
+      .max(10, "Phone number too long"),
 
   // Optional fields
   website: zod.string().optional(),
@@ -176,6 +180,12 @@ const editStudentFeesSchema = zod.object({
 });
 
 
+const RsetPasswordSchema = zod.object({
+  currentPassword: zod.string().min(6, "password must be at least 6 characters"),
+   newPassword: zod.string().min(6, "password must be at least 6 characters")
+})
+
+
 module.exports = {
   AdminRegisterSchema,
   AdminLoginSchema,
@@ -186,5 +196,6 @@ module.exports = {
   FeesMasterSchema,
   EditFeesMasterSchema,
   createStudentFeesSchema,
-  editStudentFeesSchema
+  editStudentFeesSchema,
+  RsetPasswordSchema
 }

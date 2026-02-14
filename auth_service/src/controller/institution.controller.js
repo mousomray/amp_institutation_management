@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const { ZodError } = require("zod");
 const { User, Institution, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
-const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, FeesMasterSchema, EditFeesMasterSchema } = require("../schema/Schema.js");
+const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema,institutionSchema, RsetPasswordSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const CourseModel = require("../model/course.model.js")
@@ -77,6 +78,12 @@ const loginInstitution = async (req, res) => {
     });
   }
 };
+
+
+ 
+
+
+
 
 const createCourse = async (req, res) => {
   try {
@@ -2476,6 +2483,92 @@ const enrollMultipleStudentsToCourse = async (req, res) => {
 };
 
 
+
+const updateInstitution = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const institutionUser = await User.findById(userId);
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can update profile",
+      });
+    }
+
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+    const parsedData = institutionSchema.parse(req.body);
+
+    const photoFile = req.files?.photo?.[0];
+    const bannerFile = req.files?.banner?.[0];
+
+    let updatePayload = {
+      name: parsedData.name,
+      email: parsedData.email,
+      phone: parsedData.phone,
+      website: parsedData.website,
+      registrationNo: parsedData.registrationNo,
+      establishDate: parsedData.establishDate
+        ? new Date(parsedData.establishDate)
+        : null,
+      address: parsedData.address,
+      whatsAppNo: parsedData.whatsAppNo,
+    };
+
+    /* ================= ONLY UPDATE IF FILE EXISTS ================= */
+
+    if (photoFile) {
+      const photoUrl = await uploadSingleImage(photoFile);
+      updatePayload.institutionImage = photoUrl;
+    }
+
+    if (bannerFile) {
+      const bannerUrl = await uploadSingleImage(bannerFile);
+      updatePayload.institutionBanner = bannerUrl;
+    }
+
+    const institutionData = await Institution.findByIdAndUpdate(
+      institution._id,
+      updatePayload,
+      { new: true }
+    );
+
+    return res.status(200).json({
+      message: "Institution updated successfully",
+      institutionData,
+    });
+
+  } catch (error) {
+
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: error.issues.map((err) => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
+    }
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
+
 const getInstitution = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -2494,7 +2587,7 @@ const getInstitution = async (req, res) => {
 
     const institution = await Institution.findOne({
       adminUser: institutionUser._id,
-    });
+    })
 
     if (!institution) {
       return res.status(404).json({
@@ -2513,4 +2606,48 @@ const getInstitution = async (req, res) => {
   }
 }
 
-module.exports = {getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
+
+const resetPassword = async (req, res) => {
+  try {
+    const institutionUser = req.user?._id;
+
+    if (!institutionUser) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const institution = await User.findById(institutionUser);
+    if (!institution || institution.role !== "institution") {
+      return res.status(403).json({ message: "Only institution can logout" });
+    }
+   const parseData = RsetPasswordSchema.parse(req.body)
+   
+   if(parseData.currentPassword !== institution.password){
+    return res.status(404).json({
+      message: "Current Password is not match "
+    })
+   }
+
+   institution.password = parseData.newPassword
+   institution.save()
+
+   return res.status(200).json({
+    message: "Password updated successfully"
+   })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: error.issues.map((err) => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
+    }
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+}
+
+module.exports = {resetPassword,updateInstitution,getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };

@@ -1,4 +1,6 @@
-const { User, Institution, Student, Course } = require("../model/model.js")
+const { User, Institution} = require("../model/model.js")
+const Student = require("../model/student.model.js")
+const Course = require("../model/course.model.js")
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
@@ -147,13 +149,18 @@ const addInstitution = async (req, res) => {
 
     const parsedData = institutionSchema.parse(body);
 
+    /* ================= LOCATION REQUIRED ================= */
 
     if (!lat || !lng) {
       return res.status(400).json({ message: "Location is required" });
     }
 
+    /* ================= PHOTO REQUIRED ================= */
+
     if (!req.files?.photo?.[0]) {
-      return res.status(400).json({ message: "Image is requrird is required" })
+      return res.status(400).json({
+        message: "Institution image is required",
+      });
     }
 
     const adminId = req.user?._id;
@@ -166,22 +173,22 @@ const addInstitution = async (req, res) => {
       return res.status(403).json({ message: "Only admins can add institutions" });
     }
 
+    /* ================= FILES ================= */
 
     const photoFile = req.files.photo[0];
-    const bannerFile = req.files?.banner?.[0];
+    const bannerFile = req.files?.banner?.[0]; // optional
 
     const photoUrl = await uploadSingleImage(photoFile);
+
     let bannerUrl = null;
 
     if (bannerFile) {
       bannerUrl = await uploadSingleImage(bannerFile);
     }
 
+    /* ================= PASSWORD ================= */
+
     const plainPassword = passwordGenerator();
-
-
-    
-
 
     const institutionUser = await User.create({
       email: parsedData.email,
@@ -189,43 +196,47 @@ const addInstitution = async (req, res) => {
       role: "institution",
     });
 
+    /* ================= CREATE INSTITUTION ================= */
 
     const institution = await Institution.create({
       name: parsedData.name,
       email: parsedData.email,
       phone: parsedData.phone,
+      whatsAppNo: parsedData.whatsAppNo,
       website: parsedData.website,
       registrationNo: parsedData.registrationNo || null,
-      establishDate: parsedData.establishDate ? new Date(parsedData.establishDate) : null,
+      establishDate: parsedData.establishDate
+        ? new Date(parsedData.establishDate)
+        : null,
       address: parsedData.address,
       geoLocation: {
-        lat: lat,
-        lng: lng
+        lat,
+        lng,
       },
-      institutionBanner: bannerUrl | null,
+      institutionBanner: bannerUrl || null, // only optional field
       institutionImage: photoUrl,
       adminUser: institutionUser._id,
     });
 
-    
-     const feeNames = [
+    /* ================= DEFAULT FEES ================= */
+
+    const feeNames = [
       "Admission Fees",
       "Library Fees",
-      "Examination Fees"
+      "Examination Fees",
     ];
 
-    const feePayload = feeNames.map(name => ({
+    const feePayload = feeNames.map((name) => ({
       name,
-      institutionId: institutionUser._id  
+      institutionId: institutionUser._id,
     }));
 
-    await FeesMaster.insertMany(feePayload, { session });
-
+    await FeesMaster.insertMany(feePayload);
 
     institutionUser.institution = institution._id;
     await institutionUser.save();
 
-    await sendPasswordEmail(institutionUser.email, plainPassword)
+    await sendPasswordEmail(institutionUser.email, plainPassword);
 
     return res.status(201).json({
       message: "Institution created successfully",
@@ -237,25 +248,22 @@ const addInstitution = async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error)
     if (error.code === 11000 && error.keyPattern?.email) {
       return res.status(409).json({
-        message: "Email  already in use",
+        message: "Email already in use",
       });
     }
 
     if (error.name === "ZodError") {
       return res.status(400).json({
         message: "Validation failed",
-        errors: error.errors,
+        errors: error.issues,
       });
     }
 
-    console.error("Create student error:", error);
     return res.status(500).json({
       message: "Internal server error",
     });
-
   }
 };
 

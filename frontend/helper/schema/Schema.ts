@@ -20,6 +20,10 @@ export const InstitutionSchema = zod.object({
     .string()
     .min(10, "Phone must be at least 10 digits")
     .max(10, "Phone number too long"),
+  whatsAppNo: zod
+        .string()
+        .min(10, "Phone must be at least 10 digits")
+        .max(10, "Phone number too long"),
 
   // Optional fields
   website: zod.string().optional(),

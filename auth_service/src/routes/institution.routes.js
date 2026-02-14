@@ -1,6 +1,6 @@
 const router = require("express").Router();
 
-const { getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, deleteCoures, updateCourse, studentDetails, loginInstitution, createCourse, getMyCourses, createStudent, getMyStudents, StudentDropDown, updateStudent, deleteStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, createInstallmentPlan, listInstallmentPlans, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, getInstallmentPreview,enrollMultipleStudentsToCourse } = require("../controller/institution.controller.js");
+const {updateInstitution, resetPassword, getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, deleteCoures, updateCourse, studentDetails, loginInstitution, createCourse, getMyCourses, createStudent, getMyStudents, StudentDropDown, updateStudent, deleteStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, createInstallmentPlan, listInstallmentPlans, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, getInstallmentPreview,enrollMultipleStudentsToCourse } = require("../controller/institution.controller.js");
 const verifyJwt = require("../middleware/verifiyUser.js");
 const { upload } = require("../middleware/multer.js")
 const { uploadStudentImages } = require("../middleware/multiMulter.js")
@@ -38,4 +38,6 @@ router.post("/pay-installment/:installmentItemId", verifyJwt, payInstallment);
 router.get("/list-installment-items/:studentFeesId", verifyJwt, listInstallmentItems);
 //router.post("/courses/:courseId/enroll-students", verifyJwt, enrollMultipleStudentsToCourse);
 router.get("/get-institution",verifyJwt,getInstitution)
+router.put("/update-institution",verifyJwt,uploadStudentImages,updateInstitution)
+router.put("/reset-password",verifyJwt,resetPassword)
 module.exports = router;
