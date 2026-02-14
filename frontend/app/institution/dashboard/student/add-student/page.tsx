@@ -43,12 +43,33 @@ export default function Page() {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [webcamOpen, setWebcamOpen] = useState(false);
 
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
     if (storedToken) setToken(storedToken);
   }, []);
+
+  // Cleanup on unmount or when previews change: stop webcam and revoke object URLs
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        try {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+        } catch (e) {}
+        streamRef.current = null;
+      }
+      if (photoPreview) {
+        try { URL.revokeObjectURL(photoPreview); } catch (e) {}
+      }
+      if (signPreview) {
+        try { URL.revokeObjectURL(signPreview); } catch (e) {}
+      }
+    };
+  }, [photoPreview, signPreview]);
 
 
 
@@ -66,8 +87,7 @@ export default function Page() {
   const onSubmit = async (data: StudentFormData) => {
     setIsSubmitting(true);
     try {
-      if (!photoFile) return toast.error("Photo is required");
-      if (!signatureFile) return toast.error("Signature is required");
+      // Photo and signature are optional now; append only when provided
 
       const formData = new FormData();
       formData.append("name", data.name);
@@ -152,7 +172,7 @@ export default function Page() {
               {/* PHOTO */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">
-                  Student Photo <span className="text-red-500">*</span>
+                    Student Photo (optional)
                 </label>
                 <div
                   className="flex items-center gap-4 cursor-pointer group"
@@ -170,13 +190,92 @@ export default function Page() {
                     <p className="text-xs text-gray-500">JPG, PNG (Max 5MB)</p>
                   </div>
                 </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <button type="button" className="p-2 text-sm text-blue-600" onClick={() => photoInputRef.current?.click()}>Choose file</button>
+                  <button type="button" className="p-2 text-sm text-blue-600" onClick={async () => {
+                    if (webcamOpen) {
+                      if (streamRef.current) {
+                        streamRef.current.getTracks().forEach((t) => t.stop());
+                        streamRef.current = null;
+                      }
+                      setWebcamOpen(false);
+                      return;
+                    }
+                    try {
+                      const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                      streamRef.current = s;
+                      setWebcamOpen(true);
+                      setTimeout(() => {
+                        if (videoRef.current) {
+                          videoRef.current.srcObject = s;
+                          videoRef.current.play().catch(() => {});
+                        }
+                      }, 50);
+                    } catch (err) {
+                      console.error('Webcam error', err);
+                      toast.error('Unable to access webcam');
+                    }
+                  }}>Use Webcam</button>
+                </div>
+
                 <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    if (photoPreview) URL.revokeObjectURL(photoPreview);
                     setPhotoFile(file);
                     setPhotoPreview(URL.createObjectURL(file));
                   }
                 }} />
+
+                {webcamOpen && (
+                  <div className="mt-3">
+                    <video ref={videoRef} className="w-full rounded-md border" />
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" className="p-2 bg-blue-600 text-white rounded" onClick={async () => {
+                        try {
+                          const video = videoRef.current;
+                          if (!video) return;
+                          const canvas = document.createElement('canvas');
+                          canvas.width = video.videoWidth || 640;
+                          canvas.height = video.videoHeight || 480;
+                          const ctx = canvas.getContext('2d');
+                          if (!ctx) return;
+                          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                          canvas.toBlob((blob) => {
+                            if (!blob) return;
+                            const file = new File([blob], `webcam_${Date.now()}.jpg`, { type: blob.type });
+                            if (photoPreview) URL.revokeObjectURL(photoPreview);
+                            setPhotoFile(file);
+                            setPhotoPreview(URL.createObjectURL(file));
+
+                            // Stop webcam stream and close video after capture
+                            if (streamRef.current) {
+                              try {
+                                streamRef.current.getTracks().forEach((t) => t.stop());
+                              } catch (e) {}
+                              streamRef.current = null;
+                            }
+                            if (videoRef.current) {
+                              try { videoRef.current.pause(); } catch (e) {}
+                              try { (videoRef.current.srcObject as MediaStream | null) = null; } catch (e) {}
+                            }
+                            setWebcamOpen(false);
+                          }, 'image/jpeg');
+                        } catch (err) {
+                          console.error(err);
+                          toast.error('Failed to capture photo');
+                        }
+                      }}>Capture</button>
+                      <button type="button" className="p-2 border rounded" onClick={() => {
+                        if (streamRef.current) {
+                          streamRef.current.getTracks().forEach((t) => t.stop());
+                          streamRef.current = null;
+                        }
+                        setWebcamOpen(false);
+                      }}>Close</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -224,7 +323,44 @@ export default function Page() {
                   <span className="p-inputgroup-addon bg-blue-50">
                     <i className="pi pi-phone text-blue-600"></i>
                   </span>
-                  <InputText className="w-full" {...register("phone")} placeholder="Enter your phone number" />
+                  <InputText
+                    className="w-full"
+                    {...register("phone")}
+                    placeholder="Enter your phone number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    onKeyDown={(e) => {
+                      if (e.ctrlKey || e.metaKey || e.altKey) return;
+                      const allowed = ["Backspace", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Delete", "Tab", "Home", "End"];
+                      if (allowed.includes(e.key)) return;
+                      if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                    }}
+                    onPaste={(e) => {
+                      const paste = (e.clipboardData || (window as any).clipboardData).getData('text') || '';
+                      const digits = paste.replace(/\D/g, '');
+                      if (!digits) {
+                        e.preventDefault();
+                        return;
+                      }
+                      e.preventDefault();
+                      const el = e.currentTarget as HTMLInputElement;
+                      const start = el.selectionStart || 0;
+                      const end = el.selectionEnd || 0;
+                      const newVal = el.value.slice(0, start) + digits + el.value.slice(end);
+                      el.value = newVal;
+                      setValue('phone', newVal);
+                      el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }}
+                    onInput={(e) => {
+                      const el = e.currentTarget as HTMLInputElement;
+                      const cleaned = el.value.replace(/\D/g, '');
+                      if (el.value !== cleaned) {
+                        el.value = cleaned;
+                        setValue('phone', cleaned);
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                      }
+                    }}
+                  />
                 </div>
                 {errors.phone && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.phone.message}</small>}
               </div>
@@ -277,7 +413,7 @@ export default function Page() {
           {/* SIGNATURE */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">
-              Signature <span className="text-red-500">*</span>
+              Signature (optional)
             </label>
             <div
               className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all bg-gradient-to-br from-blue-50 to-indigo-50 group"

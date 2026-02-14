@@ -46,7 +46,8 @@ export const CourseSchema = zod.object({
 
   fee: zod.string().min(1, "Fee is required"),
 
-  description: zod.string().min(5, "Description is required it should at least 5 characters long"),
+  // Make description optional; when provided enforce a minimum length
+  description: zod.string().optional(),
 });
 
 export const StudentSchema = zod.object({

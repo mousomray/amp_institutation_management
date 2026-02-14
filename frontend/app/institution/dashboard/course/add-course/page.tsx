@@ -53,20 +53,17 @@ export default function AddCourseForm() {
     setIsSubmitting(true);
 
     try {
-      if (!imageFile) {
-        toast.error("Image is required");
-        return;
-      }
-
-
       const duration = `${data.durationValue} ${data.durationUnit}`;
 
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("duration", duration);
       formData.append("fee", data.fee);
-      formData.append("description", data.description);
-      formData.append("image", imageFile);
+      formData.append("description", data.description ?? "");
+      // Image is optional; append only if provided
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
 
       const res = await axiosInstance.post(
         "/institution/add-course",
@@ -93,7 +90,17 @@ export default function AddCourseForm() {
     }
   };
 
-  useEffect(() => { return () => { if (preview) URL.revokeObjectURL(preview); }; }, [preview]); const handleImagePreview = (file: File) => { if (preview) URL.revokeObjectURL(preview); const imageUrl = URL.createObjectURL(file); setPreview(imageUrl); };
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  const handleImagePreview = (file: File) => {
+    if (preview) URL.revokeObjectURL(preview);
+    const imageUrl = URL.createObjectURL(file);
+    setPreview(imageUrl);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -134,6 +141,15 @@ export default function AddCourseForm() {
                 className="w-full mt-1"
                 placeholder="e.g. 6"
                 {...register("durationValue", { valueAsNumber: true })}
+                step="1"
+                min="0"
+                onKeyDown={(e: any) => {
+                  // Prevent scientific notation and explicit signs
+                  if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') {
+                    e.preventDefault();
+                  }
+                }}
+                onWheel={(e: any) => (e.target as HTMLInputElement).blur()}
               />
               {errors.durationValue && (
                 <p className="text-red-500 text-sm">
@@ -172,6 +188,14 @@ export default function AddCourseForm() {
               className="w-full mt-1"
               placeholder="e.g. 5000"
               {...register("fee")}
+              step="1"
+              min="0"
+              onKeyDown={(e: any) => {
+                if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') {
+                  e.preventDefault();
+                }
+              }}
+              onWheel={(e: any) => (e.target as HTMLInputElement).blur()}
             />
             {errors.fee && (
               <p className="text-red-500 text-sm">{errors.fee.message}</p>
@@ -180,7 +204,7 @@ export default function AddCourseForm() {
 
           {/* Description */}
           <div>
-            <label className="font-semibold">Description <span className=" text-red-500">*</span></label>
+            <label className="font-semibold">Description (optional)</label>
             <InputTextarea
               rows={4}
               className="w-full mt-1"
@@ -195,7 +219,7 @@ export default function AddCourseForm() {
           </div>
 
           {/* Image */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100"> <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"> <i className="pi pi-image text-blue-600"></i> Course Image </h3> <div className="space-y-2"> <label className="block text-sm font-semibold text-gray-700"> Course Image <span className="text-red-500">*</span> </label> <div role="button" tabIndex={0} aria-label="Upload course image area" className="relative h-52 w-full border-2 border-dashed border-blue-300 rounded-2xl flex items-center justify-center overflow-hidden bg-white hover:border-blue-500 cursor-pointer transition-all duration-300" onClick={() => imageInputRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") imageInputRef.current?.click(); }} > {preview ? (<img src={preview} alt="Course Image Preview" className="w-full h-full object-contain p-4" />) : (<div className="text-center p-6"> <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"> <i className="pi pi-cloud-upload text-4xl text-blue-500"></i> </div> <p className="text-blue-600 font-semibold text-lg mb-1"> Click to upload course image </p> <p className="text-sm text-gray-500"> PNG, JPG or GIF up to 10MB </p> </div>)} </div> <input ref={imageInputRef} type="file" accept="image/*" className="hidden" aria-label="Upload course image" title="Upload course image" onChange={(e) => { const file = e.target.files?.[0]; if (file) { setImageFile(file); handleImagePreview(file); } }} /> </div> </div>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100"> <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"> <i className="pi pi-image text-blue-600"></i> Course Image </h3> <div className="space-y-2"> <label className="block text-sm font-semibold text-gray-700"> Course Image (optional) </label> <div role="button" tabIndex={0} aria-label="Upload course image area" className="relative h-52 w-full border-2 border-dashed border-blue-300 rounded-2xl flex items-center justify-center overflow-hidden bg-white hover:border-blue-500 cursor-pointer transition-all duration-300" onClick={() => imageInputRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") imageInputRef.current?.click(); }} > {preview ? (<img src={preview} alt="Course Image Preview" className="w-full h-full object-contain p-4" />) : (<div className="text-center p-6"> <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"> <i className="pi pi-cloud-upload text-4xl text-blue-500"></i> </div> <p className="text-blue-600 font-semibold text-lg mb-1"> Click to upload course image </p> <p className="text-sm text-gray-500"> PNG, JPG or GIF up to 10MB </p> </div>)} </div> <input ref={imageInputRef} type="file" accept="image/*" className="hidden" aria-label="Upload course image" title="Upload course image" onChange={(e) => { const file = e.target.files?.[0]; if (file) { setImageFile(file); handleImagePreview(file); } }} /> </div> </div>
 
           <Button
             type="submit"
