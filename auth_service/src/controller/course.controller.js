@@ -28,9 +28,9 @@ const createCourse = async (req, res) => {
                 message: "Institution not found",
             });
         }
-        if (!req.file) {
-            return res.status(400).json({ message: "Course image is required" });
-        }
+        // if (!req.file) {
+        //     return res.status(400).json({ message: "Course image is required" });
+        // }
         const existingCourse = await CourseModel.findOne({
             name: { $regex: `^${parsedData.name}$`, $options: "i" }, // case-insensitive
             institution: institution._id,

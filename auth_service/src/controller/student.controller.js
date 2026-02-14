@@ -7,50 +7,71 @@ const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 
 const createStudent = async (req, res) => {
     try {
+        /* ================= VALIDATION ================= */
         const parsedData = StudentSchema.parse(req.body);
 
+        /* ================= AUTH CHECK ================= */
         const userId = req.user?._id;
         if (!userId) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
+        /* ================= ROLE CHECK ================= */
         const institutionUser = await User.findById(userId);
         if (!institutionUser || institutionUser.role !== "institution") {
-            return res
-                .status(403)
-                .json({ message: "Only institutions can create students" });
+            return res.status(403).json({
+                message: "Only institutions can create students",
+            });
         }
 
+        /* ================= INSTITUTION CHECK ================= */
         const institution = await Institution.findOne({
             adminUser: institutionUser._id,
         });
 
         if (!institution) {
-            return res.status(404).json({ message: "Institution not found" });
+            return res.status(404).json({
+                message: "Institution not found",
+            });
         }
 
-        if (!req.files?.image || !req.files?.signature) {
-            return res
-                .status(400)
-                .json({ message: "Image and signature are required" });
-        }
+        /* ================= EMAIL CHECK ================= */
+        const emailExists = await User.findOne({
+            email: parsedData.email,
+        });
 
-        const emailExists = await User.findOne({ email: parsedData.email });
         if (emailExists) {
-            return res.status(409).json({ message: "Email already exists" });
+            return res.status(409).json({
+                message: "Email already exists",
+            });
         }
 
-        const photoUrl = await uploadSingleImage(req.files.image[0]);
-        const signatureUrl = await uploadSingleImage(req.files.signature[0]);
+        /* ================= FILE UPLOAD (SAFE) ================= */
 
+        let photoUrl = null;
+        let signatureUrl = null;
+
+        if (req.files?.image?.length > 0) {
+            photoUrl = await uploadSingleImage(req.files.image[0]);
+        }
+
+        if (req.files?.signature?.length > 0) {
+            signatureUrl = await uploadSingleImage(
+                req.files.signature[0]
+            );
+        }
+
+        /* ================= PASSWORD GENERATE ================= */
         const plainPassword = passwordGenerator();
 
+        /* ================= CREATE USER ================= */
         const user = await User.create({
             email: parsedData.email,
             password: plainPassword,
             role: "student",
         });
 
+        /* ================= CREATE STUDENT ================= */
         const student = await StudentModel.create({
             studentId: parsedData.studentId,
             name: parsedData.name,
@@ -66,10 +87,12 @@ const createStudent = async (req, res) => {
             email: parsedData.email,
         });
 
+        /* ================= LINK STUDENT TO USER ================= */
         await User.findByIdAndUpdate(user._id, {
             student: student._id,
         });
 
+        /* ================= RESPONSE ================= */
         return res.status(201).json({
             message: "Student created successfully",
             student,
@@ -80,22 +103,26 @@ const createStudent = async (req, res) => {
         });
 
     } catch (error) {
+
+        /* ================= ZOD ERROR ================= */
         if (error instanceof ZodError) {
             return res.status(400).json({
                 message: "Validation failed",
-                errors: error.issues.map(err => ({
+                errors: error.issues.map((err) => ({
                     field: err.path.join("."),
                     message: err.message,
                 })),
             });
         }
 
-        console.error(error);
+        console.error("Create Student Error:", error);
+
         return res.status(500).json({
             message: "Internal server error",
         });
     }
 };
+
 
 
 const getMyStudents = async (req, res) => {

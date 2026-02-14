@@ -44,6 +44,9 @@ const studentFeesLedgerRoutes = require("./src/routes/studentfeesledger.routes.j
 // Student Other Payment Routes
 const otherPaymentRoutes = require("./src/routes/OtherPayment.routes.js")
 
+// Course Fees Routes
+const courseFeesRoutes = require("./src/routes/courseFees.routes.js")
+
 app.use("/api/admin", adminRoutes)
 app.use("/api/institution",institutionRoutes)
 
@@ -55,7 +58,7 @@ app.use("/api/fees-master", feesMasterRoutes)
 app.use("/api/receipt", receiptRoutes)
 app.use("/api/student-fees-ledger", studentFeesLedgerRoutes)
 app.use("/api/other-payment", otherPaymentRoutes)
-
+app.use("/api/course-fees", courseFeesRoutes)
 const port = process.env.PORT
 
 app.listen(port,() => {

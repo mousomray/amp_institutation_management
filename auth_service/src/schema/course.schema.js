@@ -12,7 +12,7 @@ const CourseSchema = zod.object({
         .string()
         .min(1, "Fee is required"),
     description: zod.string()
-        .min(5, "description is required"),
+        .optional()
 });
 
 module.exports = CourseSchema;

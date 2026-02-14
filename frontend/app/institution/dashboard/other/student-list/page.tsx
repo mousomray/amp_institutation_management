@@ -146,7 +146,7 @@ export default function OtherPaymentStudentsPage() {
     const menuRef = useRef<Menu | null>(null);
     const items = [
       {
-        label: "View Challan",
+        label: "View Collection",
         icon: "pi pi-file",
         command: () => {
           setSelectedStudent(row);

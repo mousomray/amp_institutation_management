@@ -59,10 +59,42 @@ function CourseEnroll({
         }
     };
 
+    // New: fetch course-specific fees (API changed). If courseId provided, this returns
+    // { data: { fees: [{ feesMasterId, feesName, amount }], course: "..." } }
+    const fetchCourseFees = async (cId: string) => {
+        try {
+            const res = await axiosInstance.get(`/course-fees/get-course-fees/${cId}`);
+            const fees = res?.data?.data?.fees || [];
+
+            // build feesMasters list (so MultiSelect options remain compatible)
+            const masters = fees.map((f: any) => ({ _id: f.feesMasterId, name: f.feesName }));
+            setFeesMasters(masters);
+
+            // select all returned fees by default
+            const selected = fees.map((f: any) => f.feesMasterId);
+            setSelectedFees(selected);
+
+            // set default amounts
+            const amounts: Record<string, number> = {};
+            fees.forEach((f: any) => {
+                amounts[f.feesMasterId] = Number(f.amount) || 0;
+            });
+            setFeeAmounts(amounts);
+        } catch (err) {
+            console.error("Failed to load course fees", err);
+            toast.error("Failed to load course fees");
+        }
+    };
+
     useEffect(() => {
         fetchStudents();
-        fetchFeesMasters();
-    }, []);
+        if (courseId) {
+            fetchCourseFees(courseId);
+        } else {
+            // fallback to global fees master if no courseId
+            fetchFeesMasters();
+        }
+    }, [courseId]);
 
     // Robust parser: accepts "yyyy-mm-dd", "dd/mm/yyyy" or other parsable forms.
     const parseToDate = (s: string): Date | null => {
@@ -231,13 +263,19 @@ function CourseEnroll({
         <div className="space-y-6">
             {/* COURSE INFO */}
             <div className="flex gap-4 items-center bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
-                <Image
-                    src={courseImage}
-                    alt={courseName}
-                    width={80}
-                    height={80}
-                    className="rounded-xl object-cover shadow-md"
-                />
+                    {courseImage ? (
+                        <Image
+                            src={courseImage}
+                            alt={courseName}
+                            width={80}
+                            height={80}
+                            className="rounded-xl object-cover shadow-md"
+                        />
+                    ) : (
+                        <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center shadow-md">
+                            <i className="pi pi-image text-3xl text-gray-400" />
+                        </div>
+                    )}
 
                 <div>
                     <h3 className="text-lg font-semibold text-gray-800">{courseName}</h3>

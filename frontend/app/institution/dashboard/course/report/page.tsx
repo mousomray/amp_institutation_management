@@ -1,23 +1,19 @@
 'use client'
-import React, { useEffect, useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import axiosInstance from '@/service/axios.service';
 import axios from 'axios';
 
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { InputText } from 'primereact/inputtext';
+import { Calendar } from 'primereact/calendar';
 import { IconField } from 'primereact/iconfield';
 import { InputIcon } from 'primereact/inputicon';
 import { Tag } from 'primereact/tag';
 
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-const Chart = dynamic(
-	() => import('primereact/chart').then((mod) => mod.Chart || (mod as any).default),
-	{ ssr: false, loading: () => <div>Loading chart...</div> }
-) as any;
 
 type Student = { _id: string; name: string; email?: string; photo?: string };
 type Course = { _id: string; name: string; image?: string };
@@ -32,7 +28,17 @@ type Installment = {
 	updatedAt?: string;
 };
 
-type OtherFee = { headName?: string; amount?: number };
+type OtherFee = { feesHeadName?: string; feesHeadId?: string; amount?: number };
+
+type Breakdown = {
+	courseFeesTotal: number;
+	otherFeesTotal: number;
+};
+
+type FeeHeadSummary = {
+	feesHeadName: string;
+	totalAmount: number;
+};
 
 type RecordItem = {
 	_id: string;
@@ -84,9 +90,13 @@ const EmptyState = () => (
 );
 
 export default function ReportPage() {
+	const searchParams = useSearchParams();
+
 	const [data, setData] = useState<RecordItem[]>([]);
 	const [allData, setAllData] = useState<RecordItem[]>([]);
 	const [summary, setSummary] = useState<{ totalAmount: number; totalPaidAmount: number; totalDueAmount: number } | null>(null);
+	const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
+	const [otherFeesHeadSummary, setOtherFeesHeadSummary] = useState<FeeHeadSummary[]>([]);
 
 	const [token, setToken] = useState<string | null>(null);
 	const reportPath = '/student-fees-ledger/student-financial-report';
@@ -101,20 +111,11 @@ export default function ReportPage() {
 	const [month, setMonth] = useState<string>('');
 	const [date, setDate] = useState<string>('');
 	const [period, setPeriod] = useState<'all' | 'day' | 'week' | 'month' | 'year'>('all');
-
-	const [chartsAvailable, setChartsAvailable] = useState<boolean | null>(null);
-	const [mounted, setMounted] = useState(false);
+	const [course, setCourse] = useState<string>('');
 
 	const [expandedRows, setExpandedRows] = useState<any>(null);
 
 	const [error, setError] = useState<string>('');
-	const [chartTheme, setChartTheme] = useState({
-		primary: '#3B82F6',
-		warn: '#F59E0B',
-		purple: '#8B5CF6',
-		text: '#374151',
-		grid: '#E5E7EB'
-	});
 
 	useEffect(() => {
 		const t = localStorage.getItem('institution-token');
@@ -122,8 +123,10 @@ export default function ReportPage() {
 	}, []);
 
 	useEffect(() => {
-		setMounted(true);
-	}, []);
+		// Supports opening this page with: ?course=SQL
+		const c = (searchParams?.get('course') ?? '').trim();
+		setCourse(c);
+	}, [searchParams]);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), 500);
@@ -132,33 +135,7 @@ export default function ReportPage() {
 
 	useEffect(() => {
 		setPagination((p) => ({ ...p, page: 1 }));
-	}, [debouncedSearch, year, month, date, period]);
-
-	useEffect(() => {
-		if (!mounted) return;
-		const cs = getComputedStyle(document.documentElement);
-		const primary = (cs.getPropertyValue('--primary-color') || '').trim() || chartTheme.primary;
-		const text = (cs.getPropertyValue('--text-color') || '').trim() || chartTheme.text;
-		const grid = (cs.getPropertyValue('--surface-border') || '').trim() || chartTheme.grid;
-		setChartTheme((prev) => ({ ...prev, primary, text, grid }));
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mounted]);
-
-	useEffect(() => {
-		let mountedFlag = true;
-		(async () => {
-			try {
-				await import('chart.js/auto');
-				if (mountedFlag) setChartsAvailable(true);
-			} catch (err) {
-				console.error('Charts not available:', err);
-				if (mountedFlag) setChartsAvailable(false);
-			}
-		})();
-		return () => {
-			mountedFlag = false;
-		};
-	}, []);
+	}, [debouncedSearch, year, month, date, period, course]);
 
 	useEffect(() => {
 		if (!token) return;
@@ -179,6 +156,7 @@ export default function ReportPage() {
 				if (year) params.year = year;
 				if (month) params.month = month;
 				if (date) params.date = date;
+				if (course) params.course = course;
 
 				if (period === 'week') {
 					const today = new Date();
@@ -198,16 +176,22 @@ export default function ReportPage() {
 				const json = res?.data ?? {};
 				const pag = json.pagination ?? {};
 
-				setData(json.data || []);
-				setAllData(json.allData || []);
-				setSummary(json.summary || null);
+				// Support API responses with `data` or `paginatedData`
+				const pageData = json.data ?? json.paginatedData ?? [];
 
+				setData(pageData);
+				setAllData(json.allData ?? []);
+				setSummary(json.summary ?? null);
+				setBreakdown(json.breakdown ?? null);
+				setOtherFeesHeadSummary(json.otherFeesHeadSummary ?? []);
+
+				// Normalize pagination fields from different API shapes
 				setPagination((prev) => ({
 					...prev,
-					total: pag?.totalRecords ?? prev.total,
-					page: pag?.currentPage ?? prev.page,
-					rows: pag?.perPage ?? pag?.limit ?? prev.rows,
-					totalPages: pag?.totalPages ?? prev.totalPages
+					total: pag?.totalRecords ?? pag?.total ?? prev.total,
+					page: pag?.currentPage ?? pag?.page ?? prev.page,
+					rows: pag?.perPage ?? pag?.per_page ?? pag?.limit ?? prev.rows,
+					totalPages: pag?.totalPages ?? pag?.total_pages ?? prev.totalPages
 				}));
 			} catch (err: any) {
 				if (!active) return;
@@ -226,51 +210,7 @@ export default function ReportPage() {
 		return () => {
 			active = false;
 		};
-	}, [token, pagination.page, pagination.rows, debouncedSearch, year, month, date, period]);
-
-	const chartOptions = useMemo(
-		() => ({
-			responsive: true,
-			plugins: {
-				legend: { labels: { color: chartTheme.text } },
-				tooltip: { enabled: true }
-			},
-			scales: {
-				x: { ticks: { color: chartTheme.text }, grid: { color: chartTheme.grid } },
-				y: { ticks: { color: chartTheme.text }, grid: { color: chartTheme.grid } }
-			}
-		}),
-		[chartTheme]
-	);
-
-	const chartData = useMemo(() => {
-		const paid = summary?.totalPaidAmount ?? 0;
-		const due = summary?.totalDueAmount ?? 0;
-		
-		// Use allData for charts so they don't change with pagination
-		const chartSource = allData.length > 0 ? allData : data;
-
-		return {
-			doughnut: {
-				labels: ['Paid', 'Due'],
-				datasets: [
-					{
-						data: [paid, due],
-						backgroundColor: [chartTheme.primary, chartTheme.warn],
-						hoverBackgroundColor: [chartTheme.primary, chartTheme.warn]
-					}
-				]
-			},
-			bar: {
-				labels: chartSource.map((d) => d.course?.name ?? 'Unknown'),
-				datasets: [
-					{ label: 'Total', backgroundColor: chartTheme.purple, data: chartSource.map((d) => d.totalAmount) },
-					{ label: 'Paid', backgroundColor: chartTheme.primary, data: chartSource.map((d) => d.paidAmount) },
-					{ label: 'Due', backgroundColor: chartTheme.warn, data: chartSource.map((d) => d.dueAmount) }
-				]
-			}
-		};
-	}, [summary, allData, data, chartTheme]);
+	}, [token, pagination.page, pagination.rows, debouncedSearch, year, month, date, period, course]);
 
 	const statusSeverity = (s?: string) => (s === 'PAID' ? 'success' : s === 'PARTIAL' ? 'warning' : 'danger');
 	const typeSeverity = (t?: string) => (t === 'INSTALLMENT' ? 'info' : 'secondary');
@@ -329,7 +269,7 @@ export default function ReportPage() {
 									<tbody>
 										{otherFees.map((f, idx) => (
 											<tr key={`${row._id}-fee-${idx}`} className="border-b last:border-b-0">
-												<td className="py-2 pr-2">{f.headName ?? '-'}</td>
+												<td className="py-2 pr-2">{f.feesHeadName ?? '-'}</td>
 												<td className="py-2 pr-2">{fmtINR(f.amount)}</td>
 											</tr>
 										))}
@@ -350,6 +290,10 @@ export default function ReportPage() {
 	const exportCSV = () => {
 		// Use allData for CSV export to get all records, not just current page
 		const exportData = allData.length > 0 ? allData : data;
+		if (exportData.length === 0) {
+			toast.info('No data to export.');
+			return;
+		}
 		const rows = [
 			['Student', 'Email', 'Course', 'Type', 'Total', 'Paid', 'Due', 'Status', 'EnrollmentDate', 'CreatedAt'],
 			...exportData.map((r) => [
@@ -370,96 +314,506 @@ export default function ReportPage() {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `financial_report_all_data_${new Date().toISOString().split('T')[0]}.csv`;
+		const suffix = [course ? `course_${course}` : null, year ? `year_${year}` : null, month ? `month_${month}` : null, date ? `date_${date}` : null]
+			.filter(Boolean)
+			.join('_');
+		a.download = `financial_report_${suffix || 'filtered'}_${new Date().toISOString().split('T')[0]}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	};
 
-	return (
-		<div className="w-full flex justify-center items-center">
-			<div className="w-full card bg-white p-4 rounded-lg shadow">
-				{/* Header (same style idea as enrollments) */}
-				<div className="flex flex-col gap-3 bg-primary p-3 rounded-lg">
-					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-						<div>
-							<h2 className="text-lg font-semibold text-white">Financial Report</h2>
-							<p className="text-sm text-black">Student fees ledger report (with installments & other fees)</p>
-						</div>
+	const escapeHtml = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-						<IconField iconPosition="left">
+	const printReport = () => {
+		const exportData = allData.length > 0 ? allData : data;
+		if (!exportData || exportData.length === 0) {
+			toast.info('No data to print.');
+			return;
+		}
+
+		const win = window.open('', '_blank');
+		if (!win) {
+			toast.error('Popup blocked. Please allow popups.');
+			return;
+		}
+
+		const filterParts = [
+			course ? `Course: ${course}` : '',
+			year ? `Year: ${year}` : '',
+			month ? `Month: ${month}` : '',
+			date ? `Date: ${date}` : '',
+			period && period !== 'all' ? `Period: ${period}` : ''
+		].filter(Boolean);
+		const filterLine = filterParts.length ? filterParts.join(' | ') : 'All Records';
+
+		let html = `<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<title>Financial Report - Institute Library Management</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		body { 
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+			color: #1f2937; 
+			padding: 20px;
+			background: #fff;
+		}
+		.header { 
+			border-bottom: 3px solid #3b82f6; 
+			padding-bottom: 12px; 
+			margin-bottom: 16px; 
+		}
+		.header h1 { 
+			font-size: 22px; 
+			color: #1f2937; 
+			margin-bottom: 4px; 
+		}
+		.meta { 
+			font-size: 11px; 
+			color: #6b7280; 
+			margin-top: 4px; 
+		}
+		.summary { 
+			display: grid; 
+			grid-template-columns: repeat(3, 1fr); 
+			gap: 12px; 
+			margin: 16px 0; 
+		}
+		.summary-card { 
+			border: 1px solid #e5e7eb; 
+			border-radius: 8px; 
+			padding: 12px; 
+		}
+		.summary-card .label { 
+			font-size: 11px; 
+			color: #6b7280; 
+			text-transform: uppercase; 
+			letter-spacing: 0.5px; 
+		}
+		.summary-card .value { 
+			font-size: 20px; 
+			font-weight: 700; 
+			margin-top: 4px; 
+		}
+		.summary-card.total .value { color: #1f2937; }
+		.summary-card.paid .value { color: #059669; }
+		.summary-card.due .value { color: #dc2626; }
+		
+		.record { 
+			border: 1px solid #e5e7eb; 
+			border-radius: 8px; 
+			margin-bottom: 16px; 
+			padding: 12px; 
+			page-break-inside: avoid; 
+		}
+		.record-header { 
+			display: grid; 
+			grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr; 
+			gap: 8px; 
+			padding: 10px; 
+			background: #f9fafb; 
+			border-radius: 6px; 
+			margin-bottom: 8px; 
+			font-size: 12px; 
+		}
+		.record-header > div { }
+		.record-header .label { 
+			font-size: 10px; 
+			color: #6b7280; 
+			margin-bottom: 2px; 
+		}
+		.record-header .val { 
+			font-weight: 600; 
+			color: #1f2937; 
+		}
+		.badge { 
+			display: inline-block; 
+			padding: 2px 8px; 
+			border-radius: 4px; 
+			font-size: 10px; 
+			font-weight: 600; 
+		}
+		.badge.paid { background: #d1fae5; color: #065f46; }
+		.badge.partial { background: #fef3c7; color: #92400e; }
+		.badge.due { background: #fee2e2; color: #991b1b; }
+		.badge.installment { background: #dbeafe; color: #1e40af; }
+		.badge.normal { background: #e5e7eb; color: #374151; }
+		
+		.sub-section { 
+			margin-top: 8px; 
+			padding: 8px; 
+			background: #fafbfc; 
+			border-radius: 4px; 
+		}
+		.sub-section h4 { 
+			font-size: 11px; 
+			color: #374151; 
+			margin-bottom: 6px; 
+			text-transform: uppercase; 
+			letter-spacing: 0.5px; 
+		}
+		table { 
+			width: 100%; 
+			border-collapse: collapse; 
+			font-size: 11px; 
+		}
+		table th, table td { 
+			border: 1px solid #e5e7eb; 
+			padding: 6px 8px; 
+			text-align: left; 
+		}
+		table th { 
+			background: #f3f4f6; 
+			font-weight: 600; 
+			color: #374151; 
+		}
+		.no-data { 
+			font-size: 11px; 
+			color: #9ca3af; 
+			font-style: italic; 
+		}
+		@media print {
+			body { padding: 8mm; }
+			.record { page-break-inside: avoid; }
+		}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>📊 Financial Report</h1>
+		<div class="meta">Institute Library Management System</div>
+		<div class="meta">Filters: ${escapeHtml(filterLine)}</div>
+		<div class="meta">Generated: ${escapeHtml(new Date().toLocaleString('en-IN'))}</div>
+	</div>
+
+	<div class="summary">
+		<div class="summary-card total">
+			<div class="label">Total Amount</div>
+			<div class="value">${escapeHtml(fmtINR(summary?.totalAmount))}</div>
+		</div>
+		<div class="summary-card paid">
+			<div class="label">Total Paid</div>
+			<div class="value">${escapeHtml(fmtINR(summary?.totalPaidAmount))}</div>
+		</div>
+		<div class="summary-card due">
+			<div class="label">Total Due</div>
+			<div class="value">${escapeHtml(fmtINR(summary?.totalDueAmount))}</div>
+		</div>
+	</div>
+
+	${breakdown ? `
+	<div class="breakdown" style="margin:16px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">
+		<h3 style="font-size:14px;font-weight:600;color:#374151;margin-bottom:12px">💰 Fee Breakdown</h3>
+		<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px">
+			<div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
+				<div style="font-size:10px;color:#6b7280;margin-bottom:4px">COURSE FEES TOTAL</div>
+				<div style="font-size:18px;font-weight:700;color:#2563eb">${escapeHtml(fmtINR(breakdown.courseFeesTotal))}</div>
+			</div>
+			<div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
+				<div style="font-size:10px;color:#6b7280;margin-bottom:4px">OTHER FEES TOTAL</div>
+				<div style="font-size:18px;font-weight:700;color:#7c3aed">${escapeHtml(fmtINR(breakdown.otherFeesTotal))}</div>
+			</div>
+		</div>
+		${otherFeesHeadSummary.length > 0 ? `
+			<div style="margin-top:12px">
+				<h4 style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Other Fees by Head:</h4>
+				<table style="width:100%;border-collapse:collapse;font-size:11px">
+					<thead>
+						<tr style="background:#f3f4f6">
+							<th style="border:1px solid #e5e7eb;padding:6px 8px;text-align:left">Fee Head</th>
+							<th style="border:1px solid #e5e7eb;padding:6px 8px;text-align:right">Total Amount</th>
+						</tr>
+					</thead>
+					<tbody>
+						${otherFeesHeadSummary.map(head => `
+							<tr>
+								<td style="border:1px solid #e5e7eb;padding:6px 8px;background:#fff">${escapeHtml(head.feesHeadName)}</td>
+								<td style="border:1px solid #e5e7eb;padding:6px 8px;text-align:right;background:#fff;font-weight:600">${escapeHtml(fmtINR(head.totalAmount))}</td>
+							</tr>
+						`).join('')}
+					</tbody>
+				</table>
+			</div>
+		` : ''}
+	</div>
+	` : ''}
+
+	<div class="records">
+		${exportData.map((r, idx) => {
+			const installments = r.installments || [];
+			const otherFees = r.otherFees || [];
+			return `
+				<div class="record">
+					<div class="record-header">
+						<div>
+							<div class="label">Student</div>
+							<div class="val">${escapeHtml(r.student?.name)}</div>
+							<div style="font-size:10px;color:#6b7280">${escapeHtml(r.student?.email)}</div>
+						</div>
+						<div>
+							<div class="label">Course</div>
+							<div class="val">${escapeHtml(r.course?.name)}</div>
+							<div style="font-size:10px;color:#6b7280">${escapeHtml(r.paymentType)}</div>
+						</div>
+						<div>
+							<div class="label">Total</div>
+							<div class="val">${escapeHtml(fmtINR(r.totalAmount))}</div>
+						</div>
+						<div>
+							<div class="label">Paid</div>
+							<div class="val" style="color:#059669">${escapeHtml(fmtINR(r.paidAmount))}</div>
+						</div>
+						<div>
+							<div class="label">Due</div>
+							<div class="val" style="color:#dc2626">${escapeHtml(fmtINR(r.dueAmount))}</div>
+						</div>
+						<div>
+							<div class="label">Status</div>
+							<div>
+								<span class="badge ${r.status?.toLowerCase()}">${escapeHtml(r.status)}</span>
+							</div>
+						</div>
+					</div>
+
+					${installments.length > 0 ? `
+						<div class="sub-section">
+							<h4>Installments (${installments.length})</h4>
+							<table>
+								<thead>
+									<tr>
+										<th>Due Date</th>
+										<th>Amount</th>
+										<th>Paid Amount</th>
+										<th>Status</th>
+									</tr>
+								</thead>
+								<tbody>
+									${installments.map(ins => `
+										<tr>
+											<td>${escapeHtml(formatDateUTC(ins.dueDate))}</td>
+											<td>${escapeHtml(fmtINR(ins.amount))}</td>
+											<td>${escapeHtml(fmtINR(ins.paidAmount))}</td>
+											<td><span class="badge ${ins.status?.toLowerCase()}">${escapeHtml(ins.status)}</span></td>
+										</tr>
+									`).join('')}
+								</tbody>
+							</table>
+						</div>
+					` : ''}
+
+					${otherFees.length > 0 ? `
+						<div class="sub-section">
+							<h4>Other Fees (${otherFees.length})</h4>
+							<table>
+								<thead>
+									<tr>
+										<th>Fee Head</th>
+										<th>Amount</th>
+									</tr>
+								</thead>
+								<tbody>
+									${otherFees.map((fee: any) => `
+										<tr>
+											<td>${escapeHtml(fee.feesHeadName || '-')}</td>
+											<td>${escapeHtml(fmtINR(fee.amount))}</td>
+										</tr>
+									`).join('')}
+								</tbody>
+							</table>
+						</div>
+					` : ''}
+
+					${installments.length === 0 && otherFees.length === 0 ? `
+						<div class="meta" style="padding:8px;text-align:center">No additional fee details</div>
+					` : ''}
+				</div>
+			`;
+		}).join('')}
+	</div>
+
+	<div class="meta" style="margin-top:20px;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px">
+		Total Records: ${exportData.length} | Page 1 of 1
+	</div>
+</body>
+</html>`;
+
+		win.document.open();
+		win.document.write(html);
+		win.document.close();
+
+		win.onload = () => {
+			try {
+				win.focus();
+				win.print();
+			} catch (err) {
+				console.error('Print failed', err);
+			}
+		};
+	};
+
+
+
+	return (
+		<div className="min-h-screen bg-gray-50 w-full">
+			<div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-4">
+				{/* Top bar */}
+				<div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+					<div>
+						<div className="text-lg md:text-xl font-semibold text-gray-900">Financial Report</div>
+						<div className="text-sm text-gray-500">Student fees ledger report (installments & other fees)</div>
+					</div>
+
+					<div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end w-full lg:w-auto">
+						<IconField iconPosition="left" className="w-full sm:w-[320px]">
 							<InputIcon className="pi pi-search" />
 							<InputText
 								value={searchInput}
 								onChange={(e) => setSearchInput(e.target.value)}
-								placeholder="Search student / course"
-								className="p-inputtext-sm"
+								placeholder="Search student name / email"
+								className="p-inputtext-sm w-full"
 							/>
 						</IconField>
-					</div>
 
-					{/* Filters */}
-					<div className="flex flex-wrap gap-2 items-center">
-						<select className="p-inputtext p-component p-inputtext-sm" value={period} onChange={(e) => setPeriod(e.target.value as any)}>
-							<option value="all">All</option>
-							<option value="day">Day</option>
-							<option value="week">Last 7 days</option>
-							<option value="month">Month</option>
-							<option value="year">Year</option>
-						</select>
-
-						<InputText className="p-inputtext-sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-						<InputText className="p-inputtext-sm" placeholder="Year (e.g. 2026)" value={year} onChange={(e) => setYear(e.target.value)} />
-						<InputText className="p-inputtext-sm" placeholder="Month (1-12)" value={month} onChange={(e) => setMonth(e.target.value)} />
-
-						<button
-							className="p-button p-component p-button-sm"
-							onClick={() => {
-								setPagination((p) => ({ ...p, page: 1 }));
-							}}
-						>
-							Apply
-						</button>
-
-						<button
-							className="p-button p-component p-button-secondary p-button-sm"
-							onClick={() => {
-								setSearchInput('');
-								setYear('');
-								setMonth('');
-								setDate('');
-								setPeriod('all');
-								setPagination((p) => ({ ...p, page: 1 }));
-							}}
-						>
-							Reset
-						</button>
-
-						<div className="ml-auto flex gap-2">
+						<div className="flex gap-2 justify-end">
 							<button className="p-button p-component p-button-help p-button-sm" onClick={exportCSV}>
 								Download CSV
 							</button>
-							<button className="p-button p-component p-button-warning p-button-sm" onClick={() => window.print()}>
+							<button className="p-button p-component p-button-warning p-button-sm" onClick={printReport}>
 								Print / PDF
 							</button>
 						</div>
 					</div>
 				</div>
 
-				{/* Summary cards */}
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-					<div className="border rounded-lg p-3">
-						<div className="text-sm text-gray-600">Total Amount</div>
-						<div className="text-xl font-semibold">{fmtINR(summary?.totalAmount)}</div>
+				{/* Filters */}
+				<div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5">
+					<div className="flex items-center justify-between gap-3">
+						<div className="text-sm font-semibold text-gray-800">Filters</div>
+						<div className="flex gap-2">
+							<button className="p-button p-component p-button-sm" onClick={() => setPagination((p) => ({ ...p, page: 1 }))}>
+								Apply
+							</button>
+							<button
+								className="p-button p-component p-button-secondary p-button-sm"
+								onClick={() => {
+									setSearchInput('');
+									setYear('');
+									setMonth('');
+									setDate('');
+									setPeriod('all');
+									setCourse('');
+									setPagination((p) => ({ ...p, page: 1 }));
+								}}
+							>
+								Reset
+							</button>
+						</div>
 					</div>
-					<div className="border rounded-lg p-3">
-						<div className="text-sm text-gray-600">Total Paid</div>
-						<div className="text-xl font-semibold text-green-700">{fmtINR(summary?.totalPaidAmount)}</div>
-					</div>
-					<div className="border rounded-lg p-3">
-						<div className="text-sm text-gray-600">Total Due</div>
-						<div className="text-xl font-semibold text-red-700">{fmtINR(summary?.totalDueAmount)}</div>
+
+					<div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+						<div className="flex flex-col gap-1">
+							<label className="text-xs text-gray-500">Period</label>
+							<select
+								className="p-inputtext p-component p-inputtext-sm"
+								value={period}
+								onChange={(e) => setPeriod(e.target.value as any)}
+							>
+								<option value="all">All</option>
+								<option value="day">Day</option>
+								<option value="week">Last 7 days</option>
+								<option value="month">Month</option>
+								<option value="year">Year</option>
+							</select>
+						</div>
+
+						<div className="flex flex-col gap-1">
+							<label className="text-xs text-gray-500">Date</label>
+							<InputText className="p-inputtext-sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+						</div>
+
+						<div className="flex flex-col gap-1">
+							<label className="text-xs text-gray-500">Year</label>
+							<Calendar
+								view="year"
+								dateFormat="yy"
+								className="p-inputtext-sm"
+								value={year ? new Date(Number(year), 0, 1) : null}
+								onChange={(e) => {
+									const d = e.value as Date | null;
+									setYear(d ? String(d.getFullYear()) : '');
+								}}
+								showIcon
+								placeholder="Select year"
+							/>
+						</div>
+
+
+						<div className="flex flex-col gap-1">
+							<label className="text-xs text-gray-500">Course</label>
+							<InputText className="p-inputtext-sm" placeholder="e.g. SQL" value={course} onChange={(e) => setCourse(e.target.value)} />
+						</div>
+
+						{/* Month and Rows controls removed as requested */}
 					</div>
 				</div>
+
+				{/* Summary */}
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+					<div className="bg-white border border-gray-200 rounded-2xl p-4">
+						<div className="text-xs text-gray-500">Total Amount</div>
+						<div className="text-2xl font-semibold text-gray-900 mt-1">{fmtINR(summary?.totalAmount)}</div>
+					</div>
+					<div className="bg-white border border-gray-200 rounded-2xl p-4">
+						<div className="text-xs text-gray-500">Total Paid</div>
+						<div className="text-2xl font-semibold text-green-700 mt-1">{fmtINR(summary?.totalPaidAmount)}</div>
+					</div>
+					<div className="bg-white border border-gray-200 rounded-2xl p-4">
+						<div className="text-xs text-gray-500">Total Due</div>
+						<div className="text-2xl font-semibold text-red-700 mt-1">{fmtINR(summary?.totalDueAmount)}</div>
+					</div>
+				</div>
+
+				{/* Breakdown */}
+				{breakdown && (
+					<div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-5">
+						<div className="text-sm font-semibold text-gray-800 mb-4">💰 Fee Breakdown</div>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+							<div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+								<div className="text-xs text-blue-600 font-medium">Course Fees Total</div>
+								<div className="text-xl font-bold text-blue-700 mt-1">{fmtINR(breakdown.courseFeesTotal)}</div>
+							</div>
+							<div className="border border-purple-200 bg-purple-50 rounded-lg p-3">
+								<div className="text-xs text-purple-600 font-medium">Other Fees Total</div>
+								<div className="text-xl font-bold text-purple-700 mt-1">{fmtINR(breakdown.otherFeesTotal)}</div>
+							</div>
+						</div>
+
+						{otherFeesHeadSummary.length > 0 && (
+							<div className="mt-4">
+								<div className="text-xs font-semibold text-gray-700 mb-2">Other Fees by Head:</div>
+								<div className="overflow-auto">
+									<table className="w-full text-sm border-collapse">
+										<thead>
+											<tr className="bg-gray-100">
+												<th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold text-gray-600">Fee Head</th>
+												<th className="border border-gray-300 px-3 py-2 text-right text-xs font-semibold text-gray-600">Total Amount</th>
+											</tr>
+										</thead>
+										<tbody>
+											{otherFeesHeadSummary.map((head, idx) => (
+												<tr key={idx} className="hover:bg-gray-50">
+													<td className="border border-gray-300 px-3 py-2">{head.feesHeadName}</td>
+													<td className="border border-gray-300 px-3 py-2 text-right font-semibold text-purple-700">{fmtINR(head.totalAmount)}</td>
+												</tr>
+											))}
+										</tbody>
+									</table>
+								</div>
+							</div>
+						)}
+					</div>
+				)}
 
 				{/* Error */}
 				{error ? (
@@ -471,33 +825,14 @@ export default function ReportPage() {
 					</div>
 				) : null}
 
-				{/* Charts */}
-				<div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
-					{!mounted || chartsAvailable === null ? (
-						<div className="border rounded-lg p-3">Loading charts...</div>
-					) : chartsAvailable === false ? (
-						<div className="border rounded-lg p-3 bg-red-50 text-red-800">
-							<strong>Charts unavailable.</strong>
-							<div className="mt-2 text-sm">
-								Install Chart.js: <code>npm install chart.js</code> then restart.
-							</div>
-						</div>
-					) : (
-						<>
-							<div className="border rounded-lg p-3">
-								<div className="font-semibold mb-2">Paid vs Due</div>
-								<Chart type="doughnut" data={chartData.doughnut} options={chartOptions} />
-							</div>
-							<div className="border rounded-lg p-3 lg:col-span-2">
-						<div className="font-semibold mb-2">Amounts by Course (all records)</div>
-								<Chart type="bar" data={chartData.bar} options={chartOptions} style={{ height: 260 }} />
-							</div>
-						</>
-					)}
-				</div>
+				{/* Charts removed (not needed) */}
 
-				{/* DataTable */}
-				<div className="mt-4">
+				{/* Table */}
+				<div className="bg-white rounded-2xl border border-gray-200 p-3 md:p-4">
+					<div className="flex items-center justify-between gap-3 pb-2">
+						<div className="text-sm font-semibold text-gray-800">Records</div>
+						<div className="text-xs text-gray-500">Page {pagination.page} of {pagination.totalPages}</div>
+					</div>
 					<DataTable
 						value={data}
 						loading={loading}
@@ -553,13 +888,8 @@ export default function ReportPage() {
 						<Column header="Paid" body={(r: RecordItem) => <span className="text-green-700 font-medium">{fmtINR(r.paidAmount)}</span>} />
 						<Column header="Due" body={(r: RecordItem) => <span className="text-red-600 font-medium">{fmtINR(r.dueAmount)}</span>} />
 						<Column header="Status" body={(r: RecordItem) => <Tag value={r.status} severity={statusSeverity(r.status)} />} style={{ width: '120px' }} />
-						<Column header="Enrolled" body={(r: RecordItem) => formatDateUTC(r.enrollmentDate)} style={{ width: '130px' }} />
 					</DataTable>
-
-					{data.length === 0 && !loading && <EmptyState />}
-					<div className="text-xs text-gray-500 mt-2">
-						Page {pagination.page} of {pagination.totalPages}
-					</div>
+					{data.length === 0 && !loading && <div className="py-8"><EmptyState /></div>}
 				</div>
 
 				<ToastContainer position="top-right" />
