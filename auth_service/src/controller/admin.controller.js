@@ -228,7 +228,7 @@ const addInstitution = async (req, res) => {
 
     const feePayload = feeNames.map((name) => ({
       name,
-      institutionId: institutionUser._id,
+      userId: institutionUser._id,
     }));
 
     await FeesMaster.insertMany(feePayload);
@@ -248,6 +248,7 @@ const addInstitution = async (req, res) => {
     });
 
   } catch (error) {
+    console.log("Add institution error:", error);
     if (error.code === 11000 && error.keyPattern?.email) {
       return res.status(409).json({
         message: "Email already in use",

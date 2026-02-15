@@ -1,6 +1,5 @@
-'use client'
+"use client"
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import axiosInstance from '@/service/axios.service';
 import axios from 'axios';
 
@@ -90,7 +89,8 @@ const EmptyState = () => (
 );
 
 export default function ReportPage() {
-	const searchParams = useSearchParams();
+	// Note: avoid next/navigation's useSearchParams to prevent SSR prerender errors.
+	// Read query params from window.location when running in browser.
 
 	const [data, setData] = useState<RecordItem[]>([]);
 	const [allData, setAllData] = useState<RecordItem[]>([]);
@@ -124,9 +124,18 @@ export default function ReportPage() {
 
 	useEffect(() => {
 		// Supports opening this page with: ?course=SQL
-		const c = (searchParams?.get('course') ?? '').trim();
-		setCourse(c);
-	}, [searchParams]);
+		if (typeof window === 'undefined') {
+			setCourse('');
+			return;
+		}
+		try {
+			const params = new URLSearchParams(window.location.search || '');
+			const c = (params.get('course') ?? '').trim();
+			setCourse(c);
+		} catch (err) {
+			setCourse('');
+		}
+	}, []);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), 500);

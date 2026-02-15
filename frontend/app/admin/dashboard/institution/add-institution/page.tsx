@@ -151,8 +151,10 @@ export default function InstitutionForm() {
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("email", data.email);
-      if (data.phone) formData.append("phone", data.phone);
-      if(data.whatsAppNo) formData.append("whatsAppNo",data.whatsAppNo)
+      // phone and whatsAppNo are stored as digit-only strings in the form state
+      if (typeof data.phone !== "undefined" && data.phone !== null) formData.append("phone", (data.phone as unknown as string));
+      if (typeof (data as any).whatsAppNo !== "undefined" && (data as any).whatsAppNo !== null)
+        formData.append("whatsAppNo", (data as any).whatsAppNo as string);
       if (data.website) formData.append("website", data.website);
       if (data.establishDate) formData.append("establishDate", data.establishDate);
       if (data.registrationNo) formData.append("registrationNo", data.registrationNo);
@@ -186,12 +188,12 @@ export default function InstitutionForm() {
       } else {
         toast.error('Unexpected error occurred')
       }
-      reset()
-      setBannerImageFile(null)
-      setPhotoFile(null)
-      setBannerPreview(null)
-      setPhotoPreview(null)
-      setLocation(null)
+      // reset()
+      // setBannerImageFile(null)
+      // setPhotoFile(null)
+      // setBannerPreview(null)
+      // setPhotoPreview(null)
+      // setLocation(null)
     } finally {
       setIsSubmitting(false);
     }
@@ -319,9 +321,25 @@ export default function InstitutionForm() {
           <div>
             <label className="text-sm font-medium">Phone No <span className=" text-red-500 text-xl">*</span></label>
             <InputText
+              type="tel"
+              inputMode="numeric"
               placeholder="Enter phone number"
               className="w-full mt-1"
-              {...register("phone", { required: "Phone number is required" })}
+              {...register("phone", {
+                required: "Phone number is required",
+                setValueAs: (v) => {
+                  const s = String(v ?? "").replace(/\D/g, "");
+                  return s === "" ? undefined : s; // keep as digit-only string
+                },
+                validate: (v) => typeof v === "string" && /^\d+$/.test(v) && v.length >= 6 || "Enter a valid phone number"
+              })}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                // allow navigation keys, backspace, etc.
+                const allowedKeys = ["Backspace", "ArrowLeft", "ArrowRight", "Delete", "Tab"];
+                if (allowedKeys.includes(e.key)) return;
+                // prevent non-digit input (blocks letters like 'e')
+                if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+              }}
             />
             {errors.phone && <p className="text-red-500 text-xs">{errors.phone.message}</p>}
           </div>
@@ -330,9 +348,23 @@ export default function InstitutionForm() {
           <div>
             <label className="text-sm font-medium">WhatsApp No <span className=" text-red-500 text-xl">*</span></label>
             <InputText
+             type="tel"
+             inputMode="numeric"
              placeholder="Enter WhatsApp number"
               className="w-full mt-1"
-              {...register("whatsAppNo", { required: "WhatsApp number is required" })}
+              {...register("whatsAppNo", {
+                required: "WhatsApp number is required",
+                setValueAs: (v) => {
+                  const s = String(v ?? "").replace(/\D/g, "");
+                  return s === "" ? undefined : s; // keep as digit-only string
+                },
+                validate: (v) => typeof v === "string" && /^\d+$/.test(v) && v.length >= 6 || "Enter a valid WhatsApp number"
+              })}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                const allowedKeys = ["Backspace", "ArrowLeft", "ArrowRight", "Delete", "Tab"];
+                if (allowedKeys.includes(e.key)) return;
+                if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+              }}
             />
             {errors.whatsAppNo && <p className="text-red-500 text-xs">{errors.whatsAppNo.message}</p>}
           </div>
