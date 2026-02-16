@@ -3,13 +3,16 @@ const StudentFeesLedgerModel = require("../model/studentFeesLedger.model.js");
 const ReceiptMasterModel = require("../model/receiptMaster.model.js");
 const EnrollmentModel = require("../model/studentCourse.model.js");
 const ReceiptDetailsModel = require("../model/receiptDetails.model.js");
+const puppeteer = require("puppeteer");
+const ejs = require("ejs");
+const path = require("path");
 
 const createStudentFees = async (req, res) => {
   try {
     const { enrollmentId, receiptMasterId } = req.body;
 
     // 🔹 Logged-in user
-    const userId = req.user._id;
+    const userId = req.user.id;
 
     // 1️⃣ Fetch Enrollment
     const enrollment = await EnrollmentModel.findOne({
@@ -535,10 +538,10 @@ const getStudentFinancialReport = async (req, res) => {
 
       ...(search
         ? [{
-            $match: {
-              "student.name": { $regex: search, $options: "i" }
-            }
-          }]
+          $match: {
+            "student.name": { $regex: search, $options: "i" }
+          }
+        }]
         : []),
 
       /* ================= COURSE ================= */
@@ -554,10 +557,10 @@ const getStudentFinancialReport = async (req, res) => {
 
       ...(course
         ? [{
-            $match: {
-              "course.name": { $regex: course, $options: "i" }
-            }
-          }]
+          $match: {
+            "course.name": { $regex: course, $options: "i" }
+          }
+        }]
         : []),
 
       /* ================= INSTALLMENTS ================= */
@@ -714,9 +717,8 @@ const getStudentFinancialReport = async (req, res) => {
 
       paginatedData: result[0]?.paginatedData || [],
 
-      allData: result[0]?.allData || []   
+      allData: result[0]?.allData || []
     });
-
   } catch (error) {
     console.error("Report Error:", error);
     res.status(500).json({
@@ -726,5 +728,241 @@ const getStudentFinancialReport = async (req, res) => {
   }
 };
 
+// studentFinancialReport.service.js বা controller file এ
+const getFinancialDataForPDF = async (req) => {
+  const userId = req.user._id;
 
-module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport };
+  const { year, month, date, week, search, course, paymentType } = req.query;
+
+  let startDate, endDate;
+
+  // ================= DATE FILTER =================
+  if (date) {
+    startDate = new Date(date);
+    endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (week) {
+    const current = new Date(week);
+    const firstDay = current.getDate() - current.getDay();
+    startDate = new Date(current.setDate(firstDay));
+    startDate.setHours(0, 0, 0, 0);
+
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (year && month) {
+    startDate = new Date(year, month - 1, 1);
+    endDate = new Date(year, month, 0);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (year) {
+    startDate = new Date(year, 0, 1);
+    endDate = new Date(year, 11, 31);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  const match = {
+    userId: new mongoose.Types.ObjectId(userId)
+  };
+
+  if (startDate && endDate) {
+    match.createdAt = { $gte: startDate, $lte: endDate };
+  }
+
+  if (paymentType) {
+    match.paymentType = paymentType.toUpperCase();
+  }
+
+  // ================= AGGREGATION PIPELINE =================
+  const pipeline = [
+    { $match: match },
+
+    {
+      $lookup: {
+        from: "studentcourses",
+        localField: "enrollmentId",
+        foreignField: "_id",
+        as: "enrollment"
+      }
+    },
+    { $unwind: "$enrollment" },
+
+    {
+      $lookup: {
+        from: "students",
+        localField: "enrollment.studentId",
+        foreignField: "_id",
+        as: "student"
+      }
+    },
+    { $unwind: "$student" },
+
+    ...(search
+      ? [{ $match: { "student.name": { $regex: search, $options: "i" } } }]
+      : []),
+
+    {
+      $lookup: {
+        from: "courses",
+        localField: "enrollment.courseId",
+        foreignField: "_id",
+        as: "course"
+      }
+    },
+    { $unwind: "$course" },
+
+    ...(course
+      ? [{ $match: { "course.name": { $regex: course, $options: "i" } } }]
+      : []),
+
+    {
+      $lookup: {
+        from: "studentinstallmentitems",
+        localField: "_id",
+        foreignField: "studentFeesId",
+        as: "installments"
+      }
+    },
+
+    {
+      $lookup: {
+        from: "receiptmasters",
+        localField: "receiptMasterId",
+        foreignField: "_id",
+        as: "receiptMaster"
+      }
+    },
+    {
+      $unwind: { path: "$receiptMaster", preserveNullAndEmptyArrays: true }
+    },
+
+    {
+      $lookup: {
+        from: "receiptdetails",
+        localField: "receiptMaster._id",
+        foreignField: "receiptId",
+        as: "receiptDetails"
+      }
+    },
+
+    {
+      $lookup: {
+        from: "feesmasters",
+        localField: "receiptDetails.feesMasterId",
+        foreignField: "_id",
+        as: "feesMasters"
+      }
+    },
+
+    { $sort: { createdAt: -1 } },
+
+    {
+      $facet: {
+        // ================= SUMMARY =================
+        summary: [
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: "$totalAmount" },
+              totalPaidAmount: { $sum: "$paidAmount" },
+              totalDueAmount: { $sum: "$dueAmount" }
+            }
+          }
+        ],
+
+        // ================= COURSE vs OTHER =================
+        courseAndOtherSummary: [
+          {
+            $group: {
+              _id: null,
+              courseFeesTotal: {
+                $sum: {
+                  $cond: [{ $eq: ["$paymentType", "INSTALLMENT"] }, "$totalAmount", 0]
+                }
+              },
+              otherFeesTotal: {
+                $sum: {
+                  $cond: [{ $eq: ["$paymentType", "NORMAL"] }, "$totalAmount", 0]
+                }
+              }
+            }
+          }
+        ],
+
+        // ================= HEAD WISE TOTAL =================
+        otherFeesHeadSummary: [
+          { $match: { paymentType: "NORMAL" } },
+          { $unwind: "$receiptDetails" },
+          {
+            $lookup: {
+              from: "feesmasters",
+              localField: "receiptDetails.feesMasterId",
+              foreignField: "_id",
+              as: "feesMaster"
+            }
+          },
+          { $unwind: "$feesMaster" },
+          {
+            $group: {
+              _id: "$feesMaster.name",
+              totalAmount: { $sum: "$receiptDetails.amount" }
+            }
+          },
+          { $project: { _id: 0, feesHeadName: "$_id", totalAmount: 1 } }
+        ],
+
+        allData: [{ $match: {} }] // সব record for PDF
+      }
+    }
+  ];
+
+  const result = await StudentFeesLedgerModel.aggregate(pipeline);
+
+  return {
+    summary: result[0]?.summary[0] || {},
+    breakdown: result[0]?.courseAndOtherSummary[0] || {},
+    otherFeesHeadSummary: result[0]?.otherFeesHeadSummary || [],
+    allData: result[0]?.allData || []
+  };
+};
+
+
+const generateStudentFinancialPDF = async (req, res) => {
+  try {
+    const reportData = await getFinancialDataForPDF(req);
+    const browser = await puppeteer.launch({ headless: "new" });
+    const page = await browser.newPage();
+    const html = await ejs.renderFile(
+      path.join(__dirname, "../views/studentFinancialReport.ejs"),
+      { data: reportData }
+    );
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "100px", bottom: "80px", left: "20px", right: "20px" },
+      displayHeaderFooter: true,
+      headerTemplate: `
+        <div style="font-size:12px; text-align:center; width:100%; padding:10px 0; border-bottom:1px solid #ccc;">
+          <strong>My Institute Name ${req.user.email}</strong> - Student Financial Report
+        </div>
+      `,
+      footerTemplate: `
+        <div style="font-size:10px; text-align:center; width:100%; padding:5px 0; border-top:1px solid #ccc;">
+          Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+        </div>
+      `
+    });
+    await browser.close();
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=student-financial-report.pdf"
+    });
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF };

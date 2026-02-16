@@ -100,6 +100,7 @@ export default function ReportPage() {
 
 	const [token, setToken] = useState<string | null>(null);
 	const reportPath = '/student-fees-ledger/student-financial-report';
+	const pdfPath = '/student-fees-ledger/student-financial/pdf';
 
 	const [pagination, setPagination] = useState({ page: 1, rows: 5, total: 0, totalPages: 1 });
 	const [loading, setLoading] = useState<boolean>(false);
@@ -333,332 +334,67 @@ export default function ReportPage() {
 
 	const escapeHtml = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-	const printReport = () => {
-		const exportData = allData.length > 0 ? allData : data;
-		if (!exportData || exportData.length === 0) {
-			toast.info('No data to print.');
+	const generatePdf = async () => {
+		if (!token) {
+			toast.error('Missing auth token. Please login.');
 			return;
 		}
 
-		const win = window.open('', '_blank');
-		if (!win) {
-			toast.error('Popup blocked. Please allow popups.');
-			return;
-		}
-
-		const filterParts = [
-			course ? `Course: ${course}` : '',
-			year ? `Year: ${year}` : '',
-			month ? `Month: ${month}` : '',
-			date ? `Date: ${date}` : '',
-			period && period !== 'all' ? `Period: ${period}` : ''
-		].filter(Boolean);
-		const filterLine = filterParts.length ? filterParts.join(' | ') : 'All Records';
-
-		let html = `<!doctype html>
-<html>
-<head>
-	<meta charset="utf-8" />
-	<title>Financial Report - Institute Library Management</title>
-	<style>
-		* { margin: 0; padding: 0; box-sizing: border-box; }
-		body { 
-			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-			color: #1f2937; 
-			padding: 20px;
-			background: #fff;
-		}
-		.header { 
-			border-bottom: 3px solid #3b82f6; 
-			padding-bottom: 12px; 
-			margin-bottom: 16px; 
-		}
-		.header h1 { 
-			font-size: 22px; 
-			color: #1f2937; 
-			margin-bottom: 4px; 
-		}
-		.meta { 
-			font-size: 11px; 
-			color: #6b7280; 
-			margin-top: 4px; 
-		}
-		.summary { 
-			display: grid; 
-			grid-template-columns: repeat(3, 1fr); 
-			gap: 12px; 
-			margin: 16px 0; 
-		}
-		.summary-card { 
-			border: 1px solid #e5e7eb; 
-			border-radius: 8px; 
-			padding: 12px; 
-		}
-		.summary-card .label { 
-			font-size: 11px; 
-			color: #6b7280; 
-			text-transform: uppercase; 
-			letter-spacing: 0.5px; 
-		}
-		.summary-card .value { 
-			font-size: 20px; 
-			font-weight: 700; 
-			margin-top: 4px; 
-		}
-		.summary-card.total .value { color: #1f2937; }
-		.summary-card.paid .value { color: #059669; }
-		.summary-card.due .value { color: #dc2626; }
-		
-		.record { 
-			border: 1px solid #e5e7eb; 
-			border-radius: 8px; 
-			margin-bottom: 16px; 
-			padding: 12px; 
-			page-break-inside: avoid; 
-		}
-		.record-header { 
-			display: grid; 
-			grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr; 
-			gap: 8px; 
-			padding: 10px; 
-			background: #f9fafb; 
-			border-radius: 6px; 
-			margin-bottom: 8px; 
-			font-size: 12px; 
-		}
-		.record-header > div { }
-		.record-header .label { 
-			font-size: 10px; 
-			color: #6b7280; 
-			margin-bottom: 2px; 
-		}
-		.record-header .val { 
-			font-weight: 600; 
-			color: #1f2937; 
-		}
-		.badge { 
-			display: inline-block; 
-			padding: 2px 8px; 
-			border-radius: 4px; 
-			font-size: 10px; 
-			font-weight: 600; 
-		}
-		.badge.paid { background: #d1fae5; color: #065f46; }
-		.badge.partial { background: #fef3c7; color: #92400e; }
-		.badge.due { background: #fee2e2; color: #991b1b; }
-		.badge.installment { background: #dbeafe; color: #1e40af; }
-		.badge.normal { background: #e5e7eb; color: #374151; }
-		
-		.sub-section { 
-			margin-top: 8px; 
-			padding: 8px; 
-			background: #fafbfc; 
-			border-radius: 4px; 
-		}
-		.sub-section h4 { 
-			font-size: 11px; 
-			color: #374151; 
-			margin-bottom: 6px; 
-			text-transform: uppercase; 
-			letter-spacing: 0.5px; 
-		}
-		table { 
-			width: 100%; 
-			border-collapse: collapse; 
-			font-size: 11px; 
-		}
-		table th, table td { 
-			border: 1px solid #e5e7eb; 
-			padding: 6px 8px; 
-			text-align: left; 
-		}
-		table th { 
-			background: #f3f4f6; 
-			font-weight: 600; 
-			color: #374151; 
-		}
-		.no-data { 
-			font-size: 11px; 
-			color: #9ca3af; 
-			font-style: italic; 
-		}
-		@media print {
-			body { padding: 8mm; }
-			.record { page-break-inside: avoid; }
-		}
-	</style>
-</head>
-<body>
-	<div class="header">
-		<h1>📊 Financial Report</h1>
-		<div class="meta">Institute Library Management System</div>
-		<div class="meta">Filters: ${escapeHtml(filterLine)}</div>
-		<div class="meta">Generated: ${escapeHtml(new Date().toLocaleString('en-IN'))}</div>
-	</div>
-
-	<div class="summary">
-		<div class="summary-card total">
-			<div class="label">Total Amount</div>
-			<div class="value">${escapeHtml(fmtINR(summary?.totalAmount))}</div>
-		</div>
-		<div class="summary-card paid">
-			<div class="label">Total Paid</div>
-			<div class="value">${escapeHtml(fmtINR(summary?.totalPaidAmount))}</div>
-		</div>
-		<div class="summary-card due">
-			<div class="label">Total Due</div>
-			<div class="value">${escapeHtml(fmtINR(summary?.totalDueAmount))}</div>
-		</div>
-	</div>
-
-	${breakdown ? `
-	<div class="breakdown" style="margin:16px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">
-		<h3 style="font-size:14px;font-weight:600;color:#374151;margin-bottom:12px">💰 Fee Breakdown</h3>
-		<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px">
-			<div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
-				<div style="font-size:10px;color:#6b7280;margin-bottom:4px">COURSE FEES TOTAL</div>
-				<div style="font-size:18px;font-weight:700;color:#2563eb">${escapeHtml(fmtINR(breakdown.courseFeesTotal))}</div>
-			</div>
-			<div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
-				<div style="font-size:10px;color:#6b7280;margin-bottom:4px">OTHER FEES TOTAL</div>
-				<div style="font-size:18px;font-weight:700;color:#7c3aed">${escapeHtml(fmtINR(breakdown.otherFeesTotal))}</div>
-			</div>
-		</div>
-		${otherFeesHeadSummary.length > 0 ? `
-			<div style="margin-top:12px">
-				<h4 style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Other Fees by Head:</h4>
-				<table style="width:100%;border-collapse:collapse;font-size:11px">
-					<thead>
-						<tr style="background:#f3f4f6">
-							<th style="border:1px solid #e5e7eb;padding:6px 8px;text-align:left">Fee Head</th>
-							<th style="border:1px solid #e5e7eb;padding:6px 8px;text-align:right">Total Amount</th>
-						</tr>
-					</thead>
-					<tbody>
-						${otherFeesHeadSummary.map(head => `
-							<tr>
-								<td style="border:1px solid #e5e7eb;padding:6px 8px;background:#fff">${escapeHtml(head.feesHeadName)}</td>
-								<td style="border:1px solid #e5e7eb;padding:6px 8px;text-align:right;background:#fff;font-weight:600">${escapeHtml(fmtINR(head.totalAmount))}</td>
-							</tr>
-						`).join('')}
-					</tbody>
-				</table>
-			</div>
-		` : ''}
-	</div>
-	` : ''}
-
-	<div class="records">
-		${exportData.map((r, idx) => {
-			const installments = r.installments || [];
-			const otherFees = r.otherFees || [];
-			return `
-				<div class="record">
-					<div class="record-header">
-						<div>
-							<div class="label">Student</div>
-							<div class="val">${escapeHtml(r.student?.name)}</div>
-							<div style="font-size:10px;color:#6b7280">${escapeHtml(r.student?.email)}</div>
-						</div>
-						<div>
-							<div class="label">Course</div>
-							<div class="val">${escapeHtml(r.course?.name)}</div>
-							<div style="font-size:10px;color:#6b7280">${escapeHtml(r.paymentType)}</div>
-						</div>
-						<div>
-							<div class="label">Total</div>
-							<div class="val">${escapeHtml(fmtINR(r.totalAmount))}</div>
-						</div>
-						<div>
-							<div class="label">Paid</div>
-							<div class="val" style="color:#059669">${escapeHtml(fmtINR(r.paidAmount))}</div>
-						</div>
-						<div>
-							<div class="label">Due</div>
-							<div class="val" style="color:#dc2626">${escapeHtml(fmtINR(r.dueAmount))}</div>
-						</div>
-						<div>
-							<div class="label">Status</div>
-							<div>
-								<span class="badge ${r.status?.toLowerCase()}">${escapeHtml(r.status)}</span>
-							</div>
-						</div>
-					</div>
-
-					${installments.length > 0 ? `
-						<div class="sub-section">
-							<h4>Installments (${installments.length})</h4>
-							<table>
-								<thead>
-									<tr>
-										<th>Due Date</th>
-										<th>Amount</th>
-										<th>Paid Amount</th>
-										<th>Status</th>
-									</tr>
-								</thead>
-								<tbody>
-									${installments.map(ins => `
-										<tr>
-											<td>${escapeHtml(formatDateUTC(ins.dueDate))}</td>
-											<td>${escapeHtml(fmtINR(ins.amount))}</td>
-											<td>${escapeHtml(fmtINR(ins.paidAmount))}</td>
-											<td><span class="badge ${ins.status?.toLowerCase()}">${escapeHtml(ins.status)}</span></td>
-										</tr>
-									`).join('')}
-								</tbody>
-							</table>
-						</div>
-					` : ''}
-
-					${otherFees.length > 0 ? `
-						<div class="sub-section">
-							<h4>Other Fees (${otherFees.length})</h4>
-							<table>
-								<thead>
-									<tr>
-										<th>Fee Head</th>
-										<th>Amount</th>
-									</tr>
-								</thead>
-								<tbody>
-									${otherFees.map((fee: any) => `
-										<tr>
-											<td>${escapeHtml(fee.feesHeadName || '-')}</td>
-											<td>${escapeHtml(fmtINR(fee.amount))}</td>
-										</tr>
-									`).join('')}
-								</tbody>
-							</table>
-						</div>
-					` : ''}
-
-					${installments.length === 0 && otherFees.length === 0 ? `
-						<div class="meta" style="padding:8px;text-align:center">No additional fee details</div>
-					` : ''}
-				</div>
-			`;
-		}).join('')}
-	</div>
-
-	<div class="meta" style="margin-top:20px;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px">
-		Total Records: ${exportData.length} | Page 1 of 1
-	</div>
-</body>
-</html>`;
-
-		win.document.open();
-		win.document.write(html);
-		win.document.close();
-
-		win.onload = () => {
-			try {
-				win.focus();
-				win.print();
-			} catch (err) {
-				console.error('Print failed', err);
-			}
+		const params: Record<string, any> = {
+			...(debouncedSearch ? { search: debouncedSearch } : {})
 		};
+		if (year) params.year = year;
+		if (month) params.month = month;
+		if (date) params.date = date;
+		if (course) params.course = course;
+		if (period === 'week') {
+			const today = new Date();
+			const start = new Date(today);
+			start.setDate(today.getDate() - 7);
+			params.startDate = start.toISOString().slice(0, 10);
+			params.endDate = today.toISOString().slice(0, 10);
+		}
+
+		try {
+			setLoading(true);
+			const res = await axiosInstance.get(pdfPath, {
+				params,
+				headers: { Authorization: `Bearer ${token}` },
+				responseType: 'blob',
+				timeout: 60000
+			});
+
+			const blobData = res?.data;
+			if (!blobData) {
+				toast.error('No PDF returned from server.');
+				return;
+			}
+
+			const suffix = [course ? `course_${course}` : null, year ? `year_${year}` : null, month ? `month_${month}` : null, date ? `date_${date}` : null]
+				.filter(Boolean)
+				.join('_');
+			const filename = `financial_report_${suffix || 'filtered'}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+			const mime = res.headers?.['content-type'] ?? 'application/pdf';
+			const blob = new Blob([blobData], { type: mime });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = filename;
+			a.style.display = 'none';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			setTimeout(() => URL.revokeObjectURL(url), 10000);
+			toast.success('PDF downloaded');
+		} catch (err: any) {
+			console.error(err);
+			let msg = 'Failed to generate PDF.';
+			if (axios.isAxiosError(err)) msg = err.response?.data?.message || `Request failed (${err.response?.status ?? 'unknown'})`;
+			toast.error(msg);
+		} finally {
+			setLoading(false);
+		}
 	};
 
 
@@ -688,7 +424,7 @@ export default function ReportPage() {
 							<button className="p-button p-component p-button-help p-button-sm" onClick={exportCSV}>
 								Download CSV
 							</button>
-							<button className="p-button p-component p-button-warning p-button-sm" onClick={printReport}>
+							<button className="p-button p-component p-button-warning p-button-sm" onClick={generatePdf}>
 								Print / PDF
 							</button>
 						</div>

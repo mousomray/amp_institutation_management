@@ -1,6 +1,6 @@
 const express = require("express")
 const dotenv = require("dotenv")
-
+const path = require("path");
 const cors = require("cors")
 const Conect = require("./src/db/Connent.js")
 const cookieParser = require('cookie-parser')
@@ -13,7 +13,7 @@ const app = express()
 app.use(cors(
     {
         origin : [process.env.FRONTEND_URL],
-        methods: ["GET", "POST", "PUT", "PUTCH", "DELETE"],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
         credentials: true
     }
 ))
@@ -21,6 +21,10 @@ app.use(cookieParser())
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views")); 
 
 const adminRoutes = require ("./src/routes/admin.routes.js")
 const institutionRoutes = require("./src/routes/institution.routes.js")
