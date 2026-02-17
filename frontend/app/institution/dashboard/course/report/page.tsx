@@ -358,6 +358,12 @@ export default function ReportPage() {
 			params.endDate = today.toISOString().slice(0, 10);
 		}
 
+		// Open a blank tab immediately to avoid popup blocking, we'll set its location once PDF is ready
+		let newTab: Window | null = null;
+		if (typeof window !== 'undefined') {
+			newTab = window.open('', '_blank');
+		}
+
 		try {
 			setLoading(true);
 			const res = await axiosInstance.get(pdfPath, {
@@ -370,28 +376,39 @@ export default function ReportPage() {
 			const blobData = res?.data;
 			if (!blobData) {
 				toast.error('No PDF returned from server.');
+				if (newTab) newTab.close();
 				return;
 			}
-
-			const suffix = [course ? `course_${course}` : null, year ? `year_${year}` : null, month ? `month_${month}` : null, date ? `date_${date}` : null]
-				.filter(Boolean)
-				.join('_');
-			const filename = `financial_report_${suffix || 'filtered'}_${new Date().toISOString().split('T')[0]}.pdf`;
 
 			const mime = res.headers?.['content-type'] ?? 'application/pdf';
 			const blob = new Blob([blobData], { type: mime });
 			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = filename;
-			a.style.display = 'none';
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
+
+			if (newTab) {
+				// Load blob URL in the previously opened tab
+				try {
+					newTab.location.href = url;
+				} catch (e) {
+					// In some browsers setting location on a cross-origin blank may throw; fallback to writing a viewer
+					newTab.document.write(`<iframe src="${url}" style="border:none;width:100%;height:100vh"></iframe>`);
+				}
+			} else {
+				// Fallback: open in same tab via anchor
+				const a = document.createElement('a');
+				a.href = url;
+				a.target = '_blank';
+				a.rel = 'noopener noreferrer';
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+			}
+
+			// Revoke URL after some time
 			setTimeout(() => URL.revokeObjectURL(url), 10000);
-			toast.success('PDF downloaded');
+			// toast.success('PDF opened in new tab');
 		} catch (err: any) {
 			console.error(err);
+			if (newTab) newTab.close();
 			let msg = 'Failed to generate PDF.';
 			if (axios.isAxiosError(err)) msg = err.response?.data?.message || `Request failed (${err.response?.status ?? 'unknown'})`;
 			toast.error(msg);

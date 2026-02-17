@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const StudentModel = require("../model/student.model.js");
 const StudentFeesLedgerModel = require("../model/studentFeesLedger.model.js");
 const ReceiptMasterModel = require("../model/receiptMaster.model.js");
 const EnrollmentModel = require("../model/studentCourse.model.js");
@@ -905,6 +906,7 @@ const getFinancialDataForPDF = async (req) => {
     endDate.setHours(23, 59, 59, 999);
   }
 
+  // ================= MATCH OBJECT =================
   const match = {
     userId: new mongoose.Types.ObjectId(userId)
   };
@@ -940,6 +942,9 @@ const getFinancialDataForPDF = async (req) => {
       }
     },
     { $unwind: "$student" },
+
+    // ✅ STUDENT NAME ASCENDING SORT
+    { $sort: { "student.name": 1, createdAt: -1 } },
 
     ...(search
       ? [{ $match: { "student.name": { $regex: search, $options: "i" } } }]
@@ -998,8 +1003,6 @@ const getFinancialDataForPDF = async (req) => {
       }
     },
 
-    { $sort: { createdAt: -1 } },
-
     {
       $facet: {
         // ================= SUMMARY =================
@@ -1021,12 +1024,20 @@ const getFinancialDataForPDF = async (req) => {
               _id: null,
               courseFeesTotal: {
                 $sum: {
-                  $cond: [{ $eq: ["$paymentType", "INSTALLMENT"] }, "$totalAmount", 0]
+                  $cond: [
+                    { $eq: ["$paymentType", "INSTALLMENT"] },
+                    "$totalAmount",
+                    0
+                  ]
                 }
               },
               otherFeesTotal: {
                 $sum: {
-                  $cond: [{ $eq: ["$paymentType", "NORMAL"] }, "$totalAmount", 0]
+                  $cond: [
+                    { $eq: ["$paymentType", "NORMAL"] },
+                    "$totalAmount",
+                    0
+                  ]
                 }
               }
             }
@@ -1055,7 +1066,8 @@ const getFinancialDataForPDF = async (req) => {
           { $project: { _id: 0, feesHeadName: "$_id", totalAmount: 1 } }
         ],
 
-        allData: [{ $match: {} }] // সব record for PDF
+        // ================= ALL DATA FOR PDF =================
+        allData: [{ $match: {} }]
       }
     }
   ];
@@ -1069,6 +1081,7 @@ const getFinancialDataForPDF = async (req) => {
     allData: result[0]?.allData || []
   };
 };
+
 
 
 const generateStudentFinancialPDF = async (req, res) => {
@@ -1093,14 +1106,7 @@ const generateStudentFinancialPDF = async (req, res) => {
       displayHeaderFooter: true,
       headerTemplate: `
         <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:12px;padding:12px 20px;border-bottom:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#06b6d4);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">IL</div>
-            <div>
-              <div style="font-size:14px;font-weight:700;color:#0f172a">My Institute Name</div>
-              <div style="font-size:11px;color:#6b7280">Student Financial Report</div>
-            </div>
-          </div>
-          <div style="text-align:right;font-size:12px;color:#374151">
+        <div style="text-align:right;font-size:12px;color:#374151">
             <div>${req.user?.email || ''}</div>
             <div>${new Date().toLocaleDateString()}</div>
           </div>
@@ -1126,5 +1132,396 @@ const generateStudentFinancialPDF = async (req, res) => {
   }
 };
 
+const getStudentFullFinancialSummary = async (req, res) => {
+  try {
+    const { studentId } = req.params;
 
-module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF };
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid student ID"
+      });
+    }
+
+    const pipeline = [
+      /* ================= MATCH STUDENT ================= */
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(studentId)
+        }
+      },
+
+      /* ================= ENROLLMENTS ================= */
+      {
+        $lookup: {
+          from: "studentcourses",
+          localField: "_id",
+          foreignField: "studentId",
+          as: "enrollments"
+        }
+      },
+
+      {
+        $unwind: {
+          path: "$enrollments",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      /* ================= COURSE ================= */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "enrollments.courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      {
+        $unwind: {
+          path: "$course",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      /* ================= FEES LEDGER ================= */
+      {
+        $lookup: {
+          from: "studentfeesledgers",
+          localField: "enrollments._id",
+          foreignField: "enrollmentId",
+          as: "ledgers"
+        }
+      },
+
+      {
+        $unwind: {
+          path: "$ledgers",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      /* ================= INSTALLMENTS ================= */
+      {
+        $lookup: {
+          from: "studentinstallmentitems",
+          localField: "ledgers._id",
+          foreignField: "studentFeesId",
+          as: "installments"
+        }
+      },
+
+      /* ================= RECEIPTS ================= */
+      {
+        $lookup: {
+          from: "receiptmasters",
+          localField: "ledgers.receiptMasterId",
+          foreignField: "_id",
+          as: "receiptMaster"
+        }
+      },
+
+      {
+        $unwind: {
+          path: "$receiptMaster",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      {
+        $lookup: {
+          from: "receiptdetails",
+          localField: "receiptMaster._id",
+          foreignField: "receiptId",
+          as: "receiptDetails"
+        }
+      },
+
+      /* ================= GROUP BY ENROLLMENT ================= */
+      {
+        $group: {
+          _id: "$enrollments._id",
+
+          student: { $first: "$$ROOT" },
+          course: { $first: "$course" },
+
+          totalAmount: { $sum: { $ifNull: ["$ledgers.totalAmount", 0] } },
+          totalPaid: { $sum: { $ifNull: ["$ledgers.paidAmount", 0] } },
+          totalDue: { $sum: { $ifNull: ["$ledgers.dueAmount", 0] } },
+
+          ledgers: {
+            $push: {
+              ledgerId: "$ledgers._id",
+              totalAmount: "$ledgers.totalAmount",
+              paidAmount: "$ledgers.paidAmount",
+              dueAmount: "$ledgers.dueAmount",
+              status: "$ledgers.status",
+              paymentType: "$ledgers.paymentType",
+              installments: "$installments",
+              receiptDetails: "$receiptDetails"
+            }
+          }
+        }
+      },
+
+      /* ================= FINAL SUMMARY ================= */
+      {
+        $group: {
+          _id: "$student._id",
+
+          studentInfo: {
+            $first: {
+              name: "$student.name",
+              email: "$student.email",
+              phone: "$student.phone",
+              photo: "$student.photo"
+            }
+          },
+
+          totalCourses: { $sum: 1 },
+          overallTotalAmount: { $sum: "$totalAmount" },
+          overallPaidAmount: { $sum: "$totalPaid" },
+          overallDueAmount: { $sum: "$totalDue" },
+
+          courses: {
+            $push: {
+              enrollmentId: "$_id",
+              course: "$course",
+              totalAmount: "$totalAmount",
+              totalPaid: "$totalPaid",
+              totalDue: "$totalDue",
+              ledgers: "$ledgers"
+            }
+          }
+        }
+      }
+    ];
+
+    const result = await StudentModel.aggregate(pipeline);
+
+    if (!result.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result[0]
+    });
+
+  } catch (error) {
+    console.error("Student Financial Summary Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+const getStudentSingleDataService = async (studentId) => {
+
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    throw new Error("Invalid student ID");
+  }
+
+  const pipeline = [
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(studentId)
+      }
+    },
+    {
+      $lookup: {
+        from: "studentcourses",
+        localField: "_id",
+        foreignField: "studentId",
+        as: "enrollments"
+      }
+    },
+    {
+      $unwind: {
+        path: "$enrollments",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "courses",
+        localField: "enrollments.courseId",
+        foreignField: "_id",
+        as: "course"
+      }
+    },
+    {
+      $unwind: {
+        path: "$course",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "studentfeesledgers",
+        localField: "enrollments._id",
+        foreignField: "enrollmentId",
+        as: "ledgers"
+      }
+    },
+    {
+      $unwind: {
+        path: "$ledgers",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "studentinstallmentitems",
+        localField: "ledgers._id",
+        foreignField: "studentFeesId",
+        as: "installments"
+      }
+    },
+    {
+      $lookup: {
+        from: "receiptmasters",
+        localField: "ledgers.receiptMasterId",
+        foreignField: "_id",
+        as: "receiptMaster"
+      }
+    },
+    {
+      $unwind: {
+        path: "$receiptMaster",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "receiptdetails",
+        localField: "receiptMaster._id",
+        foreignField: "receiptId",
+        as: "receiptDetails"
+      }
+    },
+    {
+      $group: {
+        _id: "$enrollments._id",
+
+        student: { $first: "$$ROOT" },
+        course: { $first: "$course" },
+
+        totalAmount: { $sum: { $ifNull: ["$ledgers.totalAmount", 0] } },
+        totalPaid: { $sum: { $ifNull: ["$ledgers.paidAmount", 0] } },
+        totalDue: { $sum: { $ifNull: ["$ledgers.dueAmount", 0] } },
+
+        ledgers: {
+          $push: {
+            ledgerId: "$ledgers._id",
+            totalAmount: "$ledgers.totalAmount",
+            paidAmount: "$ledgers.paidAmount",
+            dueAmount: "$ledgers.dueAmount",
+            status: "$ledgers.status",
+            paymentType: "$ledgers.paymentType",
+            installments: "$installments",
+            receiptDetails: "$receiptDetails"
+          }
+        }
+      }
+    },
+    {
+      $group: {
+        _id: "$student._id",
+
+        studentInfo: {
+          $first: {
+            name: "$student.name",
+            email: "$student.email",
+            phone: "$student.phone",
+            photo: "$student.photo"
+          }
+        },
+
+        totalCourses: { $sum: 1 },
+        overallTotalAmount: { $sum: "$totalAmount" },
+        overallPaidAmount: { $sum: "$totalPaid" },
+        overallDueAmount: { $sum: "$totalDue" },
+
+        courses: {
+          $push: {
+            enrollmentId: "$_id",
+            course: "$course",
+            totalAmount: "$totalAmount",
+            totalPaid: "$totalPaid",
+            totalDue: "$totalDue",
+            ledgers: "$ledgers"
+          }
+        }
+      }
+    }
+  ];
+
+  const result = await StudentModel.aggregate(pipeline);
+
+  if (!result.length) {
+    throw new Error("Student not found");
+  }
+
+  return {
+    summary: {
+      totalCourses: result[0].totalCourses,
+      overallTotalAmount: result[0].overallTotalAmount,
+      overallPaidAmount: result[0].overallPaidAmount,
+      overallDueAmount: result[0].overallDueAmount
+    },
+    breakdown: result[0].courses || [],
+    studentInfo: result[0].studentInfo || {}
+  };
+};
+
+const generateSinglePDF = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    const data = await getStudentSingleDataService(studentId);
+
+    const filePath = path.join(
+      __dirname,
+      "../views/studentReport.ejs"
+    );
+    const html = await ejs.renderFile(filePath, { data });
+    const chromePath = process.env.CHROME_PATH
+    const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: chromePath,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=student-report.pdf"
+    });
+
+    res.send(pdf);
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+
+module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF, getStudentFullFinancialSummary, generateSinglePDF };
