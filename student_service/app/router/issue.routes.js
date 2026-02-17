@@ -10,5 +10,6 @@ router.put('/issues/student/:studentId', Auth, IssueController.getIssuesByStuden
 router.get('/dashboard', Auth, IssueController.getDashboardStats)
 router.get('/student-library-report', Auth, IssueController.getStudentLibraryReport)
 router.patch('/collect-library-payment/:issueId', Auth, IssueController.collectLibraryPayment)
+router.get('/generate-student-library-report/pdf', Auth, IssueController.generateLibraryPdfReport.bind(IssueController))
 
 module.exports = router

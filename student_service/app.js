@@ -1,8 +1,9 @@
-const express = require('express'); // Import For Express
-const dotenv = require('dotenv'); // For .env file 
-const cors = require('cors'); // For to run different server when I run use React with node 
+const express = require('express'); 
+const dotenv = require('dotenv');  
+const cors = require('cors');  
 const connectDB = require('./app/config/db.js'); // Connect Database
 const cookieParser = require('cookie-parser')
+const path = require('path');
 
 dotenv.config(); // .env with config
 const app = express();
@@ -19,6 +20,8 @@ app.use(cors(
 )) 
 app.use(cookieParser())
 app.use('/uploads', express.static(__dirname + '/uploads'));
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
 
 // Auth router
 const AuthRouter = require('./app/router/auth.routes.js');

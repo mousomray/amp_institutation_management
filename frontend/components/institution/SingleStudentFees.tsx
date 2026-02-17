@@ -14,8 +14,10 @@ type Props = {
 
 export default function SingleStudentFees({ id, onClose }: Props) {
   const [loading, setLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [data, setData] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  
 
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
@@ -93,160 +95,54 @@ export default function SingleStudentFees({ id, onClose }: Props) {
   const C = 2 * Math.PI * R; // circumference (~100)
   const dash = (percent / 100) * C;
 
-  const escapeHtml = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-  const printReceipt = () => {
-    const inst = data?.institution ?? {};
-    const student = data?.student ?? {};
-    interface Institution {
-      initials?: string;
-      name?: string;
-      address?: string;
+  const downloadPDF = async () => {
+    if (!id || !token) {
+      toast.error('Missing ID or authentication token');
+      return;
     }
 
-    interface Student {
-      _id?: string;
-      name?: string;
-      email?: string;
-      photo?: string;
+    try {
+      setPdfLoading(true);
+
+      const res = await axiosInstance.get(
+        `/student-fees-ledger/single-student-fees/pdf/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob',
+          timeout: 60000
+        }
+      );
+
+      const blobData = res?.data;
+      if (!blobData) {
+        toast.error('No PDF returned from server.');
+        return;
+      }
+
+      const mime = res.headers?.['content-type'] ?? 'application/pdf';
+      const blob = new Blob([blobData], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `student-fees-${id}-${new Date().toISOString().split('T')[0]}.pdf`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      toast.success('PDF downloaded successfully');
+    } catch (err: any) {
+      console.error('PDF download error:', err);
+      let msg = 'Failed to generate PDF.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.message || `Request failed (${err.response?.status ?? 'unknown'})`;
+      }
+      toast.error(msg);
+    } finally {
+      setPdfLoading(false);
     }
-
-    interface Course {
-      name?: string;
-      duration?: string;
-      fees?: number;
-      amount?: number;
-    }
-
-    interface MasterFee {
-      name: string;
-      amount: number;
-    }
-
-    interface Installment {
-      _id?: string;
-      dueDate: string;
-      amount: number;
-      paidAmount?: number;
-      status?: string;
-      note?: string;
-    }
-
-    const html: string = `<!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <title>Receipt - ${escapeHtml(student?.name ?? 'Student')}</title>
-      <style>
-      body{font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif;color:#111;margin:0;padding:20px}
-      .wrap{max-width:800px;margin:0 auto;background:#fff;padding:22px;border-radius:6px}
-      .header{display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid #4f46e5;padding-bottom:12px}
-      .h-left{display:flex;gap:14px;align-items:center}
-      .logo{width:64px;height:64px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#3b82f6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:22px}
-      .title{font-size:18px;font-weight:700}
-      .meta{font-size:12px;color:#6b7280}
-      .grid{display:grid;grid-template-columns:1fr 240px;gap:18px;margin-top:16px}
-      .card{background:#f8fafc;padding:12px;border-radius:6px}
-      table{width:100%;border-collapse:collapse;margin-top:12px}
-      th,td{padding:10px;border-bottom:1px solid #e6e9ef;text-align:left}
-      th{background:#f3f4f6;font-size:13px}
-      .text-right{text-align:right}
-      .small{font-size:12px;color:#6b7280}
-      .muted{color:#6b7280;font-size:12px}
-      .footer{margin-top:18px;text-align:center;color:#9ca3af;font-size:12px}
-      @media print{ body{padding:0} .wrap{box-shadow:none;border-radius:0;padding:12mm} .no-print{display:none} }
-      </style>
-    </head>
-    <body>
-      <div class="wrap">
-      <div class="header">
-        <div class="h-left">
-        <div class="logo">${escapeHtml((inst as Institution)?.initials ?? 'IN')}</div>
-        <div>
-          <div class="title">${escapeHtml((inst as Institution)?.name ?? 'Institute')}</div>
-          <div class="meta">${escapeHtml((inst as Institution)?.address ?? '')}</div>
-        </div>
-        </div>
-        <div class="muted">
-        <div>Receipt</div>
-        <div style="font-weight:700;margin-top:6px">#${escapeHtml(String(data?._id ?? ''))}</div>
-        <div class="small" style="margin-top:6px">${escapeHtml(formatDate(summary.createdAt ?? new Date().toISOString()))}</div>
-        </div>
-      </div>
-
-      <div class="grid">
-        <div>
-        <div style="display:flex;gap:12px;align-items:center">
-          <div style="width:72px;height:72px;border-radius:8px;overflow:hidden;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-weight:700;color:#4f46e5">
-          ${data?.student?.photo ? `<img src="${escapeHtml(data.student.photo)}" style="width:100%;height:100%;object-fit:cover"/>` : escapeHtml(initials(data?.student?.name))}
-          </div>
-          <div>
-          <div style="font-weight:700">${escapeHtml((student as Student)?.name ?? 'Student')}</div>
-          <div class="small">ID: ${escapeHtml((student as Student)?._id ?? '')} • ${escapeHtml((student as Student)?.email ?? '')}</div>
-          <div class="small" style="margin-top:6px">Status: <strong>${escapeHtml((summary.status ?? 'DUE').toString().toUpperCase())}</strong></div>
-          </div>
-        </div>
-
-        <div style="margin-top:14px" class="card">
-          <div class="small">Summary</div>
-          <div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:700">
-          <div>Total</div><div>${escapeHtml(fmt(summary.totalAmount))}</div>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px">
-          <div>Paid</div><div style="color:#059669">${escapeHtml(fmt(summary.paidAmount))}</div>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px">
-          <div>Due</div><div style="color:#b91c1c">${escapeHtml(fmt(summary.dueAmount))}</div>
-          </div>
-        </div>
-
-        <div style="margin-top:12px">
-          <div class="small">Charges</div>
-          <table>
-          <thead>
-            <tr><th>Description</th><th class="text-right">Amount</th></tr>
-          </thead>
-          <tbody>
-            ${(coursesArr as Course[]).map(c => `<tr><td>${escapeHtml(c?.name ?? '')}${c?.duration ? ` <div class="muted">${escapeHtml(c.duration)}</div>` : ''}</td><td class="text-right"><strong>${escapeHtml(fmt(c?.fees ?? c?.amount))}</strong></td></tr>`).join('')}
-            ${(masterFees as MasterFee[]).map(m => `<tr><td>${escapeHtml(m?.name)}</td><td class="text-right"><strong>${escapeHtml(fmt(m?.amount))}</strong></td></tr>`).join('')}
-          </tbody>
-          <tfoot>
-            <tr><td class="muted text-right">Subtotal</td><td class="text-right"><strong>${escapeHtml(fmt((coursesArr as Course[]).reduce((s:number,c:any)=>s+(c?.fees??c?.amount??0),0) + (masterFees as MasterFee[]).reduce((s:number,m:any)=>s+(m?.amount??0),0)))}</strong></td></tr>
-            <tr><td class="muted text-right">Discount</td><td class="text-right"><strong>${escapeHtml(fmt(summary.discountAmount))}</strong></td></tr>
-            <tr><td class="muted text-right">Grand Total</td><td class="text-right"><strong>${escapeHtml(fmt(summary.totalAmount))}</strong></td></tr>
-          </tfoot>
-          </table>
-        </div>
-        </div>
-
-        <div>
-        <div class="card">
-          <div class="small">Payment Details</div>
-          <div style="margin-top:8px">Method: <strong>${escapeHtml(summary.paymentType)}</strong></div>
-          <div style="margin-top:8px">Next Due: <strong>${escapeHtml((() => { const next = (installments as Installment[]).find((x:any)=>x?.status !== 'PAID'); return next ? `${formatDate(next.dueDate)} • ${fmt(next.amount - (next.paidAmount ?? 0))}` : 'All paid'; })())}</strong></div>
-        </div>
-
-        <div style="margin-top:12px" class="card">
-          <div class="small">Installments</div>
-          <div style="margin-top:8px">
-          ${(installments as Installment[]).length ? (installments as Installment[]).map((it: Installment, idx: number) => `<div style="padding:8px 0;border-bottom:1px dashed #eef2f6"><div style="font-weight:700">#${idx+1} • ${escapeHtml(formatDate(it?.dueDate))}</div><div class="muted">${escapeHtml(it.note ?? '')}</div><div style="margin-top:6px"><strong>${escapeHtml(fmt(it?.amount))}</strong> • Paid ${escapeHtml(fmt(it?.paidAmount))} • <span style="background:${it?.status==='PAID'?'#ecfccb':'#fff7ed'};padding:4px 8px;border-radius:6px;font-size:12px">${escapeHtml((it?.status ?? 'DUE').toString().toUpperCase())}</span></div></div>`).join('') : '<div class="muted">No installments</div>'}
-          </div>
-        </div>
-        </div>
-      </div>
-
-      <div class="footer">This is a computer generated receipt — no signature required.</div>
-      </div>
-    </body>
-    </html>`;
-
-    const win = window.open('', '_blank');
-    if (!win) { toast.error('Popup blocked. Allow popups to print.'); return; }
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    win.onload = () => { try { win.focus(); win.print(); } catch(e){ console.error(e); } };
   };
+
 
   if (!id) return <div className="text-sm text-gray-500">No record selected</div>;
 
@@ -256,6 +152,10 @@ export default function SingleStudentFees({ id, onClose }: Props) {
 
   const statusClass = (s?: string) =>
     s === "PAID" ? "bg-green-100 text-green-800" : s === "PARTIAL" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800";
+
+  const printReceipt = () => {
+    window.print();
+  };
 
   return (
     <div className="bg-gray-50 p-6">
@@ -311,6 +211,16 @@ export default function SingleStudentFees({ id, onClose }: Props) {
                 <div className="flex items-center justify-between text-sm mt-2">
                   <div className="text-gray-600">Due</div>
                   <div className="font-semibold text-red-700">{fmt(summary.dueAmount)}</div>
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="relative w-12 h-12">
+                    <svg className="-rotate-90" width="48" height="48" viewBox="0 0 36 36">
+                      <circle cx="18" cy="18" r={R} fill="none" stroke="#eef2ff" strokeWidth="4" />
+                      <circle cx="18" cy="18" r={R} fill="none" stroke="#4f46e5" strokeWidth="4" strokeDasharray={`${dash} ${C - dash}`} strokeLinecap="round" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-700">{percent}%</div>
+                  </div>
+                  <div className="text-sm text-gray-500">Payment progress</div>
                 </div>
               </div>
             </div>
@@ -396,7 +306,20 @@ export default function SingleStudentFees({ id, onClose }: Props) {
               </div>
               
               <div className="mt-6 flex gap-3 no-print">
-                <Button icon="pi pi-print" label="Print" className="flex-1" onClick={printReceipt} />
+                <Button 
+                  icon="pi pi-file-pdf" 
+                  label={pdfLoading ? 'Generating...' : 'Download PDF'} 
+                  className="flex-1 p-button-primary" 
+                  onClick={downloadPDF}
+                  loading={pdfLoading}
+                  disabled={pdfLoading}
+                />
+                {/* <Button 
+                  icon="pi pi-print" 
+                  label="Print" 
+                  className="flex-1" 
+                  onClick={printReceipt} 
+                /> */}
                 <Button label="Close" className="p-button-text" onClick={onClose} />
               </div>
             </div>

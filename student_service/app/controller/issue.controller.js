@@ -4,6 +4,9 @@ const StudentModel = require('../model/student')
 const SettingsModel = require('../model/setting')
 const mongoose = require('mongoose')
 const { getStudentFromStudentService } = require('../service/student.service')
+const puppeteer = require("puppeteer-core")
+const path = require("path")
+const ejs = require("ejs")
 
 class IssueController {
 
@@ -720,6 +723,198 @@ class IssueController {
             })
         }
     }
+
+
+    async getStudentLibraryReportData(req) {
+
+        const userId = req.user.id
+
+        const basePipeline = [
+
+            { $match: { userId } },
+
+            {
+                $lookup: {
+                    from: "books",
+                    localField: "book_id",
+                    foreignField: "_id",
+                    as: "book"
+                }
+            },
+            { $unwind: { path: "$book", preserveNullAndEmptyArrays: true } },
+
+            {
+                $addFields: {
+                    calculatedFine: {
+                        $multiply: [
+                            { $ifNull: ["$delay_days", 0] },
+                            { $ifNull: ["$late_fine", 0] }
+                        ]
+                    }
+                }
+            },
+
+            {
+                $addFields: {
+                    calculatedTotal: {
+                        $add: [
+                            { $ifNull: ["$book_fee", 0] },
+                            "$calculatedFine"
+                        ]
+                    }
+                }
+            },
+
+            {
+                $addFields: {
+                    paid_amount: {
+                        $cond: [
+                            { $eq: ["$payment_status", "paid"] },
+                            "$calculatedTotal",
+                            { $ifNull: ["$paid_amount", 0] }
+                        ]
+                    },
+                    due_amount: {
+                        $cond: [
+                            { $eq: ["$payment_status", "paid"] },
+                            0,
+                            {
+                                $subtract: [
+                                    "$calculatedTotal",
+                                    { $ifNull: ["$paid_amount", 0] }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+
+            {
+                $group: {
+                    _id: "$student_id",
+                    totalBooks: { $sum: 1 },
+                    totalBookFee: { $sum: "$book_fee" },
+                    totalFine: { $sum: "$calculatedFine" },
+                    totalAmount: { $sum: "$calculatedTotal" },
+                    totalPaid: { $sum: "$paid_amount" },
+                    totalDue: { $sum: "$due_amount" },
+                    books: { $push: "$$ROOT" }
+                }
+            },
+
+            { $sort: { totalAmount: -1 } }
+        ]
+
+        const students = await IssueModel.aggregate(basePipeline)
+
+        const finalResult = []
+
+        for (let studentIssue of students) {
+
+            let studentData = null
+
+            try {
+                studentData = await getStudentFromStudentService(
+                    studentIssue._id,
+                    req
+                )
+            } catch (err) {
+                console.log("Student service error:", err.message)
+            }
+
+            let overallStatus = "unpaid"
+
+            if (studentIssue.totalDue === 0 && studentIssue.totalAmount > 0) {
+                overallStatus = "paid"
+            } else if (
+                studentIssue.totalPaid > 0 &&
+                studentIssue.totalDue > 0
+            ) {
+                overallStatus = "partial"
+            }
+
+            finalResult.push({
+                student: studentData,
+                totalBooks: studentIssue.totalBooks,
+                totalBookFee: studentIssue.totalBookFee,
+                totalFine: studentIssue.totalFine,
+                totalAmount: studentIssue.totalAmount,
+                totalPaid: studentIssue.totalPaid,
+                totalDue: studentIssue.totalDue,
+                paymentStatus: overallStatus,
+                books: studentIssue.books
+            })
+        }
+
+        return finalResult
+    }
+
+    async getStudentLibraryReportNormal(req, res) {
+        try {
+
+            const data = await this.getStudentLibraryReportData(req)
+            return res.status(200).json({
+                success: true,
+                totalStudents: data.length,
+                data
+            })
+
+        } catch (error) {
+            console.error(error)
+            return res.status(500).json({
+                success: false,
+                message: "Failed to fetch student library report"
+            })
+        }
+    }
+
+    async generateLibraryPdfReport(req, res) {
+        try {
+
+            const students = await this.getStudentLibraryReportData(req)
+            const chromePath = process.env.CHROME_PATH
+            const browser = await puppeteer.launch({
+                headless: "new",
+                executablePath: chromePath,
+                args: ["--no-sandbox", "--disable-setuid-sandbox"]
+            });
+            const page = await browser.newPage()
+            const html = await ejs.renderFile(
+                path.join(__dirname, "../../views/libraryReport.ejs"),
+                { students }
+            )
+
+            await page.setContent(html, { waitUntil: "networkidle0" })
+
+            const pdfBuffer = await page.pdf({
+                format: "A4",
+                printBackground: true,
+                margin: {
+                    top: "40px",
+                    bottom: "40px",
+                    left: "30px",
+                    right: "30px"
+                }
+            })
+
+            await browser.close()
+
+            res.set({
+                "Content-Type": "application/pdf",
+                "Content-Disposition": "attachment; filename=library-report.pdf"
+            })
+
+            res.send(pdfBuffer)
+
+        } catch (error) {
+            console.error("Library PDF Error:", error)
+            res.status(500).json({
+                success: false,
+                message: "Failed to generate library PDF"
+            })
+        }
+    }
+
 
 
     async collectLibraryPayment(req, res) {
