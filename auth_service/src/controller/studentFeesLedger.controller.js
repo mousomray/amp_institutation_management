@@ -3,7 +3,7 @@ const StudentFeesLedgerModel = require("../model/studentFeesLedger.model.js");
 const ReceiptMasterModel = require("../model/receiptMaster.model.js");
 const EnrollmentModel = require("../model/studentCourse.model.js");
 const ReceiptDetailsModel = require("../model/receiptDetails.model.js");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 const ejs = require("ejs");
 const path = require("path");
 
@@ -333,14 +333,14 @@ const getSingleStudentFees = async (req, res) => {
     }
 
     const data = await StudentFeesLedgerModel.aggregate([
-      /* 1️⃣ Match Ledger */
+
       {
         $match: {
           _id: new mongoose.Types.ObjectId(ledgerId)
         }
       },
 
-      /* 2️⃣ Enrollment */
+
       {
         $lookup: {
           from: "studentcourses",
@@ -351,7 +351,7 @@ const getSingleStudentFees = async (req, res) => {
       },
       { $unwind: "$enrollment" },
 
-      /* 3️⃣ Student */
+
       {
         $lookup: {
           from: "students",
@@ -362,7 +362,7 @@ const getSingleStudentFees = async (req, res) => {
       },
       { $unwind: "$student" },
 
-      /* 4️⃣ Course */
+
       {
         $lookup: {
           from: "courses",
@@ -373,7 +373,7 @@ const getSingleStudentFees = async (req, res) => {
       },
       { $unwind: "$course" },
 
-      /* 5️⃣ Installment Items */
+
       {
         $lookup: {
           from: "studentinstallmentitems",
@@ -383,7 +383,7 @@ const getSingleStudentFees = async (req, res) => {
         }
       },
 
-      /* 6️⃣ Sort Installments by Due Date */
+
       {
         $addFields: {
           installments: {
@@ -395,7 +395,7 @@ const getSingleStudentFees = async (req, res) => {
         }
       },
 
-      /* 7️⃣ Final Response */
+
       {
         $project: {
           ledgerId: "$_id",
@@ -453,6 +453,151 @@ const getSingleStudentFees = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+const getSingleStudentFeesData = async (ledgerId) => {
+
+  if (!mongoose.Types.ObjectId.isValid(ledgerId)) {
+    throw new Error("Invalid ledger ID");
+  }
+
+  const data = await StudentFeesLedgerModel.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(ledgerId)
+      }
+    },
+
+    {
+      $lookup: {
+        from: "studentcourses",
+        localField: "enrollmentId",
+        foreignField: "_id",
+        as: "enrollment"
+      }
+    },
+    { $unwind: "$enrollment" },
+
+    {
+      $lookup: {
+        from: "students",
+        localField: "enrollment.studentId",
+        foreignField: "_id",
+        as: "student"
+      }
+    },
+    { $unwind: "$student" },
+
+    {
+      $lookup: {
+        from: "courses",
+        localField: "enrollment.courseId",
+        foreignField: "_id",
+        as: "course"
+      }
+    },
+    { $unwind: "$course" },
+
+    {
+      $lookup: {
+        from: "studentinstallmentitems",
+        localField: "_id",
+        foreignField: "studentFeesId",
+        as: "installments"
+      }
+    },
+
+    {
+      $addFields: {
+        installments: {
+          $sortArray: {
+            input: "$installments",
+            sortBy: { dueDate: 1 }
+          }
+        }
+      }
+    }
+  ]);
+
+  if (!data.length) {
+    throw new Error("Fees record not found");
+  }
+
+  return data[0];
+};
+
+
+const generateSingleStudentFeesPDF = async (req, res) => {
+  try {
+    const ledgerId = req.params.id;
+
+    const reportData = await getSingleStudentFeesData(ledgerId);
+
+    const chromePath = process.env.CHROME_PATH
+    const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: chromePath,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+    const page = await browser.newPage();
+
+    const html = await ejs.renderFile(
+      path.join(__dirname, "../views/singleStudentFeesReport.ejs"),
+      { data: reportData }
+    );
+
+    await page.setContent(html, { waitUntil: "networkidle2" });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+
+      margin: {
+        top: "110px",
+        bottom: "70px",
+        left: "20px",
+        right: "20px"
+      },
+
+      displayHeaderFooter: true,
+      headerTemplate: `
+        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:12px;padding:12px 24px;border-bottom:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#06b6d4);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">IL</div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#0f172a">Your Institute Name</div>
+              <div style="font-size:12px;color:#6b7280">Student Fees Report</div>
+            </div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:#374151">
+            <div>Date: ${new Date().toLocaleDateString()}</div>
+            <div>Ledger ID: ${ledgerId}</div>
+          </div>
+        </div>
+      `,
+      footerTemplate: `
+        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:10px;padding:8px 24px;border-top:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
+          <div style="color:#6b7280">This is a system generated report — ${req.user?.email || ''}</div>
+          <div style="color:#374151">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>
+        </div>
+      `,
+      preferCSSPageSize: true
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename=student-fees-${ledgerId}.pdf`
+    });
+
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error("Single Fees PDF Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 const getStudentFinancialReport = async (req, res) => {
   try {
@@ -929,7 +1074,12 @@ const getFinancialDataForPDF = async (req) => {
 const generateStudentFinancialPDF = async (req, res) => {
   try {
     const reportData = await getFinancialDataForPDF(req);
-    const browser = await puppeteer.launch({ headless: "new" });
+    const chromePath = process.env.CHROME_PATH
+    const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: chromePath,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
     const page = await browser.newPage();
     const html = await ejs.renderFile(
       path.join(__dirname, "../views/studentFinancialReport.ejs"),
@@ -942,15 +1092,27 @@ const generateStudentFinancialPDF = async (req, res) => {
       margin: { top: "100px", bottom: "80px", left: "20px", right: "20px" },
       displayHeaderFooter: true,
       headerTemplate: `
-        <div style="font-size:12px; text-align:center; width:100%; padding:10px 0; border-bottom:1px solid #ccc;">
-          <strong>My Institute Name ${req.user.email}</strong> - Student Financial Report
+        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:12px;padding:12px 20px;border-bottom:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#06b6d4);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">IL</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#0f172a">My Institute Name</div>
+              <div style="font-size:11px;color:#6b7280">Student Financial Report</div>
+            </div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:#374151">
+            <div>${req.user?.email || ''}</div>
+            <div>${new Date().toLocaleDateString()}</div>
+          </div>
         </div>
       `,
       footerTemplate: `
-        <div style="font-size:10px; text-align:center; width:100%; padding:5px 0; border-top:1px solid #ccc;">
-          Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:10px;padding:8px 20px;border-top:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
+          <div style="color:#6b7280">Generated by My Institute</div>
+          <div style="color:#374151">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>
         </div>
-      `
+      `,
+      preferCSSPageSize: true
     });
     await browser.close();
     res.set({
@@ -965,4 +1127,4 @@ const generateStudentFinancialPDF = async (req, res) => {
 };
 
 
-module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF };
+module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF };

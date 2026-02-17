@@ -104,6 +104,7 @@ export default function ReportPage() {
 
 	const [pagination, setPagination] = useState({ page: 1, rows: 5, total: 0, totalPages: 1 });
 	const [loading, setLoading] = useState<boolean>(false);
+	const [pdfLoading, setPdfLoading] = useState<boolean>(false);
 
 	const [searchInput, setSearchInput] = useState<string>('');
 	const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -340,6 +341,8 @@ export default function ReportPage() {
 			return;
 		}
 
+		setPdfLoading(true);
+
 		const params: Record<string, any> = {
 			...(debouncedSearch ? { search: debouncedSearch } : {})
 		};
@@ -394,6 +397,7 @@ export default function ReportPage() {
 			toast.error(msg);
 		} finally {
 			setLoading(false);
+			setPdfLoading(false);
 		}
 	};
 
@@ -424,8 +428,13 @@ export default function ReportPage() {
 							<button className="p-button p-component p-button-help p-button-sm" onClick={exportCSV}>
 								Download CSV
 							</button>
-							<button className="p-button p-component p-button-warning p-button-sm" onClick={generatePdf}>
-								Print / PDF
+							<button
+								className="p-button p-component p-button-warning p-button-sm"
+								onClick={generatePdf}
+								disabled={pdfLoading}
+								aria-busy={pdfLoading}
+							>
+								{pdfLoading ? 'Generating...' : 'Print / PDF'}
 							</button>
 						</div>
 					</div>
