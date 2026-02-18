@@ -24,6 +24,11 @@ const institutionSchema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phone: String,
+    appPassword: {
+      type: String,
+      required: true,
+      select: false   
+    },
     whatsAppNo: String,
     website: String,
     registrationNo: {

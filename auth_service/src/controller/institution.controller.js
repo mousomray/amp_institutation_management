@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { ZodError } = require("zod");
 const { User, Institution, StudentFeeItems, StudentFeePayment, StudentInstallmentItem } = require("../model/model.js");
-const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema,institutionSchema, RsetPasswordSchema } = require("../schema/Schema.js");
+const { AdminLoginSchema, CourseSchema, StudentSchema, EditStudentSchema, institutionSchema, RsetPasswordSchema } = require("../schema/Schema.js");
 const uploadSingleImage = require("../helper/upload.js")
 const { passwordGenerator } = require("../helper/PasswordGenerator.js")
 const CourseModel = require("../model/course.model.js")
@@ -80,7 +80,7 @@ const loginInstitution = async (req, res) => {
 };
 
 
- 
+
 
 
 
@@ -2292,7 +2292,7 @@ const payInstallment = async (req, res) => {
         paymentMode,
         instrumentId: paymentMode === "CASH" ? null : instrumentId,
         userId,
-        instrumentDate: paymentMode === "CASH" ? null : instrumentDate,userId,
+        instrumentDate: paymentMode === "CASH" ? null : instrumentDate, userId,
       }],
       { session }
     );
@@ -2581,6 +2581,45 @@ const updateInstitution = async (req, res) => {
   }
 };
 
+const updateInstitutionAppPassword = async (req, res) => {
+  try {
+    const userId = req?.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can change app password",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    }).select("+appPassword");
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+    const { appPassword } = req.body;
+    if (!appPassword) {
+      return res.status(400).json({
+        message: "App password is required",
+      });
+    }
+    institution.appPassword = appPassword;
+    await institution.save();
+    return res.status(200).json({
+      message: "App password updated successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
+
 
 const getInstitution = async (req, res) => {
   try {
@@ -2632,20 +2671,20 @@ const resetPassword = async (req, res) => {
     if (!institution || institution.role !== "institution") {
       return res.status(403).json({ message: "Only institution can logout" });
     }
-   const parseData = RsetPasswordSchema.parse(req.body)
-   
-   if(parseData.currentPassword !== institution.password){
-    return res.status(404).json({
-      message: "Current Password is not match "
+    const parseData = RsetPasswordSchema.parse(req.body)
+
+    if (parseData.currentPassword !== institution.password) {
+      return res.status(404).json({
+        message: "Current Password is not match "
+      })
+    }
+
+    institution.password = parseData.newPassword
+    institution.save()
+
+    return res.status(200).json({
+      message: "Password updated successfully"
     })
-   }
-
-   institution.password = parseData.newPassword
-   institution.save()
-
-   return res.status(200).json({
-    message: "Password updated successfully"
-   })
   } catch (error) {
     if (error instanceof ZodError) {
       return res.status(400).json({
@@ -2663,4 +2702,4 @@ const resetPassword = async (req, res) => {
   }
 }
 
-module.exports = {resetPassword,updateInstitution,getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
+module.exports = { resetPassword, updateInstitution, updateInstitutionAppPassword, getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
