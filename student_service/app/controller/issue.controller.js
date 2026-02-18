@@ -724,149 +724,163 @@ class IssueController {
         }
     }
 
-
     async getStudentLibraryReportData(req) {
 
-        const userId = req.user.id
+    const userId = req.user.id
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 5
+    const skip = (page - 1) * limit
 
-        const basePipeline = [
+    const basePipeline = [
 
-            { $match: { userId } },
+        { $match: { userId } },
 
-            {
-                $lookup: {
-                    from: "books",
-                    localField: "book_id",
-                    foreignField: "_id",
-                    as: "book"
-                }
-            },
-            { $unwind: { path: "$book", preserveNullAndEmptyArrays: true } },
-
-            {
-                $addFields: {
-                    calculatedFine: {
-                        $multiply: [
-                            { $ifNull: ["$delay_days", 0] },
-                            { $ifNull: ["$late_fine", 0] }
-                        ]
-                    }
-                }
-            },
-
-            {
-                $addFields: {
-                    calculatedTotal: {
-                        $add: [
-                            { $ifNull: ["$book_fee", 0] },
-                            "$calculatedFine"
-                        ]
-                    }
-                }
-            },
-
-            {
-                $addFields: {
-                    paid_amount: {
-                        $cond: [
-                            { $eq: ["$payment_status", "paid"] },
-                            "$calculatedTotal",
-                            { $ifNull: ["$paid_amount", 0] }
-                        ]
-                    },
-                    due_amount: {
-                        $cond: [
-                            { $eq: ["$payment_status", "paid"] },
-                            0,
-                            {
-                                $subtract: [
-                                    "$calculatedTotal",
-                                    { $ifNull: ["$paid_amount", 0] }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            },
-
-            {
-                $group: {
-                    _id: "$student_id",
-                    totalBooks: { $sum: 1 },
-                    totalBookFee: { $sum: "$book_fee" },
-                    totalFine: { $sum: "$calculatedFine" },
-                    totalAmount: { $sum: "$calculatedTotal" },
-                    totalPaid: { $sum: "$paid_amount" },
-                    totalDue: { $sum: "$due_amount" },
-                    books: { $push: "$$ROOT" }
-                }
-            },
-
-            { $sort: { totalAmount: -1 } }
-        ]
-
-        const students = await IssueModel.aggregate(basePipeline)
-
-        const finalResult = []
-
-        for (let studentIssue of students) {
-
-            let studentData = null
-
-            try {
-                studentData = await getStudentFromStudentService(
-                    studentIssue._id,
-                    req
-                )
-            } catch (err) {
-                console.log("Student service error:", err.message)
+        {
+            $lookup: {
+                from: "books",
+                localField: "book_id",
+                foreignField: "_id",
+                as: "book"
             }
+        },
+        { $unwind: { path: "$book", preserveNullAndEmptyArrays: true } },
 
-            let overallStatus = "unpaid"
-
-            if (studentIssue.totalDue === 0 && studentIssue.totalAmount > 0) {
-                overallStatus = "paid"
-            } else if (
-                studentIssue.totalPaid > 0 &&
-                studentIssue.totalDue > 0
-            ) {
-                overallStatus = "partial"
+        {
+            $addFields: {
+                calculatedFine: {
+                    $multiply: [
+                        { $ifNull: ["$delay_days", 0] },
+                        { $ifNull: ["$late_fine", 0] }
+                    ]
+                }
             }
+        },
 
-            finalResult.push({
-                student: studentData,
+        {
+            $addFields: {
+                calculatedTotal: {
+                    $add: [
+                        { $ifNull: ["$book_fee", 0] },
+                        "$calculatedFine"
+                    ]
+                }
+            }
+        },
+
+        {
+            $addFields: {
+
+                paid_amount: {
+                    $cond: [
+                        { $eq: ["$payment_status", "paid"] },
+                        "$calculatedTotal",
+                        { $ifNull: ["$paid_amount", 0] }
+                    ]
+                },
+
+                due_amount: {
+                    $cond: [
+                        { $eq: ["$payment_status", "paid"] },
+                        0,
+                        {
+                            $subtract: [
+                                "$calculatedTotal",
+                                { $ifNull: ["$paid_amount", 0] }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+
+        {
+            $group: {
+                _id: "$student_id",
+
+                totalBooks: { $sum: 1 },
+                totalBookFee: { $sum: "$book_fee" },
+                totalFine: { $sum: "$calculatedFine" },
+                totalAmount: { $sum: "$calculatedTotal" },
+                totalPaid: { $sum: "$paid_amount" },
+                totalDue: { $sum: "$due_amount" },
+
+                books: {
+                    $push: {
+                        book_name: "$book.name",
+                        issue_date: "$issue_date",
+                        return_date: "$return_date",
+                        actual_return_date: "$actual_return_date",
+                        delay_days: "$delay_days",
+                        book_fee: "$book_fee",
+                        fine_amount: "$calculatedFine",
+                        total_amount: "$calculatedTotal",
+                        paid_amount: "$paid_amount",
+                        due_amount: "$due_amount",
+                        payment_status: "$payment_status"
+                    }
+                }
+            }
+        },
+
+        { $sort: { totalAmount: -1 } }
+    ]
+
+    const studentsRaw = await IssueModel.aggregate(basePipeline)
+
+    const finalResult = []
+
+    for (let studentIssue of studentsRaw) {
+
+        let studentData = null
+
+        try {
+            studentData = await getStudentFromStudentService(
+                studentIssue._id,
+                req
+            )
+        } catch (err) {
+            console.log("Student service error:", err.message)
+        }
+
+        let overallStatus = "unpaid"
+
+        if (studentIssue.totalDue === 0 && studentIssue.totalAmount > 0) {
+            overallStatus = "paid"
+        } else if (
+            studentIssue.totalPaid > 0 &&
+            studentIssue.totalDue > 0
+        ) {
+            overallStatus = "partial"
+        }
+
+        finalResult.push({
+            student: studentData
+                ? {
+                    id: studentData._id,
+                    name: studentData.name,
+                    email: studentData.email,
+                    phone: studentData.phone,
+                    photo: studentData.photo || null
+                }
+                : null,
+
+            summary: {
                 totalBooks: studentIssue.totalBooks,
                 totalBookFee: studentIssue.totalBookFee,
                 totalFine: studentIssue.totalFine,
                 totalAmount: studentIssue.totalAmount,
                 totalPaid: studentIssue.totalPaid,
                 totalDue: studentIssue.totalDue,
-                paymentStatus: overallStatus,
-                books: studentIssue.books
-            })
-        }
+                paymentStatus: overallStatus
+            },
 
-        return finalResult
+            books: studentIssue.books
+        })
     }
 
-    async getStudentLibraryReportNormal(req, res) {
-        try {
-
-            const data = await this.getStudentLibraryReportData(req)
-            return res.status(200).json({
-                success: true,
-                totalStudents: data.length,
-                data
-            })
-
-        } catch (error) {
-            console.error(error)
-            return res.status(500).json({
-                success: false,
-                message: "Failed to fetch student library report"
-            })
-        }
-    }
+    return finalResult
+}
+  
 
     async generateLibraryPdfReport(req, res) {
         try {
@@ -915,7 +929,7 @@ class IssueController {
         }
     }
 
-
+    
 
     async collectLibraryPayment(req, res) {
         try {

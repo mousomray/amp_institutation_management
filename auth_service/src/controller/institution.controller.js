@@ -1850,7 +1850,7 @@ const payStudentFees = async (req, res) => {
 
   try {
     const { studentFeesId } = req.params;
-    let { amount, paymentMode, instrumentId } = req.body;
+    let { amount, paymentMode, instrumentId, instrumentDate } = req.body;
     const userId = req.user.id;
 
     if (!amount || amount <= 0) {
@@ -1885,6 +1885,11 @@ const payStudentFees = async (req, res) => {
           message: `${paymentMode} payment requires instrumentId`
         });
       }
+      if (!instrumentDate) {
+        return res.status(400).json({
+          message: `${paymentMode} payment requires instrumentDate`
+        });
+      }
     } else if (paymentMode === "CASH") {
       instrumentId = null;
     } else {
@@ -1909,7 +1914,9 @@ const payStudentFees = async (req, res) => {
           paymentMode,
           userId,
           instrumentId:
-            nonCashModes.includes(paymentMode) ? instrumentId : null
+            nonCashModes.includes(paymentMode) ? instrumentId : null,
+          instrumentDate:
+            nonCashModes.includes(paymentMode) ? instrumentDate : null
         }
       ],
       { session }
@@ -2197,7 +2204,7 @@ const payInstallment = async (req, res) => {
   try {
     const userId = req.user.id;
     const { installmentItemId } = req.params;
-    let { amount, paymentMode, instrumentId } = req.body;
+    let { amount, paymentMode, instrumentId, instrumentDate } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
@@ -2213,6 +2220,11 @@ const payInstallment = async (req, res) => {
       if (!instrumentId) {
         return res.status(400).json({
           message: `${paymentMode} payment requires instrumentId`
+        });
+      }
+      if (!instrumentDate) {
+        return res.status(400).json({
+          message: `${paymentMode} payment requires instrumentDate`
         });
       }
     } else if (paymentMode === "CASH") {
@@ -2279,7 +2291,8 @@ const payInstallment = async (req, res) => {
         amount: payNow,
         paymentMode,
         instrumentId: paymentMode === "CASH" ? null : instrumentId,
-        userId
+        userId,
+        instrumentDate: paymentMode === "CASH" ? null : instrumentDate,userId,
       }],
       { session }
     );

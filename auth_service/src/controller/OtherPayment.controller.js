@@ -242,6 +242,172 @@ const getSingleOtherPayment = async (req, res) => {
   }
 };
 
+const getSingleOtherPaymentData = async (req, res, isPdf = false) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (isPdf) throw new Error("Invalid payment ID");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment ID"
+      });
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(id)
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "createdByUser"
+        }
+      },
+      {
+        $unwind: {
+          path: "$createdByUser",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "studentotherpayments",
+          localField: "_id",
+          foreignField: "otherPaymentId",
+          as: "studentPayments"
+        }
+      },
+      {
+        $addFields: {
+          totalStudentsAssigned: { $size: "$studentPayments" },
+          totalAmount: { $sum: "$studentPayments.amount" },
+          totalPaid: { $sum: "$studentPayments.paidAmount" },
+          totalDue: { $sum: "$studentPayments.dueAmount" }
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          amount: 1,
+          description: 1,
+          isActive: 1,
+          isDeleted: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          createdBy: {
+            name: "$createdByUser.name",
+            email: "$createdByUser.email"
+          },
+          totalStudentsAssigned: 1,
+          totalAmount: 1,
+          totalPaid: 1,
+          totalDue: 1
+        }
+      }
+    ];
+
+    const result = await OtherPaymentMaster.aggregate(pipeline);
+
+    if (!result || result.length === 0) {
+      if (isPdf) throw new Error("Other payment not found");
+      return res.status(404).json({
+        success: false,
+        message: "Other payment not found"
+      });
+    }
+    // Normal API response
+    return res.status(200).json({
+      success: true,
+      data: result[0]
+    });
+
+  } catch (error) {
+    console.log("Error in getSingleOtherPayment:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+async function generateOtherPaymentPdf(req, res) {
+  try {
+
+    const payment = await getSingleOtherPayment(req, res, true);
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: process.env.CHROME_PATH,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+
+    const html = await ejs.renderFile(
+      path.join(__dirname, "../views/otherPaymentReport.ejs"),
+      { payment }
+    );
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      displayHeaderFooter: true,
+
+      headerTemplate: `
+        <div style="width:100%; font-size:10px; padding:0 30px; text-align:center;">
+          <span style="font-weight:bold;">
+            Institute Management System
+          </span>
+          <br/>
+          <span>
+            Other Payment Report
+          </span>
+        </div>
+      `,
+
+      footerTemplate: `
+        <div style="width:100%; font-size:9px; padding:0 30px; text-align:center;">
+          <span>
+            Generated on: ${new Date().toLocaleDateString()}
+          </span>
+          &nbsp;&nbsp;|&nbsp;&nbsp;
+          Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+        </div>
+      `,
+
+      margin: {
+        top: "80px",      // header space
+        bottom: "80px",   // footer space
+        left: "30px",
+        right: "30px"
+      }
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=other-payment-report.pdf"
+    });
+
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}
+
+
 const updateOtherPayment = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();

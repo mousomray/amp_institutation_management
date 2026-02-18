@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { InputNumber } from "primereact/inputnumber";
+import { Calendar } from "primereact/calendar";
 
 type Props = {
   id?: string | null;
@@ -16,6 +17,7 @@ type Props = {
 export default function AddPayment({ id, onClose, onSuccess, isInstallment = false, studentFeesId }: Props) {
   const [amount, setAmount] = useState<number | null>(null);
   const [instrumentId, setInstrumentId] = useState<string>(""); // for UPI/bank/check references
+  const [instrumentDate, setInstrumentDate] = useState<Date | null>(new Date()); // date for UPI/bank/check
   const [mode, setMode] = useState<string>("CASH");
   const [loading, setLoading] = useState(false);
   const [fetchingAmount, setFetchingAmount] = useState(false);
@@ -129,6 +131,9 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
       // include instrumentId only when provided (for UPI/bank/check references)
       const payload: any = { amount: Number(amount), paymentMode: mode };
       if (instrumentId && instrumentId.trim().length > 0) payload.instrumentId = instrumentId.trim();
+      if (instrumentDate && mode !== "CASH" && mode !== "CARD") {
+        payload.instrumentDate = instrumentDate.toISOString();
+      }
 
       let url: string;
       if (isInstallment && studentFeesId) {
@@ -143,6 +148,7 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
       toast.success(res.data?.message || "Payment successful");
       setAmount(null);
       setInstrumentId("");
+      setInstrumentDate(new Date());
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error(err);
@@ -183,25 +189,45 @@ export default function AddPayment({ id, onClose, onSuccess, isInstallment = fal
       </div>
 
       {/* instrumentId input for UPI/Bank/CHEQUE modes */}
-      {mode && mode !== "CASH" && (
-        <div className="px-2">
-          <label className="text-sm font-medium text-gray-700">
-            {mode === "CHEQUE" ? "Cheque Number" : "Transaction / Instrument ID"}
-          </label>
-          <div className="mt-2">
-            <input
-              value={instrumentId}
-              onChange={(e) => setInstrumentId(e.target.value)}
-              className="w-full p-2 border rounded"
-              placeholder={
-                mode === "CHEQUE"
-                  ? "e.g. Cheque number"
-                  : "e.g. UPI txn id or cheque number (optional)"
-              }
-              disabled={loading}
-            />
+      {mode && mode !== "CASH" && mode !== "CARD" && (
+        <>
+          <div className="px-2">
+            <label className="text-sm font-medium text-gray-700">
+              {mode === "CHEQUE" ? "Cheque Number" : "Transaction / Instrument ID"}
+            </label>
+            <div className="mt-2">
+              <input
+                value={instrumentId}
+                onChange={(e) => setInstrumentId(e.target.value)}
+                className="w-full p-2 border rounded"
+                placeholder={
+                  mode === "CHEQUE"
+                    ? "e.g. Cheque number"
+                    : "e.g. UPI txn id or cheque number (optional)"
+                }
+                disabled={loading}
+              />
+            </div>
           </div>
-        </div>
+
+          <div className="px-2">
+            <label className="text-sm font-medium text-gray-700">
+              {mode === "CHEQUE" ? "Cheque Date" : "Transaction Date"}
+            </label>
+            <div className="mt-2">
+              <Calendar
+                value={instrumentDate}
+                onChange={(e) => setInstrumentDate(e.value as Date | null)}
+                dateFormat="dd/mm/yy"
+                showIcon
+                className="w-full"
+                placeholder="Select date"
+                disabled={loading}
+                maxDate={new Date()}
+              />
+            </div>
+          </div>
+        </>
       )}
 
       <div className="px-2">

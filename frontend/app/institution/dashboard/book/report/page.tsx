@@ -127,6 +127,7 @@ export default function ReportPage() {
 	const [expandedRows, setExpandedRows] = useState<any>(null);
 	const [error, setError] = useState<string>('');
 	const [totalsFetched, setTotalsFetched] = useState(false);
+	const [pdfLoading, setPdfLoading] = useState(false);
 	const [globalTotals, setGlobalTotals] = useState<{
 		totalBooks: number;
 		totalBookFee: number;
@@ -403,121 +404,34 @@ export default function ReportPage() {
 		URL.revokeObjectURL(url);
 	};
 
-	const escapeHtml = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	const printReport = async () => {
+		const newTab = window.open("about:blank");
+		setPdfLoading(true);
 
-	const printReport = () => {
-		const exportData = allData.length > 0 ? allData : data;
-		if (!exportData || exportData.length === 0) {
-			toast.info('No data to print.');
-			return;
+		try {
+			const token = localStorage.getItem('institution-token');
+			const res = await axios.get(`http://localhost:3004/api/generate-student-library-report/pdf`, {
+				responseType: "blob",
+				headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+			});
+
+			const blob = new Blob([res.data], { type: "application/pdf" });
+			const blobUrl = URL.createObjectURL(blob);
+			if (newTab) newTab.location.href = blobUrl;
+			else window.open(blobUrl, "_blank");
+			// revoke after some time
+			setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+			toast.success('PDF report opened in new tab!');
+		} catch (error: any) {
+			if (axios.isAxiosError(error)) {
+				toast.error(error.response?.data?.message || "Failed to generate PDF");
+			} else {
+				toast.error("Unexpected error while generating PDF");
+			}
+			if (newTab) newTab.close();
+		} finally {
+			setPdfLoading(false);
 		}
-
-		const totals = {
-			totalStudents: totalStudents,
-			totalBooks: exportData.reduce((s, r) => s + Number(r.totalBooks ?? 0), 0),
-			totalAmount: exportData.reduce((s, r) => s + Number(r.totalAmount ?? 0), 0),
-			totalFine: exportData.reduce((s, r) => s + Number(r.totalFine ?? 0), 0)
-		};
-
-		const win = window.open('', '_blank');
-		if (!win) {
-			toast.error('Popup blocked. Please allow popups.');
-			return;
-		}
-
-		const rowsHtml = exportData
-			.map((r) => {
-				const booksHtml = (r.books || [])
-					.map(
-						(b: any) => `
-							<tr>
-								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(b.book_name)}</td>
-								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(formatDateUTC(b.issue_date))}</td>
-								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(formatDateUTC(b.return_date))}</td>
-								<td style="padding:6px;border:1px solid #e5e7eb">${escapeHtml(formatDateUTC(b.actual_return_date))}</td>
-								<td style="padding:6px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(b.total_amount ?? b.totalAmount))}</td>
-								<td style="padding:6px;border:1px solid #e5e7eb;text-align:center">${escapeHtml((b.status || '').toString().toUpperCase())}</td>
-							</tr>`
-					)
-					.join('');
-
-				return `
-					<tr>
-						<td style="padding:8px;border:1px solid #e5e7eb;vertical-align:top">
-							<div style="font-weight:700">${escapeHtml(r.student?.name)}</div>
-							<div style="font-size:12px;color:#6b7280">${escapeHtml(r.student?.email)} • ${escapeHtml(r.student?.phone)}</div>
-						</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(String(r.totalBooks ?? 0))}</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(r.totalBookFee))}</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(r.totalFine))}</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR(r.totalAmount))}</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR((r as any).totalPaid ?? 0))}</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:right">${escapeHtml(fmtINR((r as any).totalDue ?? 0))}</td>
-						<td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${escapeHtml(((r as any).paymentStatus ?? (r as any).payment_status ?? '').toString().toUpperCase())}</td>
-					</tr>
-					${booksHtml ? `
-					<tr><td colspan="8" style="padding:0;background:#fafafa"><table style="width:100%;border-collapse:collapse;margin:8px 0">${booksHtml}</table></td></tr>
-					` : ''}
-				`;
-			})
-			.join('');
-
-		const html = `<!doctype html>
-		<html>
-		<head>
-		<meta charset="utf-8" />
-		<title>Library Report</title>
-		<style>
-		body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;color:#111;padding:20px}
-		.header{border-bottom:3px solid #3B82F6;padding-bottom:12px;margin-bottom:16px}
-		.header h1{font-size:20px}
-		.table{width:100%;border-collapse:collapse;margin-top:12px}
-		.table th{background:#f3f4f6;padding:8px;border:1px solid #e5e7eb;text-align:left}
-		.table td{padding:8px;border:1px solid #e5e7eb}
-		.summary{display:flex;gap:12px;margin-top:12px}
-		.summary .card{padding:10px;border:1px solid #e5e7eb;border-radius:6px}
-		.small{font-size:12px;color:#6b7280}
-		</style>
-		</head>
-		<body>
-		<div class="header">
-			<h1>📚 Library Report</h1>
-			<div class="small">Generated: ${escapeHtml(new Date().toLocaleString('en-IN'))}</div>
-		</div>
-		<div class="summary">
-			<div class="card"><div class="small">Students</div><div style="font-weight:700">${escapeHtml(String(totals.totalStudents))}</div></div>
-			<div class="card"><div class="small">Total Books Issued</div><div style="font-weight:700">${escapeHtml(String(totals.totalBooks))}</div></div>
-			<div class="card"><div class="small">Total Amount Collected</div><div style="font-weight:700">${escapeHtml(fmtINR(totals.totalAmount))}</div></div>
-			<div class="card"><div class="small">Total Fine</div><div style="font-weight:700">${escapeHtml(fmtINR(totals.totalFine))}</div></div>
-		</div>
-		<table class="table" style="margin-top:18px">
-		<thead>
-		<tr>
-		<th>Student</th>
-		<th style="text-align:right">Books</th>
-		<th style="text-align:right">Book Fee</th>
-		<th style="text-align:right">Fine</th>
-		<th style="text-align:right">Total</th>
-		<th style="text-align:right">Paid</th>
-		<th style="text-align:right">Due</th>
-		<th>Payment Status</th>
-		</tr>
-		</thead>
-		<tbody>
-		${rowsHtml}
-		</tbody>
-		</table>
-		<div style="margin-top:18px;text-align:center;color:#6b7280;font-size:12px">Total Records: ${escapeHtml(String(exportData.length))}</div>
-		</body>
-		</html>`;
-
-		win.document.open();
-		win.document.write(html);
-		win.document.close();
-
-		win.onload = () => {
-			try { win.focus(); win.print(); } catch (err) { console.error('Print failed', err); }
-		};
 	};
 
 	return (
@@ -539,7 +453,9 @@ export default function ReportPage() {
 					<div className="flex items-center gap-2">
 						<button className="p-button p-component p-button-help p-button-sm" onClick={exportCSV}>Download CSV</button>
 						<button className="p-button p-component p-button-secondary p-button-sm" onClick={() => refreshData()}>Refresh</button>
-						<button className="p-button p-component p-button-warning p-button-sm" onClick={printReport}>Print / PDF</button>
+						<button className="p-button p-component p-button-warning p-button-sm" onClick={printReport} disabled={pdfLoading}>
+							{pdfLoading ? 'Opening PDF...' : 'Print / PDF'}
+						</button>
 					</div>
 				</div>
 

@@ -101,9 +101,10 @@ export default function SingleStudentFees({ id, onClose }: Props) {
       return;
     }
 
-    try {
-      setPdfLoading(true);
+    const newTab = window.open("about:blank");
+    setPdfLoading(true);
 
+    try {
       const res = await axiosInstance.get(
         `/student-fees-ledger/single-student-fees/pdf/${id}`,
         {
@@ -116,28 +117,25 @@ export default function SingleStudentFees({ id, onClose }: Props) {
       const blobData = res?.data;
       if (!blobData) {
         toast.error('No PDF returned from server.');
+        if (newTab) newTab.close();
         return;
       }
 
-      const mime = res.headers?.['content-type'] ?? 'application/pdf';
-      const blob = new Blob([blobData], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `student-fees-${id}-${new Date().toISOString().split('T')[0]}.pdf`;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-      toast.success('PDF downloaded successfully');
+      const blob = new Blob([blobData], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      if (newTab) newTab.location.href = blobUrl;
+      else window.open(blobUrl, "_blank");
+      // revoke after some time
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      toast.success('PDF opened in new tab!');
     } catch (err: any) {
-      console.error('PDF download error:', err);
-      let msg = 'Failed to generate PDF.';
+      console.error('PDF generation error:', err);
       if (axios.isAxiosError(err)) {
-        msg = err.response?.data?.message || `Request failed (${err.response?.status ?? 'unknown'})`;
+        toast.error(err.response?.data?.message || "Failed to generate PDF");
+      } else {
+        toast.error("Unexpected error while generating PDF");
       }
-      toast.error(msg);
+      if (newTab) newTab.close();
     } finally {
       setPdfLoading(false);
     }
@@ -308,7 +306,7 @@ export default function SingleStudentFees({ id, onClose }: Props) {
               <div className="mt-6 flex gap-3 no-print">
                 <Button 
                   icon="pi pi-file-pdf" 
-                  label={pdfLoading ? 'Generating...' : 'Download PDF'} 
+                  label={pdfLoading ? 'Opening PDF...' : 'View PDF'} 
                   className="flex-1 p-button-primary" 
                   onClick={downloadPDF}
                   loading={pdfLoading}

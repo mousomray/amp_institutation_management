@@ -2,191 +2,671 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Library Report</title>
-
+    <title>Library Management Report</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 12px;
-            color: #333;
-            margin: 0;
-            padding: 0;
+            color: #2d3748;
+            background: #fff;
+            line-height: 1.6;
         }
 
-        .header {
-            text-align: center;
-            border-bottom: 2px solid #2c3e50;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 22px;
-            color: #2c3e50;
-        }
-
-        .header p {
-            margin: 5px 0;
-            font-size: 12px;
-            color: #555;
-        }
-
-        .student-card {
-            border: 1px solid #ddd;
-            padding: 12px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
-
-        .student-info {
+        /* ===== PAGE WRAPPER ===== */
+        .page {
+            width: 100%;
+            min-height: 100vh;
             display: flex;
+            flex-direction: column;
+            padding: 0 30px 0 30px;
+        }
+
+        /* ===== HEADER ===== */
+        .report-header {
+            background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%);
+            color: #fff;
+            padding: 24px 32px;
+            margin: 0 -30px 28px -30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .report-header .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .report-header .brand-icon {
+            width: 52px;
+            height: 52px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .report-header .brand-text h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .report-header .brand-text p {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 3px;
+        }
+
+        .report-header .meta {
+            text-align: right;
+            font-size: 11px;
+            opacity: 0.92;
+            line-height: 1.8;
+        }
+
+        .report-header .meta strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== REPORT SUMMARY BANNER ===== */
+        .report-summary-banner {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+
+        .rsb-item {
+            flex: 1;
+            background: #ebf8ff;
+            border: 1px solid #bee3f8;
+            border-radius: 8px;
+            padding: 12px 16px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(43, 108, 176, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .rsb-item .rsb-label {
+            font-size: 10px;
+            color: #4a5568;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-weight: 600;
+        }
+
+        .rsb-item .rsb-val {
+            font-size: 22px;
+            font-weight: 700;
+            color: #2b6cb0;
+            line-height: 1.2;
+        }
+
+        /* ===== SECTION TITLE ===== */
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1a365d;
+            border-left: 5px solid #2b6cb0;
+            padding-left: 12px;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            background: linear-gradient(90deg, #ebf8ff 0%, transparent 100%);
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+        /* ===== STUDENT CARD ===== */
+        .student-card {
+            border: 1px solid #cbd5e0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: box-shadow 0.3s ease;
+        }
+
+        /* Student Card Header */
+        .sc-head {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-bottom: 2px solid #cbd5e0;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
             justify-content: space-between;
         }
 
-        .student-info div {
-            width: 48%;
+        .sc-student-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
-        .summary-box {
-            margin-top: 10px;
-            background: #f4f6f8;
-            padding: 10px;
-            border-radius: 4px;
+        .sc-photo {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #bee3f8;
+            background: #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .summary-box span {
+        .sc-photo-placeholder {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2b6cb0, #4299e1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 22px;
+            font-weight: 700;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .sc-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a365d;
+            margin-bottom: 3px;
+        }
+
+        .sc-contacts {
+            font-size: 11px;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .sc-contacts span {
+            margin-right: 14px;
+        }
+
+        /* Payment Status Badge */
+        .badge {
             display: inline-block;
-            margin-right: 15px;
-            font-weight: bold;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
-        table {
+        .badge-paid    { background: #c6f6d5; color: #22543d; border: 1px solid #9ae6b4; }
+        .badge-partial { background: #fefcbf; color: #744210; border: 1px solid #f6e05e; }
+        .badge-unpaid  { background: #fed7d7; color: #742a2a; border: 1px solid #fc8181; }
+        .badge-due     { background: #fed7d7; color: #742a2a; border: 1px solid #fc8181; }
+        .badge-unknown { background: #e2e8f0; color: #4a5568; border: 1px solid #cbd5e0; }
+
+        /* Student Card Stats */
+        .sc-stats {
+            display: flex;
+            gap: 0;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 2px solid #cbd5e0;
+            background: #fafafa;
+        }
+
+        .sc-stat-item {
+            flex: 1;
+            padding: 12px 14px;
+            text-align: center;
+            border-right: 1px solid #e2e8f0;
+        }
+
+        .sc-stat-item:last-child { border-right: none; }
+
+        .sc-stat-label {
+            font-size: 9px;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .sc-stat-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: #2b6cb0;
+            line-height: 1.2;
+        }
+
+        .sc-stat-val.green  { color: #276749; }
+        .sc-stat-val.red    { color: #c53030; }
+        .sc-stat-val.orange { color: #c05621; }
+
+        /* ===== TABLE ===== */
+        .book-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
         }
 
-        table th {
-            background: #2c3e50;
+        .book-table thead tr {
+            background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+            box-shadow: 0 2px 4px rgba(43, 108, 176, 0.2);
+        }
+
+        .book-table thead th {
             color: #fff;
-            padding: 6px;
-            font-size: 12px;
-        }
-
-        table td {
-            padding: 6px;
-            border: 1px solid #ddd;
-            font-size: 11px;
-        }
-
-        .status-paid {
-            color: green;
-            font-weight: bold;
-        }
-
-        .status-partial {
-            color: orange;
-            font-weight: bold;
-        }
-
-        .status-unpaid {
-            color: red;
-            font-weight: bold;
-        }
-
-        .footer {
-            text-align: center;
+            padding: 10px 12px;
             font-size: 10px;
-            margin-top: 20px;
-            color: #777;
+            font-weight: 700;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
         }
 
-        .page-break {
-            page-break-after: always;
+        .book-table thead th:last-child { text-align: center; }
+
+        .book-table tbody tr:nth-child(even) {
+            background: #f7fafc;
+        }
+
+        .book-table tbody tr:hover {
+            background: #ebf8ff;
+        }
+
+        .book-table tbody td {
+            padding: 9px 12px;
+            font-size: 11px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+            color: #4a5568;
+        }
+
+        .book-table tbody td:last-child { text-align: center; }
+
+        .book-name-cell {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .delay-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #fed7d7, #fc8181);
+            color: #742a2a;
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px solid #fc8181;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .no-delay-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
+            color: #22543d;
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px solid #9ae6b4;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .tfoot-row td {
+            background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+            font-weight: 700;
+            font-size: 11px;
+            color: #2d3748;
+            border-top: 2px solid #2b6cb0;
+            border-bottom: 2px solid #2b6cb0;
+            padding: 10px 12px;
+        }
+
+        /* ===== PAGE BREAK ===== */
+        .page-break { page-break-after: always; }
+
+        /* ===== FOOTER ===== */
+        .report-footer {
+            margin-top: auto;
+            border-top: 3px solid #2b6cb0;
+            padding: 16px 0 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(0deg, #f7fafc 0%, transparent 100%);
+            padding-top: 14px;
+        }
+
+        .report-footer .footer-left {
+            font-size: 10px;
+            color: #718096;
+            font-weight: 600;
+        }
+
+        .report-footer .footer-center {
+            font-size: 10px;
+            color: #718096;
+            text-align: center;
+        }
+
+        .report-footer .footer-right {
+            font-size: 10px;
+            color: #718096;
+            text-align: right;
+        }
+
+        .footer-confidential {
+            display: inline-block;
+            background: linear-gradient(135deg, #fed7d7, #fc8181);
+            color: #742a2a;
+            border-radius: 4px;
+            padding: 3px 10px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            border: 1px solid #fc8181;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ===== WATERMARK / NO DATA ===== */
+        .no-data {
+            text-align: center;
+            padding: 80px 20px;
+            color: #718096;
+            font-size: 18px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 2px dashed #cbd5e0;
+            font-weight: 600;
         }
     </style>
 </head>
-
 <body>
 
-<% students.forEach(function(studentData, index) { %>
+<%
+    const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+    const currency   = (n) => '₹' + (parseFloat(n) || 0).toFixed(2);
+    const totalStudents = students ? students.length : 0;
+    const totalBooks    = students ? students.reduce((s, sd) => s + (sd.summary ? sd.summary.totalBooks : (sd.totalBooks || 0)), 0) : 0;
+    const grandTotal    = students ? students.reduce((s, sd) => s + (sd.summary ? sd.summary.totalAmount : (sd.totalAmount || 0)), 0) : 0;
+    const grandPaid     = students ? students.reduce((s, sd) => s + (sd.summary ? sd.summary.totalPaid : (sd.totalPaid || 0)), 0) : 0;
+    const grandDue      = students ? students.reduce((s, sd) => s + (sd.summary ? sd.summary.totalDue : (sd.totalDue || 0)), 0) : 0;
 
-    <div class="header">
-        <h1>Library Management Report</h1>
-        <p>Generated on: <%= new Date().toLocaleDateString() %></p>
+    function getField(sd, directKey, summaryKey) {
+      if (sd.summary) return sd.summary[summaryKey || directKey] || 0;
+      return sd[directKey] || 0;
+    }
+
+    function getStatus(sd) {
+      if (sd.summary) return sd.summary.paymentStatus || 'unpaid';
+      return sd.paymentStatus || 'unpaid';
+    }
+%>
+
+<% if (students && students.length > 0) { %>
+
+<!-- ===== REPORT HEADER (appears on every page via fixed positioning via repeat on each page-wrap) ===== -->
+<div class="page">
+
+    <div class="report-header">
+        <div class="brand">
+            <div class="brand-icon">&#128218;</div>
+            <div class="brand-text">
+                <h1>Library Management System</h1>
+                <p>Student Book Issue &amp; Financial Report</p>
+            </div>
+        </div>
+        <div class="meta">
+            <strong>Official Report</strong>
+            Generated: <%= new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) %><br>
+            Total Students: <%= totalStudents %> &nbsp;|&nbsp; Total Books Issued: <%= totalBooks %>
+        </div>
     </div>
 
-    <div class="student-card">
+    <!-- ===== GRAND SUMMARY BANNER ===== -->
+    <div class="report-summary-banner">
+        <div class="rsb-item">
+            <div class="rsb-label">Total Students</div>
+            <div class="rsb-val"><%= totalStudents %></div>
+        </div>
+        <div class="rsb-item">
+            <div class="rsb-label">Books Issued</div>
+            <div class="rsb-val"><%= totalBooks %></div>
+        </div>
+        <div class="rsb-item">
+            <div class="rsb-label">Grand Total</div>
+            <div class="rsb-val">₹<%= grandTotal.toFixed(2) %></div>
+        </div>
+        <div class="rsb-item" style="background:#c6f6d5; border-color:#9ae6b4;">
+            <div class="rsb-label">Total Collected</div>
+            <div class="rsb-val" style="color:#276749;">₹<%= grandPaid.toFixed(2) %></div>
+        </div>
+        <div class="rsb-item" style="background:#fed7d7; border-color:#feb2b2;">
+            <div class="rsb-label">Total Outstanding</div>
+            <div class="rsb-val" style="color:#c53030;">₹<%= grandDue.toFixed(2) %></div>
+        </div>
+    </div>
 
-        <div class="student-info">
-            <div>
-                <p><strong>Name:</strong> <%= studentData.student?.name || "N/A" %></p>
-                <p><strong>Email:</strong> <%= studentData.student?.email || "N/A" %></p>
-                <p><strong>Phone:</strong> <%= studentData.student?.phone || "N/A" %></p>
+    <!-- ===== STUDENT RECORDS ===== -->
+    <div class="section-title">Student Records</div>
+
+    <% students.forEach(function(sd, index) {
+
+        const status      = getStatus(sd);
+        const tBooks      = getField(sd, 'totalBooks');
+        const tBookFee    = getField(sd, 'totalBookFee');
+        const tFine       = getField(sd, 'totalFine');
+        const tAmount     = getField(sd, 'totalAmount');
+        const tPaid       = getField(sd, 'totalPaid');
+        const tDue        = getField(sd, 'totalDue');
+        const stuName     = sd.student ? (sd.student.name || 'N/A') : 'N/A';
+        const stuEmail    = sd.student ? (sd.student.email || 'N/A') : 'N/A';
+        const stuPhone    = sd.student ? (sd.student.phone || 'N/A') : 'N/A';
+        const stuPhoto    = sd.student ? sd.student.photo : null;
+        const initial     = stuName.charAt(0).toUpperCase();
+        const books       = sd.books || [];
+
+    %>
+
+    <div class="student-card" style="margin-bottom: 24px;">
+
+        <!-- Student Header -->
+        <div class="sc-head">
+            <div class="sc-student-info">
+                <% if (stuPhoto) { %>
+                    <img src="<%= stuPhoto %>" alt="Photo" class="sc-photo" />
+                <% } else { %>
+                    <div class="sc-photo-placeholder"><%= initial %></div>
+                <% } %>
+                <div>
+                    <div class="sc-name"><%= stuName %></div>
+                    <div class="sc-contacts">
+                        <span>&#9993; <%= stuEmail %></span>
+                        <span>&#9742; <%= stuPhone %></span>
+                    </div>
+                </div>
             </div>
-
             <div>
-                <p><strong>Total Books:</strong> <%= studentData.totalBooks %></p>
-                <p><strong>Total Amount:</strong> ৳ <%= studentData.totalAmount %></p>
-                <p>
-                    <strong>Status:</strong>
-                    <span class="status-<%= studentData.paymentStatus %>">
-                        <%= studentData.paymentStatus.toUpperCase() %>
-                    </span>
-                </p>
+                <span class="badge badge-<%= status %>"><%= status.toUpperCase() %></span>
             </div>
         </div>
 
-        <div class="summary-box">
-            <span>Book Fee: ৳ <%= studentData.totalBookFee %></span>
-            <span>Fine: ৳ <%= studentData.totalFine %></span>
-            <span>Paid: ৳ <%= studentData.totalPaid %></span>
-            <span>Due: ৳ <%= studentData.totalDue %></span>
+        <!-- Stats Row -->
+        <div class="sc-stats">
+            <div class="sc-stat-item">
+                <div class="sc-stat-label">Books Issued</div>
+                <div class="sc-stat-val"><%= tBooks %></div>
+            </div>
+            <div class="sc-stat-item">
+                <div class="sc-stat-label">Book Fee</div>
+                <div class="sc-stat-val">₹<%= parseFloat(tBookFee).toFixed(2) %></div>
+            </div>
+            <div class="sc-stat-item">
+                <div class="sc-stat-label">Late Fine</div>
+                <div class="sc-stat-val orange">₹<%= parseFloat(tFine).toFixed(2) %></div>
+            </div>
+            <div class="sc-stat-item">
+                <div class="sc-stat-label">Total Amount</div>
+                <div class="sc-stat-val">₹<%= parseFloat(tAmount).toFixed(2) %></div>
+            </div>
+            <div class="sc-stat-item">
+                <div class="sc-stat-label">Total Paid</div>
+                <div class="sc-stat-val green">₹<%= parseFloat(tPaid).toFixed(2) %></div>
+            </div>
+            <div class="sc-stat-item">
+                <div class="sc-stat-label">Total Due</div>
+                <div class="sc-stat-val red">₹<%= parseFloat(tDue).toFixed(2) %></div>
+            </div>
         </div>
 
-        <table>
+        <!-- Book Table -->
+        <table class="book-table">
             <thead>
                 <tr>
-                    <th>Book Name</th>
-                    <th>Issue Date</th>
-                    <th>Return Date</th>
-                    <th>Delay</th>
-                    <th>Fee</th>
-                    <th>Fine</th>
-                    <th>Total</th>
-                    <th>Paid</th>
-                    <th>Due</th>
+                    <th style="width:4%; text-align:center;">#</th>
+                    <th style="width:20%;">Book Name</th>
+                    <th style="width:11%;">Issue Date</th>
+                    <th style="width:11%;">Due Date</th>
+                    <th style="width:11%;">Return Date</th>
+                    <th style="width:9%; text-align:center;">Delay</th>
+                    <th style="width:8%; text-align:right;">Fee</th>
+                    <th style="width:8%; text-align:right;">Fine</th>
+                    <th style="width:9%; text-align:right;">Total</th>
+                    <th style="width:9%; text-align:center;">Status</th>
                 </tr>
             </thead>
             <tbody>
-                <% studentData.books.forEach(function(book) { %>
+                <% if (books.length > 0) { %>
+                    <% books.forEach(function(book, bi) {
+                        const bStatus     = book.payment_status || book.status || 'unknown';
+                        const delayDays   = book.delay_days || 0;
+                    %>
                     <tr>
-                        <td><%= book.book?.name || "N/A" %></td>
-                        <td><%= book.issue_date ? new Date(book.issue_date).toLocaleDateString() : "-" %></td>
-                        <td><%= book.return_date ? new Date(book.return_date).toLocaleDateString() : "-" %></td>
-                        <td><%= book.delay_days || 0 %> days</td>
-                        <td>৳ <%= book.book_fee %></td>
-                        <td>৳ <%= book.calculatedFine || 0 %></td>
-                        <td>৳ <%= book.calculatedTotal || 0 %></td>
-                        <td>৳ <%= book.paid_amount %></td>
-                        <td>৳ <%= book.due_amount %></td>
+                        <td style="color:#a0aec0; text-align:center;"><%= bi + 1 %></td>
+                        <td class="book-name-cell"><%= book.book_name || 'N/A' %></td>
+                        <td><%= formatDate(book.issue_date) %></td>
+                        <td><%= formatDate(book.return_date) %></td>
+                        <td><%= book.actual_return_date ? formatDate(book.actual_return_date) : '<span style="color:#a0aec0;">Not returned</span>' %></td>
+                        <td style="text-align:center;">
+                            <% if (delayDays > 0) { %>
+                                <span class="delay-badge"><%= delayDays %> day<%= delayDays > 1 ? 's' : '' %></span>
+                            <% } else { %>
+                                <span class="no-delay-badge">On time</span>
+                            <% } %>
+                        </td>
+                        <td style="text-align:right;"><%= currency(book.book_fee) %></td>
+                        <td style="text-align:right; color:#c53030; font-weight:600;">
+                            <%= currency(book.fine_amount) %>
+                        </td>
+                        <td style="text-align:right; font-weight:700;"><%= currency(book.total_amount) %></td>
+                        <td style="text-align:center;"><span class="badge badge-<%= bStatus %>"><%= bStatus.toUpperCase() %></span></td>
                     </tr>
-                <% }) %>
+                    <% }) %>
+
+                    <!-- Totals Footer Row -->
+                    <tr class="tfoot-row">
+                        <td colspan="6" style="text-align:right; font-weight:700;">Student Total:</td>
+                        <td style="font-weight:700;"><%= currency(tBookFee) %></td>
+                        <td style="color:#c53030; font-weight:700;"><%= currency(tFine) %></td>
+                        <td style="color:#2b6cb0; font-weight:700;"><%= currency(tAmount) %></td>
+                        <td style="text-align:right;">
+                            <div style="color:#276749; font-weight:600; margin-bottom:3px;">Paid: <%= currency(tPaid) %></div>
+                            <div style="color:#c53030; font-weight:600;">Due: <%= currency(tDue) %></div>
+                        </td>
+                    </tr>
+
+                <% } else { %>
+                    <tr>
+                        <td colspan="10" style="text-align:center; padding:20px; color:#a0aec0;">
+                            No books issued to this student
+                        </td>
+                    </tr>
+                <% } %>
             </tbody>
         </table>
 
-    </div>
+    </div><!-- /.student-card -->
 
-    <% if(index !== students.length - 1) { %>
+    <!-- Page break between students (except last) -->
+    <% if (index !== students.length - 1) { %>
         <div class="page-break"></div>
+
+        <!-- Repeat header on new page -->
+        <div class="report-header" style="margin-top:0;">
+            <div class="brand">
+                <div class="brand-icon">&#128218;</div>
+                <div class="brand-text">
+                    <h1>Library Management System</h1>
+                    <p>Student Book Issue &amp; Financial Report — Continued</p>
+                </div>
+            </div>
+            <div class="meta">
+                <strong>Official Report</strong>
+                Generated: <%= new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) %>
+            </div>
+        </div>
+
     <% } %>
 
-<% }) %>
+    <% }) %> <!-- end students.forEach -->
 
-<div class="footer">
-    Library Report | Confidential Document
+    <!-- ===== FOOTER ===== -->
+    <div class="report-footer" style="margin-top: 28px;">
+        <div class="footer-left">
+            Library Management System &copy; <%= new Date().getFullYear() %>
+        </div>
+        <div class="footer-center">
+            <span class="footer-confidential">Confidential</span>
+        </div>
+        <div class="footer-right">
+            Report generated on <%= new Date().toLocaleString('en-GB') %>
+        </div>
+    </div>
+
+</div><!-- /.page -->
+
+<% } else { %>
+
+<div class="page">
+    <div class="report-header">
+        <div class="brand">
+            <div class="brand-icon">&#128218;</div>
+            <div class="brand-text">
+                <h1>Library Management System</h1>
+                <p>Student Book Issue &amp; Financial Report</p>
+            </div>
+        </div>
+        <div class="meta">
+            <strong>Official Report</strong>
+            Generated: <%= new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }) %>
+        </div>
+    </div>
+    <div class="no-data">
+        &#128218; No library data available for this report.
+    </div>
+    <div class="report-footer" style="margin-top: 28px;">
+        <div class="footer-left">Library Management System &copy; <%= new Date().getFullYear() %></div>
+        <div class="footer-center"><span class="footer-confidential">Confidential</span></div>
+        <div class="footer-right">Report generated on <%= new Date().toLocaleString('en-GB') %></div>
+    </div>
 </div>
+
+<% } %>
 
 </body>
 </html>
