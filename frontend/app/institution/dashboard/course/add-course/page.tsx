@@ -44,7 +44,7 @@ export default function AddCourseForm() {
   const [feeToAdd, setFeeToAdd] = useState<string | null>(null);
   const [feeToAddAmount, setFeeToAddAmount] = useState<number | null>(null);
   const [selectedFeesMap, setSelectedFeesMap] = useState<Record<string, { selected: boolean; amount: number | "" }>>({});
-
+  
   const {
     register,
     handleSubmit,
@@ -72,8 +72,6 @@ export default function AddCourseForm() {
         });
         const data = res.data?.data || [];
         setFeesMaster(data);
-
-        // leave selectedFees empty; user will add via dropdown
         setSelectedFees([]);
       } catch (err) {
         console.error("Failed to fetch fees master", err);
@@ -84,8 +82,22 @@ export default function AddCourseForm() {
   }, [token]);
 
   const onSubmit = async (data: CourseFormData) => {
-    setIsSubmitting(true);
+    if (showFees && selectedFees.length === 0) {
+      toast.error("Please add at least one fee item");
+      return;
+    }
 
+    if (showFees && selectedFees.some((f) => !f.amount || Number(f.amount) <= 0)) {
+      toast.error("Please enter a valid amount for all selected fees");
+      return;
+    }
+    if (!showFees) {
+      toast.error("Please enable and add fees before creating the course");
+      return;
+    }
+
+    setIsSubmitting(true);
+  
     try {
       const duration = `${data.durationValue} ${data.durationUnit}`;
 
