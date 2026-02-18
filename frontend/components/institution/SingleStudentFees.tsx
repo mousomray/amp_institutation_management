@@ -353,6 +353,19 @@ export default function SingleStudentFees({ id, onClose }: Props) {
                     disabled={pdfLoading || sendingPDF}
                   />
                 </div>
+                
+                {/* App Password Notice */}
+                <div className="mt-2 p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r">
+                  <div className="flex items-start gap-2">
+                    <i className="pi pi-info-circle text-amber-600 mt-0.5" style={{ fontSize: '0.9rem' }}></i>
+                    <div className="text-xs text-amber-800">
+                      <span className="font-semibold">Note:</span> If you haven't set up your{' '}
+                      <span className="font-medium">Google App Password</span> in your profile settings, 
+                      the email will not be sent to the student.
+                    </div>
+                  </div>
+                </div>
+                
                 {/* <Button 
                   icon="pi pi-print" 
                   label="Print" 

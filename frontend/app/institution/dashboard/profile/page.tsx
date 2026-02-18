@@ -6,7 +6,9 @@ import { Badge } from "primereact/badge";
 import axiosInstance from "@/service/axios.service";
 import { toast } from "react-toastify";
 import { InputText } from "primereact/inputtext";
+import { Button } from "primereact/button";
 import "leaflet/dist/leaflet.css";
+import "primeicons/primeicons.css";
 import dynamic from "next/dynamic";
 import { InstitutionSchema } from "@/helper/schema/Schema"
 
@@ -66,6 +68,14 @@ export default function InstitutionProfilePage() {
         lat: number;
         lng: number;
     } | null>(null);
+
+    const [appPassword, setAppPassword] = useState("");
+    const [confirmAppPassword, setConfirmAppPassword] = useState("");
+    const [appPasswordErrors, setAppPasswordErrors] = useState<{
+        appPassword?: string;
+        confirmPassword?: string;
+    }>({});
+    const [appPasswordLoading, setAppPasswordLoading] = useState(false);
 
     const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +176,16 @@ export default function InstitutionProfilePage() {
 
         const { name, value } = e.target;
 
+        // Validate numeric fields - only allow digits
+        if (name === "phone" || name === "whatsAppNo") {
+            const numericValue = value.replace(/\D/g, ''); // Remove all non-digit characters
+            setFormData({
+                ...formData,
+                [name]: numericValue,
+            });
+            return;
+        }
+
         if (name === "lat" || name === "lng") {
             setFormData({
                 ...formData,
@@ -256,6 +276,63 @@ export default function InstitutionProfilePage() {
             getInstitutionData();
         } catch (error) {
             toast.error("Update failed");
+        }
+    };
+
+    /* ================= APP PASSWORD UPDATE ================= */
+
+    const handleAppPasswordUpdate = async () => {
+        // Reset errors
+        setAppPasswordErrors({});
+
+        // Validation
+        const validationErrors: { appPassword?: string; confirmPassword?: string } = {};
+
+        if (!appPassword || appPassword.trim() === "") {
+            validationErrors.appPassword = "Google App Password is required";
+        } else if (appPassword.replace(/\s/g, '').length < 16) {
+            validationErrors.appPassword = "Google App Password must be 16 characters (spaces will be preserved)";
+        }
+
+        if (!confirmAppPassword || confirmAppPassword.trim() === "") {
+            validationErrors.confirmPassword = "Please confirm your Google App Password";
+        } else if (appPassword !== confirmAppPassword) {
+            validationErrors.confirmPassword = "Passwords do not match";
+        }
+
+        if (Object.keys(validationErrors).length > 0) {
+            setAppPasswordErrors(validationErrors);
+            return;
+        }
+
+        setAppPasswordLoading(true);
+
+        try {
+            const response = await axiosInstance.put(
+                "/institution/update-institution-app-password",
+                { appPassword: appPassword },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            setAppPassword("");
+            setConfirmAppPassword("");
+            setAppPasswordLoading(false);
+            
+            toast.success(response?.data?.message, {
+                position: "top-right",
+                autoClose: 3000,
+            });
+        } catch (error: any) {
+            setAppPasswordLoading(false);
+            toast.error(
+                error?.response?.data?.message || "Failed to save Google App Password. Please try again.",
+                {
+                    position: "top-right",
+                    autoClose: 3000,
+                }
+            );
         }
     };
 
@@ -394,8 +471,8 @@ export default function InstitutionProfilePage() {
                 {/* ================= FIELDS ================= */}
                 <div className="grid md:grid-cols-2 gap-6 mt-8">
                     <EditableField error={errors.email}  label="Email" name="email" value={formData.email || ""} editing={editing} onChange={handleChange} />
-                    <EditableField error={errors.phone} label="Phone" name="phone" value={formData.phone || ""} editing={editing} onChange={handleChange} />
-                    <EditableField error={errors.whatsAppNo} label="WhatsApp number" name="whatsAppNo" value={formData.whatsAppNo || ""} editing={editing} onChange={handleChange} />
+                    <EditableField error={errors.phone} label="Phone" name="phone" value={formData.phone || ""} editing={editing} onChange={handleChange} type="tel" maxLength={15} />
+                    <EditableField error={errors.whatsAppNo} label="WhatsApp number" name="whatsAppNo" value={formData.whatsAppNo || ""} editing={editing} onChange={handleChange} type="tel" maxLength={15} />
                     <EditableField error={errors.website} label="Website" name="website" value={formData.website} editing={editing} onChange={handleChange} />
                     <EditableField error={errors.registrationNo} label="Registration No" name="registrationNo" value={formData.registrationNo || ""} editing={editing} onChange={handleChange} />
                     <EditableField error={errors.establishDate} label="Established Date" name="establishDate" value={formData.establishDate || ""} editing={editing} onChange={handleChange} type="date" />
@@ -420,6 +497,113 @@ export default function InstitutionProfilePage() {
                     </div>
                 )}
             </div>
+
+            {/* ================= APP VAULT PASSWORD SECTION ================= */}
+            <div className="bg-white rounded-xl shadow-xl p-8 mt-8">
+                <div className="border-b pb-4 mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+                        <i className="pi pi-lock text-indigo-600" style={{ fontSize: '1.5rem' }}></i>
+                        Google APP Vault Password
+                    </h2>
+                    <div className="mt-3 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg">
+                        <p className="text-gray-700 text-sm font-semibold mb-2">
+                            <i className="pi pi-exclamation-triangle text-amber-600 mr-2"></i>
+                            Important: This is NOT your website login password!
+                        </p>
+                        <p className="text-gray-600 text-sm leading-relaxed mb-2">
+                            If you want to send emails (receipts, reports, notifications) to your students, you need to create a 
+                            <strong> Google App Password</strong> from your Google Account settings.
+                        </p>
+                        <div className="mt-3 bg-white p-3 rounded border border-amber-200">
+                            <p className="text-xs font-semibold text-gray-700 mb-2">📌 How to create Google App Password:</p>
+                            <ol className="text-xs text-gray-600 space-y-1 ml-4 list-decimal">
+                                <li>Go to your Google Account → Security</li>
+                                <li>Enable 2-Step Verification (if not enabled)</li>
+                                <li>Search for "App Passwords" in security settings</li>
+                                <li>Generate a new app password for "Mail"</li>
+                                <li>Copy the 16-character password and paste it below</li>
+                            </ol>
+                            <p className="text-xs text-indigo-600 mt-2 font-medium">
+                                Example: "abcd efgh ijkl mnop" (4 groups of 4 characters)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="max-w-2xl">
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* APP Password Field */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Google App Password <span className="text-red-500">*</span>
+                            </label>
+                            <InputText
+                                value={appPassword}
+                                onChange={(e) => setAppPassword(e.target.value)}
+                                placeholder="abcd efgh ijkl mnop"
+                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                                    appPasswordErrors.appPassword ? "border-red-500" : ""
+                                }`}
+                            />
+                            {appPasswordErrors.appPassword && (
+                                <small className="text-red-500 mt-1 block">
+                                    {appPasswordErrors.appPassword}
+                                </small>
+                            )}
+                        </div>
+
+                        {/* Confirm Password Field */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Confirm App Password <span className="text-red-500">*</span>
+                            </label>
+                            <InputText
+                                value={confirmAppPassword}
+                                onChange={(e) => setConfirmAppPassword(e.target.value)}
+                                placeholder="Re-enter the same password"
+                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                                    appPasswordErrors.confirmPassword ? "border-red-500" : ""
+                                }`}
+                            />
+                            {appPasswordErrors.confirmPassword && (
+                                <small className="text-red-500 mt-1 block">
+                                    {appPasswordErrors.confirmPassword}
+                                </small>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Password Requirements */}
+                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm font-semibold text-green-900 mb-2">
+                            <i className="pi pi-info-circle mr-2"></i>
+                            Google App Password Format:
+                        </p>
+                        <ul className="text-sm text-green-800 space-y-1 ml-6 list-disc">
+                            <li>16 characters long (typically in 4 groups of 4 characters)</li>
+                            <li>Generated from your Google Account security settings</li>
+                            <li>Used exclusively for sending emails from this application</li>
+                            <li>You can paste it with or without spaces</li>
+                        </ul>
+                    </div>
+
+                    {/* Update Button */}
+                    <div className="mt-6">
+                        <Button
+                            label="Save Google App Password"
+                            icon="pi pi-shield"
+                            loading={appPasswordLoading}
+                            onClick={handleAppPasswordUpdate}
+                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                            disabled={appPasswordLoading}
+                        />
+                        <p className="text-xs text-gray-500 mt-3">
+                            <i className="pi pi-shield mr-1"></i>
+                            This password will be securely stored and used only for sending emails to students.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -434,6 +618,7 @@ function EditableField({
     onChange,
     type = "text",
     error,
+    maxLength,
 }: {
     label: string;
     name: string;
@@ -442,6 +627,7 @@ function EditableField({
     onChange: any;
     type?: string;
     error?: string;
+    maxLength?: number;
 }) {
     return (
         <div>
@@ -453,6 +639,7 @@ function EditableField({
                         name={name}
                         value={value || ''}
                         onChange={onChange}
+                        maxLength={maxLength}
                         className={`border p-2 rounded w-full mt-1 ${error ? "border-red-500" : ""
                             }`}
                     />
