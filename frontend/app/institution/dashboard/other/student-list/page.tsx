@@ -35,7 +35,8 @@ export default function OtherPaymentStudentsPage() {
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
   const [collecting, setCollecting] = useState<Record<string, boolean>>({});
   const challanRef = useRef<HTMLDivElement | null>(null);
-
+   const [pdfLoading, setPdfLoading] = useState(false);
+   const [paymentId,setPaymentId] = useState<string | null> (null)
   const searchRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -150,6 +151,8 @@ export default function OtherPaymentStudentsPage() {
         icon: "pi pi-file",
         command: () => {
           setSelectedStudent(row);
+          setPaymentId(row.studentId)
+          console.log(row)
           setDetailVisible(true);
         },
       },
@@ -209,38 +212,52 @@ export default function OtherPaymentStudentsPage() {
       ? selectedStudent.fees[0].paymentId
       : "-";
 
-  const handlePrint = () => {
-    if (typeof window === "undefined" || !challanRef.current) return;
-    const printContent = challanRef.current.innerHTML;
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) return;
-    win.document.write(`
-      <html>
-        <head>
-          <title>Student Challan</title>
-          <style>
-            body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px; background: #f3f4f6; }
-            .challan-card { border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; padding: 24px; }
-            .challan-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-            .challan-title { font-size: 18px; font-weight: 700; }
-            .challan-sub { font-size: 12px; color: #6b7280; }
-            .challan-section-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; font-size: 12px; }
-            th { background: #f9fafb; text-align: left; font-weight: 600; }
-            .text-right { text-align: right; }
-            .summary-row td { font-weight: 600; }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    win.print();
+    const downloadPDF = async () => {
+    if (!paymentId || !token) {
+      toast.error('Missing ID or authentication token');
+      return;
+    }
+
+    const newTab = window.open("about:blank");
+    setPdfLoading(true);
+
+    try {
+      const res = await axiosInstance.get(
+        `/other-payment/generate-single-pdf/${paymentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob',
+          timeout: 60000
+        }
+      );
+
+      const blobData = res?.data;
+      if (!blobData) {
+        toast.error('No PDF returned from server.');
+        if (newTab) newTab.close();
+        return;
+      }
+
+      const blob = new Blob([blobData], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      if (newTab) newTab.location.href = blobUrl;
+      else window.open(blobUrl, "_blank");
+      // revoke after some time
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      toast.success('PDF opened in new tab!');
+    } catch (err: any) {
+      console.error('PDF generation error:', err);
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Failed to generate PDF");
+      } else {
+        toast.error("Unexpected error while generating PDF");
+      }
+      if (newTab) newTab.close();
+    } finally {
+      setPdfLoading(false);
+    }
   };
+
 
   const header = (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -445,7 +462,7 @@ export default function OtherPaymentStudentsPage() {
                 label="Print Challan"
                 icon="pi pi-print"
                 className="p-button-outlined p-button-secondary"
-                onClick={handlePrint}
+                onClick={downloadPDF}
               />
               <Button label="Close" className="p-button-text" onClick={() => setDetailVisible(false)} />
             </div>
