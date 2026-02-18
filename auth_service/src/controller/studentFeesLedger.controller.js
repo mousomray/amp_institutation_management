@@ -635,7 +635,7 @@ const sentCourseFeesChallan = async (req, res) => {
     await browser.close();
     const transporter = await createTransporter(req.user.id);
     await transporter.sendMail({
-      from: req.user.email,  
+      from: req.user.email,
       to: student.email,
       subject: "Your Student Fees Receipt",
       html: `
@@ -667,6 +667,76 @@ const sentCourseFeesChallan = async (req, res) => {
     });
   }
 };
+
+
+
+const sentStudentFinancialReport = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+  const data = await getStudentSingleDataService(studentId);
+
+  if (!data) {
+    return res.status(404).json({ message: "Report data not found" });
+  }
+
+  const student = await StudentModel.findById(studentId);
+
+  
+
+  if (!student || !student.email) {
+    return res.status(400).json({ message: "Student email not found" });
+  }
+
+  const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: process.env.CHROME_PATH,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+    const page = await browser.newPage();
+    const html = await ejs.renderFile(
+      path.join(__dirname, "../views/studentReport.ejs"),
+      { data: data }
+    );
+
+    await page.setContent(html, { waitUntil: "networkidle2" });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+    });
+    await browser.close();
+    const transporter = await createTransporter(req.user.id);
+    await transporter.sendMail({
+      from: req.user.email,
+      to: student.email,
+      subject: "Your Student Fees Receipt",
+      html: `
+        <div style="font-family:Arial,sans-serif">
+          <h2>Hello ${student.name},</h2>
+          <p>Please find attached your fees receipt.</p>
+          <p>Regards,<br/>${req.user.email}</p>
+        </div>
+      `,
+      attachments: [
+        {
+          filename: `student-fees-${studentId}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf"
+        }
+      ]
+    });
+    return res.status(200).json({
+      message: "PDF generated and sent successfully",
+    });
+  } catch (error) {
+    console.error("Single Fees PDF Error:", error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+}
 
 
 const getStudentFinancialReport = async (req, res) => {
@@ -1614,4 +1684,4 @@ const generateSinglePDF = async (req, res) => {
 
 
 
-module.exports = { createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF, getStudentFullFinancialSummary, generateSinglePDF,sentCourseFeesChallan };
+module.exports = {sentStudentFinancialReport, createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF, getStudentFullFinancialSummary, generateSinglePDF, sentCourseFeesChallan };
