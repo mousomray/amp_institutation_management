@@ -15,6 +15,7 @@ type Props = {
 export default function SingleStudentFees({ id, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [sendingPDF, setSendingPDF] = useState(false);
   const [data, setData] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
   
@@ -138,6 +139,36 @@ export default function SingleStudentFees({ id, onClose }: Props) {
       if (newTab) newTab.close();
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const sendPDF = async () => {
+    if (!id || !token) {
+      toast.error('Missing ID or authentication token');
+      return;
+    }
+
+    setSendingPDF(true);
+
+    try {
+      const res = await axiosInstance.get(
+        `/student-fees-ledger/sent-student-fees/pdf/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 60000
+        }
+      );
+
+      toast.success(res.data?.message || 'PDF sent successfully!');
+    } catch (err: any) {
+      console.error('PDF send error:', err);
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Failed to send PDF");
+      } else {
+        toast.error("Unexpected error while sending PDF");
+      }
+    } finally {
+      setSendingPDF(false);
     }
   };
 
@@ -303,15 +334,25 @@ export default function SingleStudentFees({ id, onClose }: Props) {
                 </span>
               </div>
               
-              <div className="mt-6 flex gap-3 no-print">
-                <Button 
-                  icon="pi pi-file-pdf" 
-                  label={pdfLoading ? 'Opening PDF...' : 'View PDF'} 
-                  className="flex-1 p-button-primary" 
-                  onClick={downloadPDF}
-                  loading={pdfLoading}
-                  disabled={pdfLoading}
-                />
+              <div className="mt-6 flex flex-col gap-2 no-print">
+                <div className="flex gap-2">
+                  <Button 
+                    icon="pi pi-file-pdf" 
+                    label={pdfLoading ? 'Opening PDF...' : 'View PDF'} 
+                    className="flex-1 p-button-primary" 
+                    onClick={downloadPDF}
+                    loading={pdfLoading}
+                    disabled={pdfLoading || sendingPDF}
+                  />
+                  <Button 
+                    icon="pi pi-send" 
+                    label={sendingPDF ? 'Sending...' : 'Send PDF'} 
+                    className="flex-1 p-button-success" 
+                    onClick={sendPDF}
+                    loading={sendingPDF}
+                    disabled={pdfLoading || sendingPDF}
+                  />
+                </div>
                 {/* <Button 
                   icon="pi pi-print" 
                   label="Print" 

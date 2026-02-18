@@ -26,8 +26,7 @@ const institutionSchema = new Schema(
     phone: String,
     appPassword: {
       type: String,
-      required: true,
-      select: false   
+      select: false
     },
     whatsAppNo: String,
     website: String,
