@@ -338,7 +338,10 @@ const getSingleOtherPaymentData = async (req, res, isPdf = false) => {
 async function generateOtherPaymentPdf(req, res) {
   try {
 
-    const payment = await getSingleOtherPayment(req, res, true);
+    const payment = await getSingleOtherPaymentData(req, res, true);
+
+
+    console.log("--->",payment)
 
     const browser = await puppeteer.launch({
       headless: "new",
@@ -1053,6 +1056,7 @@ const getPaymentStatistics = async (req, res) => {
 
 
 module.exports = {
+  generateOtherPaymentPdf,
   createOtherPayment,
   getAllOtherPayments,
   getSingleOtherPayment,

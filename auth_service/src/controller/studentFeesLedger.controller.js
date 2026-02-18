@@ -1326,146 +1326,165 @@ const getStudentSingleDataService = async (studentId) => {
     throw new Error("Invalid student ID");
   }
 
-  const pipeline = [
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(studentId)
-      }
-    },
-    {
-      $lookup: {
-        from: "studentcourses",
-        localField: "_id",
-        foreignField: "studentId",
-        as: "enrollments"
-      }
-    },
-    {
-      $unwind: {
-        path: "$enrollments",
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $lookup: {
-        from: "courses",
-        localField: "enrollments.courseId",
-        foreignField: "_id",
-        as: "course"
-      }
-    },
-    {
-      $unwind: {
-        path: "$course",
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $lookup: {
-        from: "studentfeesledgers",
-        localField: "enrollments._id",
-        foreignField: "enrollmentId",
-        as: "ledgers"
-      }
-    },
-    {
-      $unwind: {
-        path: "$ledgers",
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $lookup: {
-        from: "studentinstallmentitems",
-        localField: "ledgers._id",
-        foreignField: "studentFeesId",
-        as: "installments"
-      }
-    },
-    {
-      $lookup: {
-        from: "receiptmasters",
-        localField: "ledgers.receiptMasterId",
-        foreignField: "_id",
-        as: "receiptMaster"
-      }
-    },
-    {
-      $unwind: {
-        path: "$receiptMaster",
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $lookup: {
-        from: "receiptdetails",
-        localField: "receiptMaster._id",
-        foreignField: "receiptId",
-        as: "receiptDetails"
-      }
-    },
-    {
-      $group: {
-        _id: "$enrollments._id",
+   const pipeline = [
+      /* ================= MATCH STUDENT ================= */
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(studentId)
+        }
+      },
 
-        student: { $first: "$$ROOT" },
-        course: { $first: "$course" },
+      /* ================= ENROLLMENTS ================= */
+      {
+        $lookup: {
+          from: "studentcourses",
+          localField: "_id",
+          foreignField: "studentId",
+          as: "enrollments"
+        }
+      },
 
-        totalAmount: { $sum: { $ifNull: ["$ledgers.totalAmount", 0] } },
-        totalPaid: { $sum: { $ifNull: ["$ledgers.paidAmount", 0] } },
-        totalDue: { $sum: { $ifNull: ["$ledgers.dueAmount", 0] } },
+      {
+        $unwind: {
+          path: "$enrollments",
+          preserveNullAndEmptyArrays: true
+        }
+      },
 
-        ledgers: {
-          $push: {
-            ledgerId: "$ledgers._id",
-            totalAmount: "$ledgers.totalAmount",
-            paidAmount: "$ledgers.paidAmount",
-            dueAmount: "$ledgers.dueAmount",
-            status: "$ledgers.status",
-            paymentType: "$ledgers.paymentType",
-            installments: "$installments",
-            receiptDetails: "$receiptDetails"
+      /* ================= COURSE ================= */
+      {
+        $lookup: {
+          from: "courses",
+          localField: "enrollments.courseId",
+          foreignField: "_id",
+          as: "course"
+        }
+      },
+      {
+        $unwind: {
+          path: "$course",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      /* ================= FEES LEDGER ================= */
+      {
+        $lookup: {
+          from: "studentfeesledgers",
+          localField: "enrollments._id",
+          foreignField: "enrollmentId",
+          as: "ledgers"
+        }
+      },
+
+      {
+        $unwind: {
+          path: "$ledgers",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      /* ================= INSTALLMENTS ================= */
+      {
+        $lookup: {
+          from: "studentinstallmentitems",
+          localField: "ledgers._id",
+          foreignField: "studentFeesId",
+          as: "installments"
+        }
+      },
+
+      /* ================= RECEIPTS ================= */
+      {
+        $lookup: {
+          from: "receiptmasters",
+          localField: "ledgers.receiptMasterId",
+          foreignField: "_id",
+          as: "receiptMaster"
+        }
+      },
+
+      {
+        $unwind: {
+          path: "$receiptMaster",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      {
+        $lookup: {
+          from: "receiptdetails",
+          localField: "receiptMaster._id",
+          foreignField: "receiptId",
+          as: "receiptDetails"
+        }
+      },
+
+      /* ================= GROUP BY ENROLLMENT ================= */
+      {
+        $group: {
+          _id: "$enrollments._id",
+
+          student: { $first: "$$ROOT" },
+          course: { $first: "$course" },
+
+          totalAmount: { $sum: { $ifNull: ["$ledgers.totalAmount", 0] } },
+          totalPaid: { $sum: { $ifNull: ["$ledgers.paidAmount", 0] } },
+          totalDue: { $sum: { $ifNull: ["$ledgers.dueAmount", 0] } },
+
+          ledgers: {
+            $push: {
+              ledgerId: "$ledgers._id",
+              totalAmount: "$ledgers.totalAmount",
+              paidAmount: "$ledgers.paidAmount",
+              dueAmount: "$ledgers.dueAmount",
+              status: "$ledgers.status",
+              paymentType: "$ledgers.paymentType",
+              installments: "$installments",
+              receiptDetails: "$receiptDetails"
+            }
+          }
+        }
+      },
+
+      /* ================= FINAL SUMMARY ================= */
+      {
+        $group: {
+          _id: "$student._id",
+
+          studentInfo: {
+            $first: {
+              name: "$student.name",
+              email: "$student.email",
+              phone: "$student.phone",
+              photo: "$student.photo"
+            }
+          },
+
+          totalCourses: { $sum: 1 },
+          overallTotalAmount: { $sum: "$totalAmount" },
+          overallPaidAmount: { $sum: "$totalPaid" },
+          overallDueAmount: { $sum: "$totalDue" },
+
+          courses: {
+            $push: {
+              enrollmentId: "$_id",
+              course: "$course",
+              totalAmount: "$totalAmount",
+              totalPaid: "$totalPaid",
+              totalDue: "$totalDue",
+              ledgers: "$ledgers"
+            }
           }
         }
       }
-    },
-    {
-      $group: {
-        _id: "$student._id",
-
-        studentInfo: {
-          $first: {
-            name: "$student.name",
-            email: "$student.email",
-            phone: "$student.phone",
-            photo: "$student.photo"
-          }
-        },
-
-        totalCourses: { $sum: 1 },
-        overallTotalAmount: { $sum: "$totalAmount" },
-        overallPaidAmount: { $sum: "$totalPaid" },
-        overallDueAmount: { $sum: "$totalDue" },
-
-        courses: {
-          $push: {
-            enrollmentId: "$_id",
-            course: "$course",
-            totalAmount: "$totalAmount",
-            totalPaid: "$totalPaid",
-            totalDue: "$totalDue",
-            ledgers: "$ledgers"
-          }
-        }
-      }
-    }
-  ];
-
+    ];
   const result = await StudentModel.aggregate(pipeline);
 
   if (!result.length) {
     throw new Error("Student not found");
   }
+  
 
   return {
     summary: {
@@ -1484,6 +1503,8 @@ const generateSinglePDF = async (req, res) => {
     const { studentId } = req.params;
 
     const data = await getStudentSingleDataService(studentId);
+
+    console.log("==>", data)
 
     const filePath = path.join(
       __dirname,
