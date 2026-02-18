@@ -19,6 +19,7 @@ export default function StudentDetailsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [sendingPDF, setSendingPDF] = useState(false);
 
   const token =
     typeof window !== "undefined"
@@ -109,19 +110,55 @@ export default function StudentDetailsPage() {
     );
   }
 
+  const sendPDF = async (studentId?: string) => {
+   const idToUse = studentId || student?._id || id;
+    if (!idToUse) return toast.error("Student id missing");
+
+    setSendingPDF(true);
+
+    try {
+      const res = await axiosInstance.get(
+        `/student-fees-ledger/sent-single-pdf/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 60000
+        }
+      );
+
+      toast.success(res.data?.message || 'PDF sent successfully!');
+    } catch (err: any) {
+      console.error('PDF send error:', err);
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Failed to send PDF");
+      } else {
+        toast.error("Unexpected error while sending PDF");
+      }
+    } finally {
+      setSendingPDF(false);
+    }
+  };
+
 
 
   return (
     <div className="p-6 space-y-6">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex justify-end mb-2">
+          <div className="flex justify-end mb-2 gap-2">
             <Button
               label={pdfLoading ? "Opening PDF..." : "Open PDF"}
               icon="pi pi-file-pdf"
               className="p-button-sm p-button-danger"
               disabled={pdfLoading}
               onClick={() => generatePdf()}
+            />
+            <Button
+              icon="pi pi-send"
+              label={sendingPDF ? 'Sending...' : 'Send PDF'}
+              className=" p-button-success"
+              onClick={() => sendPDF()}
+              loading={sendingPDF}
+              disabled={pdfLoading || sendingPDF}
             />
           </div>
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
