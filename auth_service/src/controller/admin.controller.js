@@ -144,18 +144,17 @@ const GetAdminProfile = async (req, res) => {
 
 
 const addInstitution = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { lat, lng, ...body } = req.body;
 
     const parsedData = institutionSchema.parse(body);
 
-    /* ================= LOCATION REQUIRED ================= */
-
     if (!lat || !lng) {
       return res.status(400).json({ message: "Location is required" });
     }
-
-    /* ================= PHOTO REQUIRED ================= */
 
     if (!req.files?.photo?.[0]) {
       return res.status(400).json({
@@ -176,47 +175,57 @@ const addInstitution = async (req, res) => {
     /* ================= FILES ================= */
 
     const photoFile = req.files.photo[0];
-    const bannerFile = req.files?.banner?.[0]; // optional
+    const bannerFile = req.files?.banner?.[0];
 
     const photoUrl = await uploadSingleImage(photoFile);
-
-    let bannerUrl = null;
-
-    if (bannerFile) {
-      bannerUrl = await uploadSingleImage(bannerFile);
-    }
+    let bannerUrl = bannerFile
+      ? await uploadSingleImage(bannerFile)
+      : null;
 
     /* ================= PASSWORD ================= */
 
     const plainPassword = passwordGenerator();
 
-    const institutionUser = await User.create({
-      email: parsedData.email,
-      password: plainPassword,
-      role: "institution",
-    });
+    /* ================= CREATE USER ================= */
+
+    const institutionUser = await User.create(
+      [
+        {
+          email: parsedData.email,
+          password: plainPassword,
+          role: "institution",
+        },
+      ],
+      { session }
+    );
+
+    const createdUser = institutionUser[0];
 
     /* ================= CREATE INSTITUTION ================= */
 
-    const institution = await Institution.create({
-      name: parsedData.name,
-      email: parsedData.email,
-      phone: parsedData.phone,
-      whatsAppNo: parsedData.whatsAppNo,
-      website: parsedData.website,
-      registrationNo: parsedData.registrationNo || null,
-      establishDate: parsedData.establishDate
-        ? new Date(parsedData.establishDate)
-        : null,
-      address: parsedData.address,
-      geoLocation: {
-        lat,
-        lng,
-      },
-      institutionBanner: bannerUrl || null, // only optional field
-      institutionImage: photoUrl,
-      adminUser: institutionUser._id,
-    });
+    const institution = await Institution.create(
+      [
+        {
+          name: parsedData.name,
+          email: parsedData.email,
+          phone: parsedData.phone,
+          whatsAppNo: parsedData.whatsAppNo,
+          website: parsedData.website,
+          registrationNo: parsedData.registrationNo || null,
+          establishDate: parsedData.establishDate
+            ? new Date(parsedData.establishDate)
+            : null,
+          address: parsedData.address,
+          geoLocation: { lat, lng },
+          institutionBanner: bannerUrl,
+          institutionImage: photoUrl,
+          adminUser: createdUser._id,
+        },
+      ],
+      { session }
+    );
+
+    const createdInstitution = institution[0];
 
     /* ================= DEFAULT FEES ================= */
 
@@ -228,27 +237,37 @@ const addInstitution = async (req, res) => {
 
     const feePayload = feeNames.map((name) => ({
       name,
-      userId: institutionUser._id,
+      userId: createdUser._id,
     }));
 
-    await FeesMaster.insertMany(feePayload);
+    await FeesMaster.insertMany(feePayload, { session });
 
-    institutionUser.institution = institution._id;
-    await institutionUser.save();
+    createdUser.institution = createdInstitution._id;
+    await createdUser.save({ session });
 
-    await sendPasswordEmail(institutionUser.email, plainPassword);
+  
+
+    await session.commitTransaction();
+    session.endSession();
+
+    
+    await sendPasswordEmail(createdUser.email, plainPassword);
 
     return res.status(201).json({
       message: "Institution created successfully",
-      institution,
+      institution: createdInstitution,
       credentials: {
-        email: institutionUser.email,
+        email: createdUser.email,
         password: plainPassword,
       },
     });
 
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.log("Add institution error:", error);
+
     if (error.code === 11000 && error.keyPattern?.email) {
       return res.status(409).json({
         message: "Email already in use",
