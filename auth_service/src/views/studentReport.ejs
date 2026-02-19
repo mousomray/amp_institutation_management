@@ -13,6 +13,7 @@
     --green:#10b981;
     --red:#dc2626;
     --amber:#f59e0b;
+    --blue:#3b82f6;
   }
 
   * { box-sizing:border-box; }
@@ -31,49 +32,83 @@
     padding:30px;
   }
 
-  .header {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    border-bottom:2px solid var(--border);
-    padding-bottom:16px;
-    margin-bottom:20px;
+  /* ===== INSTITUTION HEADER ===== */
+  .institution-header {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    margin: -30px -30px 20px -30px;
+    padding: 25px 30px;
+    color: white;
   }
 
-  .student-info {
-    display:flex;
-    gap:16px;
-    align-items:center;
+  .institution-name {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
   }
 
-  .avatar {
-    width:80px;
-    height:80px;
-    border-radius:10px;
-    background:#eef2ff;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:700;
-    font-size:24px;
-    color:#4338ca;
-    overflow:hidden;
+  .institution-details {
+    font-size: 13px;
+    opacity: 0.95;
+    line-height: 1.6;
   }
 
-  .avatar img {
-    width:100%;
-    height:100%;
-    object-fit:cover;
+  .institution-details div {
+    margin: 3px 0;
+  }
+
+  /* ===== REPORT TITLE ===== */
+  .report-title {
+    text-align: center;
+    margin: 20px 0;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .report-title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 0 0 5px 0;
+  }
+
+  .report-title .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ===== STUDENT INFO (NO PHOTO) ===== */
+  .student-section {
+    background: var(--soft);
+    padding: 20px;
+    border-radius: 10px;
+    border-left: 4px solid var(--blue);
+    margin-bottom: 20px;
   }
 
   .student-name {
-    font-size:20px;
-    font-weight:700;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 8px;
   }
 
-  .student-sub {
-    font-size:12px;
-    color:var(--muted);
+  .student-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .student-details .detail-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .student-details .detail-item .icon {
+    font-size: 14px;
   }
 
   .summary {
@@ -180,6 +215,8 @@
 
   .footer {
     margin-top:25px;
+    padding-top:15px;
+    border-top:1px solid var(--border);
     font-size:11px;
     color:var(--muted);
     text-align:center;
@@ -196,34 +233,73 @@
 <div class="container">
 
 <%
-const student = data.studentInfo || {};
-const summary = data.summary || {};
+// Institution data
+const institution = data.institution || {};
+
+// Student and summary data from result
+const student = data.result?.studentInfo || {};
+const summary = data.result?.summary || {};
 const total = summary.overallTotalAmount || 0;
 const paid = summary.overallPaidAmount || 0;
 const due = summary.overallDueAmount || 0;
 const pct = total > 0 ? Math.round((paid/total)*100) : 0;
-const courses = data.breakdown || [];
+const courses = data.result?.breakdown || [];
 %>
 
-<div class="header">
-  <div class="student-info">
-    <div class="avatar">
-      <% if(student.photo){ %>
-        <img src="<%= student.photo %>" />
-      <% } else { %>
-        <%= (student.name || '').split(' ').map(s=>s[0]).slice(0,2).join('') %>
-      <% } %>
-    </div>
-    <div>
-      <div class="student-name"><%= student.name || '-' %></div>
-      <div class="student-sub"><%= student.email || '-' %> • <%= student.phone || '-' %></div>
-    </div>
-  </div>
-  <div style="font-size:12px;color:var(--muted)">
-    Generated: <%= new Date().toLocaleDateString() %>
+<!-- ===== INSTITUTION HEADER ===== -->
+<div class="institution-header">
+  <div class="institution-name"><%= institution.name || 'Institution Name' %></div>
+  <div class="institution-details">
+    <% if(institution.email){ %>
+    <div>📧 <%= institution.email %></div>
+    <% } %>
+    <% if(institution.phone){ %>
+    <div>📞 <%= institution.phone %></div>
+    <% } %>
+    <% if(institution.address){ %>
+    <div>📍 <%= institution.address %></div>
+    <% } %>
   </div>
 </div>
 
+<!-- ===== REPORT TITLE ===== -->
+<div class="report-title">
+  <h1>Student Financial Report</h1>
+  <div class="subtitle">Generated on <%= new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) %></div>
+</div>
+
+<!-- ===== STUDENT INFO (NO PHOTO) ===== -->
+<div class="student-section">
+  <div class="student-name"><%= student.name || 'Student Name' %></div>
+  <div class="student-details">
+    <% if(student.studentId){ %>
+    <div class="detail-item">
+      <span class="icon">🆔</span>
+      <span>ID: <%= student.studentId %></span>
+    </div>
+    <% } %>
+    <% if(student.email){ %>
+    <div class="detail-item">
+      <span class="icon">📧</span>
+      <span><%= student.email %></span>
+    </div>
+    <% } %>
+    <% if(student.phone){ %>
+    <div class="detail-item">
+      <span class="icon">📱</span>
+      <span><%= student.phone %></span>
+    </div>
+    <% } %>
+    <% if(student.course){ %>
+    <div class="detail-item">
+      <span class="icon">📚</span>
+      <span><%= student.course %></span>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- ===== SUMMARY CARDS ===== -->
 <div class="summary">
   <div class="card">
     <div class="label">Total Fees</div>
@@ -231,16 +307,17 @@ const courses = data.breakdown || [];
   </div>
   <div class="card">
     <div class="label">Total Paid</div>
-    <div class="value">₹<%= paid.toLocaleString('en-IN') %></div>
+    <div class="value" style="color:var(--green)">₹<%= paid.toLocaleString('en-IN') %></div>
   </div>
   <div class="card">
     <div class="label">Total Due</div>
-    <div class="value">₹<%= due.toLocaleString('en-IN') %></div>
+    <div class="value" style="color:var(--red)">₹<%= due.toLocaleString('en-IN') %></div>
   </div>
 </div>
 
+<!-- ===== PROGRESS BAR ===== -->
 <div class="progress-wrapper">
-  <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
+  <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px">
     <span>Payment Progress</span>
     <span><%= pct %>%</span>
   </div>
@@ -249,74 +326,102 @@ const courses = data.breakdown || [];
   </div>
 </div>
 
-<% courses.forEach(function(c){ %>
+<!-- ===== COURSES BREAKDOWN ===== -->
+<% if(courses && courses.length > 0){ %>
+  <% courses.forEach(function(c){ %>
 
-<div class="course">
-  <div class="course-head">
-    <div>
-      <div class="course-title"><%= c.course?.name || 'Course' %></div>
-      <div style="font-size:12px;color:var(--muted)">
-        Duration: <%= c.course?.duration || '-' %>
-      </div>
-    </div>
-    <div class="amount-box">
-      <div>Total: ₹<%= (c.totalAmount||0).toLocaleString('en-IN') %></div>
-      <div>Paid: ₹<%= (c.totalPaid||0).toLocaleString('en-IN') %></div>
-      <div style="color:var(--red)">Due: ₹<%= (c.totalDue||0).toLocaleString('en-IN') %></div>
-    </div>
-  </div>
-
-  <% (c.ledgers || []).forEach(function(l){ %>
-  <div class="ledger">
-    <div style="display:flex;justify-content:space-between;">
+  <div class="course">
+    <div class="course-head">
       <div>
-        <strong><%= l.status || '-' %></strong><br/>
-        <span style="font-size:11px;color:var(--muted)">
-          <%= l.paymentType || '' %>
-        </span>
+        <div class="course-title"><%= c.course?.name || 'Course' %></div>
+        <% if(c.course?.duration){ %>
+        <div style="font-size:12px;color:var(--muted)">
+          Duration: <%= c.course.duration %>
+        </div>
+        <% } %>
       </div>
-      <div style="text-align:right">
-        ₹<%= (l.paidAmount||0).toLocaleString('en-IN') %><br/>
-        <span style="font-size:11px;color:var(--muted)">
-          Total: ₹<%= (l.totalAmount||0).toLocaleString('en-IN') %>
-        </span>
+      <div class="amount-box">
+        <div style="font-weight:600">Total: ₹<%= (c.totalAmount||0).toLocaleString('en-IN') %></div>
+        <div style="color:var(--green)">Paid: ₹<%= (c.totalPaid||0).toLocaleString('en-IN') %></div>
+        <div style="color:var(--red)">Due: ₹<%= (c.totalDue||0).toLocaleString('en-IN') %></div>
       </div>
     </div>
 
-    <% if(l.installments && l.installments.length){ %>
-    <table>
-      <thead>
-        <tr>
-          <th>Installment</th>
-          <th>Due Date</th>
-          <th>Status</th>
-          <th>Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% l.installments.forEach(function(it,idx){ %>
-        <tr>
-          <td>Installment <%= idx+1 %></td>
-          <td><%= it.dueDate ? new Date(it.dueDate).toLocaleDateString() : '-' %></td>
-          <td>
-            <span class="badge <%= it.status==='PAID'?'paid':it.status==='DUE'?'due':'partial' %>">
-              <%= it.status %>
-            </span>
-          </td>
-          <td>₹<%= (it.amount||0).toLocaleString('en-IN') %></td>
-        </tr>
-        <% }) %>
-      </tbody>
-    </table>
-    <% } %>
+    <!-- ===== LEDGERS ===== -->
+    <% (c.ledgers || []).forEach(function(l){ %>
+    <div class="ledger">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <strong style="font-size:14px"><%= l.status || 'Status' %></strong>
+          <% if(l.paymentType){ %>
+          <br/>
+          <span style="font-size:11px;color:var(--muted)">
+            <%= l.paymentType %>
+          </span>
+          <% } %>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:700;color:var(--green)">
+            ₹<%= (l.paidAmount||0).toLocaleString('en-IN') %>
+          </div>
+          <span style="font-size:11px;color:var(--muted)">
+            of ₹<%= (l.totalAmount||0).toLocaleString('en-IN') %>
+          </span>
+        </div>
+      </div>
+
+      <!-- ===== INSTALLMENTS TABLE ===== -->
+      <% if(l.installments && l.installments.length > 0){ %>
+      <table>
+        <thead>
+          <tr>
+            <th>Installment</th>
+            <th>Due Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% l.installments.forEach(function(it,idx){ %>
+          <tr>
+            <td>#<%= idx+1 %></td>
+            <td>
+              <%= it.dueDate ? new Date(it.dueDate).toLocaleDateString('en-IN') : '-' %>
+            </td>
+            <td style="font-weight:600">
+              ₹<%= (it.amount||0).toLocaleString('en-IN') %>
+            </td>
+            <td>
+              <span class="badge <%= it.status==='PAID'?'paid':it.status==='DUE'?'due':'partial' %>">
+                <%= it.status || 'PENDING' %>
+              </span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+    <% }) %>
+
   </div>
   <% }) %>
+<% } else { %>
+  <div style="text-align:center;padding:40px;color:var(--muted)">
+    <div style="font-size:48px;margin-bottom:10px">📄</div>
+    <div>No course data available</div>
+  </div>
+<% } %>
 
-</div>
-<% }) %>
-
+<!-- ===== FOOTER ===== -->
 <div class="footer">
-  This is a system generated financial report.
+  <div style="margin-bottom:5px">
+    This is a system generated financial report from <strong><%= institution.name || 'Institution' %></strong>
+  </div>
+  <div>
+    For any queries, contact: <%= institution.email || '-' %>
+    <% if(institution.phone){ %> | <%= institution.phone %><% } %>
+  </div>
 </div>
 
 </div>

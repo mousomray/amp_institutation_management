@@ -16,6 +16,7 @@ router.get("/students/:studentId",verifyJwt, otherPaymentController.getStudentOt
 router.post("/payment-collect/:id",verifyJwt, otherPaymentController.makePayment);
 router.get("/statistics",verifyJwt, otherPaymentController.getPaymentStatistics);
 router.get("/generate-single-pdf/:id", verifyJwt, otherPaymentController.getSingleOtherPaymentPDF);
+router.get("/sent-other-fees/pdf/:id", verifyJwt, otherPaymentController.sendOtherPayment);
 
 
 module.exports = router;

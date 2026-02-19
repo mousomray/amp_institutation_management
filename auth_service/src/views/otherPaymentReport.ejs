@@ -1,145 +1,437 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Student Challan</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Collection Receipt</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<style>
-body{
-  font-family: Arial, sans-serif;
-  background:#f5f6fa;
-  padding:20px;
-}
-.card{
-  background:#fff;
-  padding:25px;
-  border-radius:10px;
-  box-shadow:0 0 10px rgba(0,0,0,0.05);
-}
-.header{
-  display:flex;
-  justify-content:space-between;
-  margin-bottom:20px;
-}
-.title{
-  font-size:20px;
-  font-weight:700;
-}
-.meta{
-  font-size:13px;
-  text-align:right;
-}
-.student-section{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:20px;
-}
-.student-info{
-  font-size:14px;
-}
-.summary{
-  border:1px solid #ddd;
-  padding:15px;
-  border-radius:6px;
-  width:200px;
-  font-size:14px;
-}
-.summary div{
-  display:flex;
-  justify-content:space-between;
-  margin-bottom:6px;
-}
-.paid{ color:green; font-weight:600;}
-.due{ color:red; font-weight:600;}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #1e293b;
+            line-height: 1.6;
+            background: #f8fafc;
+        }
 
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:15px;
-}
-th,td{
-  padding:10px;
-  border-bottom:1px solid #ddd;
-  text-align:left;
-  font-size:14px;
-}
-th{
-  background:#f0f2f5;
-}
-.total-row{
-  font-weight:700;
-}
-.footer{
-  margin-top:20px;
-  font-size:12px;
-  color:#777;
-}
-.status{
-  font-weight:600;
-}
-.status.PAID{ color:green;}
-.status.PARTIAL{ color:orange;}
-.status.PENDING{ color:red;}
-</style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            padding: 30px;
+            margin: -40px -40px 30px -40px;
+            color: white;
+            border-radius: 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .institution-info h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .institution-details {
+            font-size: 13px;
+            opacity: 0.95;
+            line-height: 1.8;
+        }
+
+        .receipt-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: right;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .receipt-badge h2 {
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0.9;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .receipt-badge .challan-no {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+
+        .receipt-badge .date {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+
+        /* ===== SECTION TITLE ===== */
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e40af;
+            margin: 30px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 3px solid #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== STUDENT INFO ===== */
+        .student-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .student-card h3 {
+            font-size: 20px;
+            color: #1e40af;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .student-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 14px;
+            color: #475569;
+        }
+
+        .student-details div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .student-details .icon {
+            color: #3b82f6;
+            font-weight: 700;
+        }
+
+        /* ===== SUMMARY BOXES ===== */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-box {
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid;
+        }
+
+        .summary-box.total {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+
+        .summary-box.paid {
+            background: #f0fdf4;
+            border-color: #22c55e;
+        }
+
+        .summary-box.due {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+
+        .summary-box .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            opacity: 0.8;
+        }
+
+        .summary-box.total .label { color: #1e40af; }
+        .summary-box.paid .label { color: #16a34a; }
+        .summary-box.due .label { color: #dc2626; }
+
+        .summary-box .amount {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .summary-box.total .amount { color: #1e40af; }
+        .summary-box.paid .amount { color: #16a34a; }
+        .summary-box.due .amount { color: #dc2626; }
+
+        /* ===== PAYMENTS TABLE ===== */
+        .payments-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .payments-table thead {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+        }
+
+        .payments-table th {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .payments-table th:last-child {
+            text-align: center;
+        }
+
+        .payments-table tbody tr {
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .payments-table tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        .payments-table tbody tr:hover {
+            background: #f1f5f9;
+        }
+
+        .payments-table td {
+            padding: 14px 16px;
+            font-size: 14px;
+            color: #475569;
+        }
+
+        .payments-table td:last-child {
+            text-align: center;
+        }
+
+        .payments-table .amount-cell {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        /* ===== STATUS BADGE ===== */
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.paid {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .status-badge.due {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .status-badge.partial {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        /* ===== TOTAL ROW ===== */
+        .payments-table tfoot {
+            background: #f8fafc;
+            border-top: 3px solid #3b82f6;
+        }
+
+        .payments-table tfoot td {
+            padding: 16px;
+            font-weight: 700;
+            font-size: 16px;
+            color: #1e40af;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            text-align: center;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .footer .note {
+            background: #fef3c7;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            color: #92400e;
+            font-weight: 500;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .footer .generated {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
 </head>
-
 <body>
+    <div class="container">
 
-<div class="card">
+        <!-- ===== HEADER ===== -->
+        <div class="header">
+            <div class="header-content">
+                <div class="institution-info">
+                    <h1><%= data.institution.name %></h1>
+                    <div class="institution-details">
+                        <div>📧 <%= data.institution.email %></div>
+                        <% if(data.institution.phone){ %>
+                        <div>📞 <%= data.institution.phone %></div>
+                        <% } %>
+                        <% if(data.institution.address){ %>
+                        <div>📍 <%= data.institution.address %></div>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="receipt-badge">
+                    <h2>Payment Receipt</h2>
+                    <div class="challan-no">#<%= data._id.toString().substring(0, 8).toUpperCase() %></div>
+                    <div class="date"><%= new Date(data.challanDate).toLocaleDateString('en-IN', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    }) %></div>
+                </div>
+            </div>
+        </div>
 
-  <div class="header">
-    <div class="title">Other Payment Collection</div>
-    <div class="meta">
-      Challan No: <%= data._id %><br/>
-      Date: <%= new Date(data.challanDate).toLocaleDateString() %>
+        <!-- ===== STUDENT INFO ===== -->
+        <div class="section-title">Student Information</div>
+        <div class="student-card">
+            <h3><%= data.student.name %></h3>
+            <div class="student-details">
+                <% if(data.student.email){ %>
+                <div>
+                    <span class="icon">📧</span>
+                    <span><%= data.student.email %></span>
+                </div>
+                <% } %>
+                <% if(data.student.mobile){ %>
+                <div>
+                    <span class="icon">📱</span>
+                    <span><%= data.student.mobile %></span>
+                </div>
+                <% } %>
+                <% if(data.student.studentId){ %>
+                <div>
+                    <span class="icon">🆔</span>
+                    <span>ID: <%= data.student.studentId %></span>
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- ===== SUMMARY ===== -->
+        <div class="section-title">Payment Summary</div>
+        <div class="summary-grid">
+            <div class="summary-box total">
+                <div class="label">Total Amount</div>
+                <div class="amount">₹<%= data.totalAmount.toLocaleString('en-IN') %></div>
+            </div>
+            <div class="summary-box paid">
+                <div class="label">Amount Paid</div>
+                <div class="amount">₹<%= data.totalPaid.toLocaleString('en-IN') %></div>
+            </div>
+            <div class="summary-box due">
+                <div class="label">Amount Due</div>
+                <div class="amount">₹<%= data.totalDue.toLocaleString('en-IN') %></div>
+            </div>
+        </div>
+
+        <!-- ===== PAYMENTS TABLE ===== -->
+        <div class="section-title">Payment Breakdown</div>
+        <table class="payments-table">
+            <thead>
+                <tr>
+                    <th>Fee Head</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% data.payments.forEach(function(p){ %>
+                <tr>
+                    <td><%= p.name %></td>
+                    <td class="amount-cell">₹<%= p.amount.toLocaleString('en-IN') %></td>
+                    <td>
+                        <span class="status-badge <%= p.status.toLowerCase() %>">
+                            <%= p.status %>
+                        </span>
+                    </td>
+                </tr>
+                <% }) %>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Grand Total</td>
+                    <td class="amount-cell">₹<%= data.totalAmount.toLocaleString('en-IN') %></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- ===== FOOTER ===== -->
+        <div class="footer">
+            <div class="note">
+                ⓘ This is a computer-generated receipt and does not require a physical signature.
+            </div>
+            <div class="generated">
+                Generated on <%= new Date().toLocaleString('en-IN', { 
+                    dateStyle: 'long', 
+                    timeStyle: 'short' 
+                }) %>
+            </div>
+        </div>
+
     </div>
-  </div>
-
-  <div class="student-section">
-    <div class="student-info">
-      <strong><%= data.student.name %></strong><br/>
-      <%= data.student.email || '' %><br/>
-      <%= data.student.mobile || '' %>
-    </div>
-
-    <div class="summary">
-      <div><span>Total:</span> <span>₹<%= data.totalAmount %></span></div>
-      <div><span>Paid:</span> <span class="paid">₹<%= data.totalPaid %></span></div>
-      <div><span>Due:</span> <span class="due">₹<%= data.totalDue %></span></div>
-    </div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Fee Head</th>
-        <th>Amount</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% data.payments.forEach(function(p){ %>
-        <tr>
-          <td><%= p.name %></td>
-          <td>₹<%= p.amount %></td>
-          <td class="status <%= p.status %>"><%= p.status %></td>
-        </tr>
-      <% }) %>
-
-      <tr class="total-row">
-        <td>Total</td>
-        <td>₹<%= data.totalAmount %></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="footer">
-    This is a system-generated challan. No signature is required.
-  </div>
-
-</div>
-
 </body>
 </html>

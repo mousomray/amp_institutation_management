@@ -7,17 +7,44 @@
   <style>
     :root{
       --bg:#f7f9fb; --card:#ffffff; --muted:#6b7280; --accent:#0f172a; --success:#059669; --warning:#f59e0b; --danger:#ef4444; --glass:rgba(15,23,42,0.04);
-      --radius:10px; --maxw:900px;
+      --radius:10px; --maxw:900px; --blue:#3b82f6; --darkblue:#1e40af;
     }
     html,body{height:100%;margin:0;background:var(--bg);font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:var(--accent);}
     .container{max-width:var(--maxw);margin:28px auto;padding:22px;}
     .card{background:var(--card);border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,23,0.06);padding:18px;margin-bottom:14px}
 
+    /* ===== INSTITUTION HEADER ===== */
+    .institution-header {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      border-radius: var(--radius);
+      padding: 24px;
+      color: white;
+      margin-bottom: 14px;
+      box-shadow: 0 6px 18px rgba(59,130,246,0.25);
+    }
+
+    .institution-name {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .institution-details {
+      font-size: 13px;
+      opacity: 0.95;
+      line-height: 1.7;
+    }
+
+    .institution-details div {
+      margin: 3px 0;
+    }
+
     /* Print-friendly rules */
     @page { size: A4; margin: 110px 20px 70px 20px; }
     body { -webkit-print-color-adjust: exact; }
     .card { page-break-inside: avoid; break-inside: avoid; -webkit-column-break-inside: avoid; -webkit-region-break-inside: avoid; }
-    .header, .brand { page-break-inside: avoid; }
+    .header, .brand, .institution-header { page-break-inside: avoid; }
     table { page-break-inside: auto; }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
@@ -25,6 +52,7 @@
     @media print {
       .container { margin: 0; padding: 8px 0; }
       .card { padding: 12px; margin-bottom: 8px; box-shadow: none; }
+      .institution-header { padding: 16px; margin-bottom: 8px; }
       .header { margin-bottom: 6px; }
       .summary { gap: 8px; margin-top: 6px; }
       .stat { padding: 8px; }
@@ -40,8 +68,35 @@
     .grid{display:flex;gap:12px;flex-wrap:wrap}
     .col{flex:1;min-width:180px}
 
-    .student-info{display:flex;gap:14px;align-items:center}
-    .avatar{width:72px;height:72px;border-radius:10px;background:var(--glass);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--accent)}
+    /* ===== STUDENT INFO (NO PHOTO) ===== */
+    .student-info{
+      background: var(--glass);
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid var(--blue);
+    }
+
+    .student-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .student-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .student-details .detail-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .meta strong{display:block;font-size:14px}
     .meta .muted{color:var(--muted);font-size:13px}
 
@@ -60,16 +115,43 @@
     tbody td{padding:10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#111827}
     tbody tr:nth-child(even){background:rgba(15,23,42,0.02)}
 
-    .foot{font-size:12px;color:var(--muted);margin-top:8px;text-align:right}
+    .foot{font-size:12px;color:var(--muted);margin-top:8px;text-align:center;padding-top:12px;border-top:1px solid #e6e9ef}
 
     @media (max-width:720px){.header{flex-direction:column;align-items:flex-start}.summary{flex-direction:column}}
   </style>
 </head>
 <body>
   <div class="container">
+
+    <%
+    const institution = data.institution || {};
+    const reportData = data.reportData || {};
+    const student = reportData.student || {};
+    const course = reportData.course || {};
+    const enrollment = reportData.enrollment || {};
+    const installments = reportData.installments || [];
+    %>
+
+    <!-- ===== INSTITUTION HEADER ===== -->
+    <div class="institution-header">
+      <div class="institution-name"><%= institution.name || 'Institution Name' %></div>
+      <div class="institution-details">
+        <% if(institution.email){ %>
+        <div>📧 <%= institution.email %></div>
+        <% } %>
+        <% if(institution.phone){ %>
+        <div>📞 <%= institution.phone %></div>
+        <% } %>
+        <% if(institution.address){ %>
+        <div>📍 <%= institution.address %></div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- ===== REPORT HEADER ===== -->
     <div class="card header">
       <div class="brand">
-        <div class="logo">IL</div>
+        <div class="logo"><%= (institution.name || 'IL').split(' ').map(n=>n[0]||'').slice(0,2).join('').toUpperCase() %></div>
         <div>
           <div class="title">Student Fees Report</div>
           <div class="subtitle">Detailed fees & installment summary</div>
@@ -77,76 +159,111 @@
       </div>
       <div style="text-align:right">
         <div style="font-size:12px;color:var(--muted)">Report for</div>
-        <div style="font-weight:700"><%= data.student.name %></div>
+        <div style="font-weight:700"><%= student.name || 'Student' %></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+          <%= new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) %>
+        </div>
       </div>
     </div>
 
+    <!-- ===== STUDENT INFO (NO PHOTO) ===== -->
     <div class="card">
-      <div class="grid">
-        <div class="col student-info">
-          <div class="avatar"><% if (data.student.photo) { %><img src="<%= data.student.photo %>" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px"> <% } else { %><%= (data.student.name || '').split(' ').map(n=>n[0]||'').slice(0,2).join('').toUpperCase() %> <% } %></div>
-          <div class="meta">
-            <strong><%= data.student.name %></strong>
-            <div class="muted"><%= data.student.email || '—' %></div>
-            <div class="muted">Course: <strong style="color:var(--accent)"><%= data.course.name %></strong></div>
+      <div class="student-info">
+        <div class="student-name"><%= student.name || 'Student Name' %></div>
+        <div class="student-details">
+          <% if(student.studentId){ %>
+          <div class="detail-item">
+            <span>🆔</span>
+            <span>ID: <%= student.studentId %></span>
           </div>
-        </div>
-
-        <div class="col">
-          <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-direction:column;align-items:flex-end">
-            <div class="muted">Enrollment</div>
-            <div style="font-weight:700"><%= data.enrollment?.enrollmentDate ? new Date(data.enrollment.enrollmentDate).toLocaleDateString() : '-' %></div>
-            <div style="margin-top:8px">
-              <span class="status <%= (data.status||'').toLowerCase()==='paid' ? 'paid' : (data.status||'').toLowerCase()==='partial' ? 'partial' : 'due' %>"><%= data.status %></span>
-            </div>
+          <% } %>
+          <% if(student.email){ %>
+          <div class="detail-item">
+            <span>📧</span>
+            <span><%= student.email %></span>
+          </div>
+          <% } %>
+          <% if(student.phone){ %>
+          <div class="detail-item">
+            <span>📱</span>
+            <span><%= student.phone %></span>
+          </div>
+          <% } %>
+          <% if(course.name){ %>
+          <div class="detail-item">
+            <span>📚</span>
+            <span>Course: <strong style="color:var(--accent)"><%= course.name %></strong></span>
+          </div>
+          <% } %>
+          <% if(enrollment.enrollmentDate){ %>
+          <div class="detail-item">
+            <span>📅</span>
+            <span>Enrolled: <%= new Date(enrollment.enrollmentDate).toLocaleDateString('en-IN') %></span>
+          </div>
+          <% } %>
+          <div class="detail-item">
+            <span>📊</span>
+            <span>Status: 
+              <span class="status <%= (reportData.status||'').toLowerCase()==='paid' ? 'paid' : (reportData.status||'').toLowerCase()==='partial' ? 'partial' : 'due' %>">
+                <%= reportData.status || 'PENDING' %>
+              </span>
+            </span>
           </div>
         </div>
       </div>
 
+      <!-- ===== SUMMARY ===== -->
       <div class="summary">
         <div class="stat">
           <div class="label">Total Course Fees</div>
-          <div class="num">₹<%= (data.enrollment?.totalFees ?? data.totalAmount ?? 0).toLocaleString('en-IN') %></div>
+          <div class="num">₹<%= (enrollment?.totalFees ?? reportData.totalAmount ?? 0).toLocaleString('en-IN') %></div>
         </div>
         <div class="stat">
           <div class="label">Net Payable</div>
-          <div class="num">₹<%= (data.enrollment?.netPayableAmount ?? 0).toLocaleString('en-IN') %></div>
+          <div class="num">₹<%= (enrollment?.netPayableAmount ?? reportData.totalAmount ?? 0).toLocaleString('en-IN') %></div>
         </div>
         <div class="stat">
           <div class="label">Paid</div>
-          <div class="num">₹<%= (data.paidAmount ?? 0).toLocaleString('en-IN') %></div>
+          <div class="num" style="color:var(--success)">₹<%= (reportData.paidAmount ?? 0).toLocaleString('en-IN') %></div>
         </div>
         <div class="stat">
           <div class="label">Due</div>
-          <div class="num">₹<%= (data.dueAmount ?? 0).toLocaleString('en-IN') %></div>
+          <div class="num" style="color:var(--danger)">₹<%= (reportData.dueAmount ?? 0).toLocaleString('en-IN') %></div>
         </div>
       </div>
     </div>
 
-    <% if (data.installments && data.installments.length > 0) { %>
+    <!-- ===== INSTALLMENTS ===== -->
+    <% if (installments && installments.length > 0) { %>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div style="font-weight:700">Installment Details</div>
-          <div class="muted">Count: <strong><%= data.installments.length %></strong></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-weight:700;font-size:16px">Installment Details</div>
+          <div class="muted">Count: <strong><%= installments.length %></strong></div>
         </div>
 
         <div style="overflow:auto;margin-top:10px">
           <table>
             <thead>
               <tr>
+                <th>#</th>
                 <th>Due Date</th>
-                <th>Amount (₹)</th>
-                <th>Paid (₹)</th>
-                <th>Status</th>
+                <th style="text-align:right">Amount (₹)</th>
+                <th style="text-align:right">Paid (₹)</th>
+                <th style="text-align:center">Status</th>
               </tr>
             </thead>
             <tbody>
-              <% data.installments.forEach(inst => { %>
+              <% installments.forEach((inst, idx) => { %>
                 <tr>
-                  <td><%= inst.dueDate ? new Date(inst.dueDate).toLocaleDateString() : '-' %></td>
-                  <td style="white-space:nowrap;text-align:right"><%= (inst.amount ?? 0).toLocaleString('en-IN') %></td>
-                  <td style="white-space:nowrap;text-align:right"><%= (inst.paidAmount ?? 0).toLocaleString('en-IN') %></td>
-                  <td><span class="status <%= (inst.status||'').toLowerCase()==='paid' ? 'paid' : (inst.status||'').toLowerCase()==='partial' ? 'partial' : 'due' %>"><%= inst.status %></span></td>
+                  <td><%= idx + 1 %></td>
+                  <td><%= inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('en-IN') : '-' %></td>
+                  <td style="white-space:nowrap;text-align:right;font-weight:600"><%= (inst.amount ?? 0).toLocaleString('en-IN') %></td>
+                  <td style="white-space:nowrap;text-align:right;color:var(--success);font-weight:600"><%= (inst.paidAmount ?? 0).toLocaleString('en-IN') %></td>
+                  <td style="text-align:center">
+                    <span class="status <%= (inst.status||'').toLowerCase()==='paid' ? 'paid' : (inst.status||'').toLowerCase()==='partial' ? 'partial' : 'due' %>">
+                      <%= inst.status || 'PENDING' %>
+                    </span>
+                  </td>
                 </tr>
               <% }) %>
             </tbody>
@@ -154,10 +271,25 @@
         </div>
       </div>
     <% } else { %>
-      <div class="card"><div class="muted">No installment records available for this student.</div></div>
+      <div class="card">
+        <div class="muted" style="text-align:center;padding:20px">
+          📄 No installment records available for this student.
+        </div>
+      </div>
     <% } %>
 
-    <div class="foot">Generated: <%= new Date().toLocaleString() %></div>
+    <!-- ===== FOOTER ===== -->
+    <div class="foot">
+      <div style="margin-bottom:5px">
+        This is a system generated report from <strong><%= institution.name || 'Institution' %></strong>
+      </div>
+      <div style="font-size:11px;opacity:0.8">
+        For queries: <%= institution.email || '-' %><% if(institution.phone){ %> | <%= institution.phone %><% } %>
+      </div>
+      <div style="font-size:11px;opacity:0.7;margin-top:5px">
+        Generated: <%= new Date().toLocaleString('en-IN') %>
+      </div>
+    </div>
   </div>
 </body>
 </html>

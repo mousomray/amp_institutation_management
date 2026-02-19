@@ -32,9 +32,9 @@ export default function StudentDetailsPage() {
 
     // Prefer env var, fallback to localhost:8080 (dev)
     // Configure NEXT_PUBLIC_API_BASE_URL at build time if different
-    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL as string) || `${window.location.protocol}//${window.location.hostname}:8080`;
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL as string) || `${window.location.protocol}//${window.location.hostname}:8080`;
 
-    const url = `${apiBase}/api/student-fees-ledger/generate-single-pdf/${idToUse}`;
+    const url = `${apiBase}/student-fees-ledger/generate-single-pdf/${idToUse}`;
 
     const newTab = window.open("about:blank");
     setPdfLoading(true);

@@ -5,6 +5,8 @@ const mongoose = require("mongoose");
 const puppeteer = require("puppeteer-core");
 const ejs = require("ejs");
 const path = require("path");
+const { User, Institution } = require("../model/model.js");
+const createTransporter = require("../helper/institute.email.service.js");
 
 const createOtherPayment = async (req, res) => {
   try {
@@ -245,9 +247,37 @@ const getSingleOtherPayment = async (req, res) => {
   }
 };
 
-const getSingleOtherPaymentPDF = async (req, res) => {
+const sendOtherPayment = async (req, res) => {
   try {
     const { id } = req.params; // studentId
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+    const student = await StudentModel.findById(id)
+    if(!student){
+      return res.status(403).json({
+        message: "Student is not found",
+      });
+    }
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new Error("Invalid student ID");
@@ -320,7 +350,176 @@ const getSingleOtherPaymentPDF = async (req, res) => {
       throw new Error("No payment found for this student");
     }
 
-    const data = result[0];
+    const data = {
+      ...result[0],
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    };
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: process.env.CHROME_PATH,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+
+    const html = await ejs.renderFile(
+      path.join(__dirname, "../views/otherPaymentReport.ejs"),
+      { data }
+    );
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" }
+    });
+
+    await browser.close();
+    const transporter = await createTransporter(institutionUser._id);
+    await transporter.sendMail({
+      from: institutionUser.email,
+      to: student.email,
+      subject: "Your Student Fees Receipt",
+      html: `
+            <div style="font-family:Arial,sans-serif">
+              <h2>Hello ${student.name},</h2>
+              <p>Please find attached your fees receipt.</p>
+              <p>Regards,<br/>${institutionUser.email}</p>
+            </div>
+          `,
+      attachments: [
+        {
+          filename: `student-fees-${student._id}.pdf`,
+          content: pdf,
+          contentType: "application/pdf"
+        }
+      ]
+    });
+    return res.status(200).json({
+      message: "PDF generated and sent successfully",
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}
+
+const getSingleOtherPaymentPDF = async (req, res) => {
+  try {
+    const { id } = req.params; // studentId
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new Error("Invalid student ID");
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          studentId: new mongoose.Types.ObjectId(id)
+        }
+      },
+      {
+        $lookup: {
+          from: "students",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "student"
+        }
+      },
+      { $unwind: "$student" },
+
+      {
+        $lookup: {
+          from: "otherpaymentmasters",
+          localField: "otherPaymentId",
+          foreignField: "_id",
+          as: "paymentDetails"
+        }
+      },
+      { $unwind: "$paymentDetails" },
+
+      {
+        $group: {
+          _id: "$studentId",
+          student: { $first: "$student" },
+          challanDate: { $first: "$createdAt" },
+
+          totalAmount: { $sum: "$amount" },
+          totalPaid: { $sum: "$paidAmount" },
+          totalDue: { $sum: "$dueAmount" },
+
+          payments: {
+            $push: {
+              name: "$paymentDetails.name",
+              amount: "$amount",
+              paidAmount: "$paidAmount",
+              dueAmount: "$dueAmount",
+              status: {
+                $cond: [
+                  { $eq: ["$dueAmount", 0] },
+                  "PAID",
+                  {
+                    $cond: [
+                      { $gt: ["$paidAmount", 0] },
+                      "PARTIAL",
+                      "PENDING"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ];
+
+    const result = await StudentOtherPayment.aggregate(pipeline);
+
+    if (!result.length) {
+      throw new Error("No payment found for this student");
+    }
+
+    const data = {
+      ...result[0],
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    };
 
     const browser = await puppeteer.launch({
       headless: "new",
@@ -1015,5 +1214,6 @@ module.exports = {
   getStudentOtherPaymentList,
   getStudentOtherPayments,
   makePayment,
-  getPaymentStatistics
+  getPaymentStatistics,
+  sendOtherPayment
 };
