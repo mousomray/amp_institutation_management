@@ -2,6 +2,9 @@ const OtherPaymentMaster = require("../model/OtherPaymentMaster.model");
 const StudentOtherPayment = require("../model/StudentOtherPayment.model");
 const StudentModel = require("../model/student.model");
 const mongoose = require("mongoose");
+const puppeteer = require("puppeteer-core");
+const ejs = require("ejs");
+const path = require("path");
 
 const createOtherPayment = async (req, res) => {
   try {
@@ -242,106 +245,82 @@ const getSingleOtherPayment = async (req, res) => {
   }
 };
 
-const getSingleOtherPaymentData = async (req, res, isPdf = false) => {
+const getSingleOtherPaymentPDF = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // studentId
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      if (isPdf) throw new Error("Invalid payment ID");
-      return res.status(400).json({
-        success: false,
-        message: "Invalid payment ID"
-      });
+      throw new Error("Invalid student ID");
     }
 
     const pipeline = [
       {
         $match: {
-          _id: new mongoose.Types.ObjectId(id)
+          studentId: new mongoose.Types.ObjectId(id)
         }
       },
       {
         $lookup: {
-          from: "users",
-          localField: "createdBy",
+          from: "students",
+          localField: "studentId",
           foreignField: "_id",
-          as: "createdByUser"
+          as: "student"
         }
       },
-      {
-        $unwind: {
-          path: "$createdByUser",
-          preserveNullAndEmptyArrays: true
-        }
-      },
+      { $unwind: "$student" },
+
       {
         $lookup: {
-          from: "studentotherpayments",
-          localField: "_id",
-          foreignField: "otherPaymentId",
-          as: "studentPayments"
+          from: "otherpaymentmasters",
+          localField: "otherPaymentId",
+          foreignField: "_id",
+          as: "paymentDetails"
         }
       },
+      { $unwind: "$paymentDetails" },
+
       {
-        $addFields: {
-          totalStudentsAssigned: { $size: "$studentPayments" },
-          totalAmount: { $sum: "$studentPayments.amount" },
-          totalPaid: { $sum: "$studentPayments.paidAmount" },
-          totalDue: { $sum: "$studentPayments.dueAmount" }
-        }
-      },
-      {
-        $project: {
-          name: 1,
-          amount: 1,
-          description: 1,
-          isActive: 1,
-          isDeleted: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          createdBy: {
-            name: "$createdByUser.name",
-            email: "$createdByUser.email"
-          },
-          totalStudentsAssigned: 1,
-          totalAmount: 1,
-          totalPaid: 1,
-          totalDue: 1
+        $group: {
+          _id: "$studentId",
+          student: { $first: "$student" },
+          challanDate: { $first: "$createdAt" },
+
+          totalAmount: { $sum: "$amount" },
+          totalPaid: { $sum: "$paidAmount" },
+          totalDue: { $sum: "$dueAmount" },
+
+          payments: {
+            $push: {
+              name: "$paymentDetails.name",
+              amount: "$amount",
+              paidAmount: "$paidAmount",
+              dueAmount: "$dueAmount",
+              status: {
+                $cond: [
+                  { $eq: ["$dueAmount", 0] },
+                  "PAID",
+                  {
+                    $cond: [
+                      { $gt: ["$paidAmount", 0] },
+                      "PARTIAL",
+                      "PENDING"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
         }
       }
     ];
 
-    const result = await OtherPaymentMaster.aggregate(pipeline);
+    const result = await StudentOtherPayment.aggregate(pipeline);
 
-    if (!result || result.length === 0) {
-      if (isPdf) throw new Error("Other payment not found");
-      return res.status(404).json({
-        success: false,
-        message: "Other payment not found"
-      });
+    if (!result.length) {
+      throw new Error("No payment found for this student");
     }
-    // Normal API response
-    return res.status(200).json({
-      success: true,
-      data: result[0]
-    });
 
-  } catch (error) {
-    console.log("Error in getSingleOtherPayment:", error);
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-async function generateOtherPaymentPdf(req, res) {
-  try {
-
-    const payment = await getSingleOtherPaymentData(req, res, true);
-
-
-    console.log("--->",payment)
+    const data = result[0];
 
     const browser = await puppeteer.launch({
       headless: "new",
@@ -353,44 +332,15 @@ async function generateOtherPaymentPdf(req, res) {
 
     const html = await ejs.renderFile(
       path.join(__dirname, "../views/otherPaymentReport.ejs"),
-      { payment }
+      { data }
     );
 
     await page.setContent(html, { waitUntil: "networkidle0" });
 
-    const pdfBuffer = await page.pdf({
+    const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      displayHeaderFooter: true,
-
-      headerTemplate: `
-        <div style="width:100%; font-size:10px; padding:0 30px; text-align:center;">
-          <span style="font-weight:bold;">
-            Institute Management System
-          </span>
-          <br/>
-          <span>
-            Other Payment Report
-          </span>
-        </div>
-      `,
-
-      footerTemplate: `
-        <div style="width:100%; font-size:9px; padding:0 30px; text-align:center;">
-          <span>
-            Generated on: ${new Date().toLocaleDateString()}
-          </span>
-          &nbsp;&nbsp;|&nbsp;&nbsp;
-          Page <span class="pageNumber"></span> of <span class="totalPages"></span>
-        </div>
-      `,
-
-      margin: {
-        top: "80px",      // header space
-        bottom: "80px",   // footer space
-        left: "30px",
-        right: "30px"
-      }
+      margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" }
     });
 
     await browser.close();
@@ -400,7 +350,7 @@ async function generateOtherPaymentPdf(req, res) {
       "Content-Disposition": "attachment; filename=other-payment-report.pdf"
     });
 
-    res.send(pdfBuffer);
+    return res.send(pdf);
 
   } catch (error) {
     return res.status(500).json({
@@ -408,7 +358,7 @@ async function generateOtherPaymentPdf(req, res) {
       message: error.message
     });
   }
-}
+};
 
 
 const updateOtherPayment = async (req, res) => {
@@ -1056,7 +1006,7 @@ const getPaymentStatistics = async (req, res) => {
 
 
 module.exports = {
-  generateOtherPaymentPdf,
+  getSingleOtherPaymentPDF,
   createOtherPayment,
   getAllOtherPayments,
   getSingleOtherPayment,

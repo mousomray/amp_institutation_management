@@ -34,7 +34,7 @@ export default function OtherPaymentStudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
   const [collecting, setCollecting] = useState<Record<string, boolean>>({});
-  const challanRef = useRef<HTMLDivElement | null>(null);
+  const CollectionRef = useRef<HTMLDivElement | null>(null);
    const [pdfLoading, setPdfLoading] = useState(false);
    const [paymentId,setPaymentId] = useState<string | null> (null)
   const searchRef = useRef<number | null>(null);
@@ -207,12 +207,12 @@ export default function OtherPaymentStudentsPage() {
     }
   };
 
-  const challanNo =
+  const CollectionNo =
     selectedStudent && selectedStudent.fees && selectedStudent.fees.length
       ? selectedStudent.fees[0].paymentId
       : "-";
 
-    const downloadPDF = async () => {
+  const downloadPDF = async () => {
     if (!paymentId || !token) {
       toast.error('Missing ID or authentication token');
       return;
@@ -222,33 +222,25 @@ export default function OtherPaymentStudentsPage() {
     setPdfLoading(true);
 
     try {
-      const res = await axiosInstance.get(
-        `/other-payment/generate-single-pdf/${paymentId}`,
+      const res = await axios.get(
+        `http://localhost:8080/api/other-payment/generate-single-pdf/${paymentId}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob',
-          timeout: 60000
+          responseType: "blob",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         }
       );
 
-      const blobData = res?.data;
-      if (!blobData) {
-        toast.error('No PDF returned from server.');
-        if (newTab) newTab.close();
-        return;
-      }
-
-      const blob = new Blob([blobData], { type: 'application/pdf' });
+      const blob = new Blob([res.data], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);
       if (newTab) newTab.location.href = blobUrl;
       else window.open(blobUrl, "_blank");
       // revoke after some time
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
       toast.success('PDF opened in new tab!');
-    } catch (err: any) {
-      console.error('PDF generation error:', err);
-      if (axios.isAxiosError(err)) {
-        toast.error(err.response?.data?.message || "Failed to generate PDF");
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to generate PDF");
       } else {
         toast.error("Unexpected error while generating PDF");
       }
@@ -314,26 +306,26 @@ export default function OtherPaymentStudentsPage() {
         <Column header="Actions" body={actionTemplate} style={{ width: "120px" }} />
       </DataTable>
 
-      {/* Challan dialog – show photo + signature */}
+      {/* Collection dialog – show photo + signature */}
       <Dialog
-        header={`Student Challan — ${selectedStudent?.studentName ?? ""}`}
+        header={`Student Collection — ${selectedStudent?.studentName ?? ""}`}
         visible={detailVisible}
         style={{ width: "70vw", maxWidth: "1000px" }}
         onHide={() => setDetailVisible(false)}
       >
         {selectedStudent ? (
           <div className="space-y-4">
-            <div ref={challanRef} className="bg-gray-50 p-4 rounded-lg">
-              <div className="challan-card bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+            <div ref={CollectionRef} className="bg-gray-50 p-4 rounded-lg">
+              <div className="Collection-card bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
                 {/* Top header */}
-                <div className="challan-header flex items-start justify-between border-b border-gray-200 pb-3 mb-2">
+                <div className="Collection-header flex items-start justify-between border-b border-gray-200 pb-3 mb-2">
                   <div>
-                    <div className="challan-title text-lg font-bold text-gray-900">Other Payment Challan</div>
-                    <div className="challan-sub text-xs text-gray-500">Student payment details</div>
+                    <div className="Collection-title text-lg font-bold text-gray-900">Other Payment Collection</div>
+                    <div className="Collection-sub text-xs text-gray-500">Student payment details</div>
                   </div>
                   <div className="text-right text-xs text-gray-600 space-y-1">
                     <div>
-                      <span className="font-semibold">Challan No:</span> {challanNo}
+                      <span className="font-semibold">Collection No:</span> {CollectionNo}
                     </div>
                     <div>
                       <span className="font-semibold">Date:</span> {new Date().toLocaleDateString()}
@@ -418,7 +410,7 @@ export default function OtherPaymentStudentsPage() {
 
                 {/* Fee table */}
                 <div>
-                  <div className="challan-section-title text-sm font-semibold text-gray-700 mb-1">Fee Details</div>
+                  <div className="Collection-section-title text-sm font-semibold text-gray-700 mb-1">Fee Details</div>
                   <table className="w-full border-collapse text-xs">
                     <thead>
                       <tr className="bg-gray-50">
@@ -451,7 +443,7 @@ export default function OtherPaymentStudentsPage() {
                 </div>
 
                 <div className="mt-4 text-[11px] text-gray-500">
-                  This is a system-generated challan for other payments. No signature is required.
+                  This is a system-generated Collection for other payments. No signature is required.
                 </div>
               </div>
             </div>
@@ -459,10 +451,12 @@ export default function OtherPaymentStudentsPage() {
             {/* Dialog actions */}
             <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
               <Button
-                label="Print Challan"
-                icon="pi pi-print"
+                label={pdfLoading ? "Opening PDF..." : "View PDF"}
+                icon={pdfLoading ? "pi pi-spin pi-spinner" : "pi pi-file-pdf"}
                 className="p-button-outlined p-button-secondary"
                 onClick={downloadPDF}
+                loading={pdfLoading}
+                disabled={pdfLoading}
               />
               <Button label="Close" className="p-button-text" onClick={() => setDetailVisible(false)} />
             </div>
