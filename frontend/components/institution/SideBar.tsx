@@ -140,7 +140,7 @@ const sidebarItems = [
     children: [
       {
         id: "5-1",
-        label: "Payment",
+        label: "Fees List",
         path: "/institution/dashboard/other",
         icon: <PaymentIcon />,
       },

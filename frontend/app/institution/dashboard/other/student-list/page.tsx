@@ -35,9 +35,10 @@ export default function OtherPaymentStudentsPage() {
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
   const [collecting, setCollecting] = useState<Record<string, boolean>>({});
   const CollectionRef = useRef<HTMLDivElement | null>(null);
-   const [pdfLoading, setPdfLoading] = useState(false);
-   const [paymentId,setPaymentId] = useState<string | null> (null)
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [paymentId, setPaymentId] = useState<string | null>(null)
   const searchRef = useRef<number | null>(null);
+  const [sendingPDF, setSendingPDF] = useState(false);
 
   useEffect(() => {
     const t = localStorage.getItem("institution-token");
@@ -92,10 +93,10 @@ export default function OtherPaymentStudentsPage() {
   const studentBody = (row: any) => {
     const initials = row.studentName
       ? String(row.studentName)
-          .split(" ")
-          .map((s: string) => s[0])
-          .slice(0, 2)
-          .join("")
+        .split(" ")
+        .map((s: string) => s[0])
+        .slice(0, 2)
+        .join("")
       : "?";
 
     return (
@@ -222,8 +223,8 @@ export default function OtherPaymentStudentsPage() {
     setPdfLoading(true);
 
     try {
-      const res = await axios.get(
-        `http://localhost:8080/api/other-payment/generate-single-pdf/${paymentId}`,
+      const res = await axiosInstance.get(
+        `/other-payment/generate-single-pdf/${paymentId}`,
         {
           responseType: "blob",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -247,6 +248,37 @@ export default function OtherPaymentStudentsPage() {
       if (newTab) newTab.close();
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+
+  const sendPDF = async () => {
+    if (!paymentId || !token) {
+      toast.error('Missing ID or authentication token');
+      return;
+    }
+
+    setSendingPDF(true);
+
+    try {
+      const res = await axiosInstance.get(
+        `/other-payment/sent-other-fees/pdf/${paymentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 60000
+        }
+      );
+
+      toast.success(res.data?.message || 'PDF sent successfully!');
+    } catch (err: any) {
+      console.error('PDF send error:', err);
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Failed to send PDF");
+      } else {
+        toast.error("Unexpected error while sending PDF");
+      }
+    } finally {
+      setSendingPDF(false);
     }
   };
 
@@ -451,15 +483,33 @@ export default function OtherPaymentStudentsPage() {
             {/* Dialog actions */}
             <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
               <Button
-                label={pdfLoading ? "Opening PDF..." : "View PDF"}
-                icon={pdfLoading ? "pi pi-spin pi-spinner" : "pi pi-file-pdf"}
-                className="p-button-outlined p-button-secondary"
+                icon="pi pi-file-pdf"
+                label={pdfLoading ? 'Opening PDF...' : 'View PDF'}
+                className="flex-1 p-button-primary"
                 onClick={downloadPDF}
                 loading={pdfLoading}
-                disabled={pdfLoading}
+                disabled={pdfLoading || sendingPDF}
+              />
+              <Button
+                icon="pi pi-send"
+                label={sendingPDF ? 'Sending...' : 'Send PDF'}
+                className="flex-1 p-button-success"
+                onClick={sendPDF}
+                loading={sendingPDF}
+                disabled={pdfLoading || sendingPDF}
               />
               <Button label="Close" className="p-button-text" onClick={() => setDetailVisible(false)} />
             </div>
+             <div className="mt-2 p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r">
+                  <div className="flex items-start gap-2">
+                    <i className="pi pi-info-circle text-amber-600 mt-0.5" style={{ fontSize: '0.9rem' }}></i>
+                    <div className="text-xs text-amber-800">
+                      <span className="font-semibold">Note:</span> If you haven't set up your{' '}
+                      <span className="font-medium">Google App Password</span> in your profile settings, 
+                      the email will not be sent to the student.
+                    </div>
+                  </div>
+                </div>
           </div>
         ) : (
           <div>No student selected</div>
@@ -520,9 +570,8 @@ export default function OtherPaymentStudentsPage() {
                           <Button
                             label={alreadyPaid ? "Collected" : "Collect"}
                             icon={alreadyPaid ? "pi pi-check" : "pi pi-credit-card"}
-                            className={`w-full md:w-auto ${
-                              alreadyPaid ? "p-button-secondary" : "p-button-primary"
-                            }`}
+                            className={`w-full md:w-auto ${alreadyPaid ? "p-button-secondary" : "p-button-primary"
+                              }`}
                             onClick={() => handleCollect(f.paymentId, due)}
                             loading={Boolean(collecting[f.paymentId])}
                             disabled={alreadyPaid}

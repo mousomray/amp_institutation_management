@@ -8,7 +8,7 @@ const puppeteer = require("puppeteer-core");
 const ejs = require("ejs");
 const path = require("path");
 const createTransporter = require("../helper/institute.email.service.js");
-
+const { User, Institution } = require("../model/model.js");
 const createStudentFees = async (req, res) => {
   try {
     const { enrollmentId, receiptMasterId } = req.body;
@@ -532,7 +532,40 @@ const generateSingleStudentFeesPDF = async (req, res) => {
   try {
     const ledgerId = req.params.id;
 
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+
     const reportData = await getSingleStudentFeesData(ledgerId);
+
+    const data = {
+      reportData,
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    }
 
     const chromePath = process.env.CHROME_PATH
     const browser = await puppeteer.launch({
@@ -544,7 +577,7 @@ const generateSingleStudentFeesPDF = async (req, res) => {
 
     const html = await ejs.renderFile(
       path.join(__dirname, "../views/singleStudentFeesReport.ejs"),
-      { data: reportData }
+      { data: data }
     );
 
     await page.setContent(html, { waitUntil: "networkidle2" });
@@ -552,37 +585,6 @@ const generateSingleStudentFeesPDF = async (req, res) => {
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-
-      margin: {
-        top: "110px",
-        bottom: "70px",
-        left: "20px",
-        right: "20px"
-      },
-
-      displayHeaderFooter: true,
-      headerTemplate: `
-        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:12px;padding:12px 24px;border-bottom:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#06b6d4);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">IL</div>
-            <div>
-              <div style="font-size:16px;font-weight:700;color:#0f172a">Your Institute Name</div>
-              <div style="font-size:12px;color:#6b7280">Student Fees Report</div>
-            </div>
-          </div>
-          <div style="text-align:right;font-size:12px;color:#374151">
-            <div>Date: ${new Date().toLocaleDateString()}</div>
-            <div>Ledger ID: ${ledgerId}</div>
-          </div>
-        </div>
-      `,
-      footerTemplate: `
-        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:10px;padding:8px 24px;border-top:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
-          <div style="color:#6b7280">This is a system generated report — ${req.user?.email || ''}</div>
-          <div style="color:#374151">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>
-        </div>
-      `,
-      preferCSSPageSize: true
     });
 
     await browser.close();
@@ -603,17 +605,51 @@ const generateSingleStudentFeesPDF = async (req, res) => {
 const sentCourseFeesChallan = async (req, res) => {
   try {
     const ledgerId = req.params.id;
+
+
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+
     const reportData = await getSingleStudentFeesData(ledgerId);
+
     if (!reportData) {
       return res.status(404).json({ message: "Report data not found" });
     }
     const student = await StudentModel.findById(reportData.enrollment.studentId);
-
-    console.log("Student Data:", reportData);
-
     if (!student || !student.email) {
       return res.status(400).json({ message: "Student email not found" });
     }
+
+    const data = {
+      reportData,
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    }
+
     const browser = await puppeteer.launch({
       headless: "new",
       executablePath: process.env.CHROME_PATH,
@@ -622,7 +658,7 @@ const sentCourseFeesChallan = async (req, res) => {
     const page = await browser.newPage();
     const html = await ejs.renderFile(
       path.join(__dirname, "../views/singleStudentFeesReport.ejs"),
-      { data: reportData }
+      { data: data }
     );
 
     await page.setContent(html, { waitUntil: "networkidle2" });
@@ -674,21 +710,47 @@ const sentStudentFinancialReport = async (req, res) => {
   try {
     const { studentId } = req.params;
 
-  const data = await getStudentSingleDataService(studentId);
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
 
-  if (!data) {
-    return res.status(404).json({ message: "Report data not found" });
-  }
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
 
-  const student = await StudentModel.findById(studentId);
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
 
-  
+    const result = await getStudentSingleDataService(studentId);
+    const data = {
+      result,
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    }
+    const student = await StudentModel.findById(studentId);
 
-  if (!student || !student.email) {
-    return res.status(400).json({ message: "Student email not found" });
-  }
 
-  const browser = await puppeteer.launch({
+
+    if (!student || !student.email) {
+      return res.status(400).json({ message: "Student email not found" });
+    }
+
+    const browser = await puppeteer.launch({
       headless: "new",
       executablePath: process.env.CHROME_PATH,
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -1225,7 +1287,44 @@ const getFinancialDataForPDF = async (req) => {
 
 const generateStudentFinancialPDF = async (req, res) => {
   try {
+
+     const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+
     const reportData = await getFinancialDataForPDF(req);
+  if (!reportData) {
+      return res.status(404).json({ message: "Report data not found" });
+    }
+    const data = {
+      reportData,
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    }
+
     const chromePath = process.env.CHROME_PATH
     const browser = await puppeteer.launch({
       headless: "new",
@@ -1235,29 +1334,12 @@ const generateStudentFinancialPDF = async (req, res) => {
     const page = await browser.newPage();
     const html = await ejs.renderFile(
       path.join(__dirname, "../views/studentFinancialReport.ejs"),
-      { data: reportData }
+      { data: data }
     );
     await page.setContent(html, { waitUntil: "networkidle0" });
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "100px", bottom: "80px", left: "20px", right: "20px" },
-      displayHeaderFooter: true,
-      headerTemplate: `
-        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:12px;padding:12px 20px;border-bottom:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
-        <div style="text-align:right;font-size:12px;color:#374151">
-            <div>${req.user?.email || ''}</div>
-            <div>${new Date().toLocaleDateString()}</div>
-          </div>
-        </div>
-      `,
-      footerTemplate: `
-        <div style="width:100%;font-family:Inter, Arial, sans-serif;font-size:10px;padding:8px 20px;border-top:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center;height:100%;box-sizing:border-box;">
-          <div style="color:#6b7280">Generated by My Institute</div>
-          <div style="color:#374151">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>
-        </div>
-      `,
-      preferCSSPageSize: true
     });
     await browser.close();
     res.set({
@@ -1641,8 +1723,39 @@ const generateSinglePDF = async (req, res) => {
   try {
     const { studentId } = req.params;
 
-    const data = await getStudentSingleDataService(studentId);
 
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const institutionUser = await User.findById(userId);
+    console.log("==>", institutionUser)
+
+    if (!institutionUser || institutionUser.role !== "institution") {
+      return res.status(403).json({
+        message: "Only institutions can create courses",
+      });
+    }
+    const institution = await Institution.findOne({
+      adminUser: institutionUser._id,
+    });
+
+    if (!institution) {
+      return res.status(404).json({
+        message: "Institution not found",
+      });
+    }
+
+    const result = await getStudentSingleDataService(studentId);
+    const data = {
+      result,
+      institution: {
+        name: institution.name,
+        email: institution.email,
+        phone: institution.phone || "",
+        address: institution.address || "",
+      },
+    }
     console.log("==>", data)
 
     const filePath = path.join(
@@ -1684,4 +1797,4 @@ const generateSinglePDF = async (req, res) => {
 
 
 
-module.exports = {sentStudentFinancialReport, createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF, getStudentFullFinancialSummary, generateSinglePDF, sentCourseFeesChallan };
+module.exports = { sentStudentFinancialReport, createStudentFees, getAllStudentFees, getSingleStudentFees, getStudentFinancialReport, generateStudentFinancialPDF, generateSingleStudentFeesPDF, getStudentFullFinancialSummary, generateSinglePDF, sentCourseFeesChallan };
