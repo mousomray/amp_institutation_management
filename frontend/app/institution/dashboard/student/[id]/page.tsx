@@ -6,7 +6,7 @@ import { Button } from "primereact/button";
 import { Divider } from "primereact/divider";
 import axiosInstance from "@/service/axios.service";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
 import { formatDate } from "@/helper/DateTime";
 import { useParams, useRouter } from "next/navigation";
 
@@ -125,14 +125,10 @@ export default function StudentDetailsPage() {
         }
       );
 
-      toast.success(res.data?.message || 'PDF sent successfully!');
+      toast.success(res?.data?.message || 'PDF sent successfully!');
     } catch (err: any) {
       console.error('PDF send error:', err);
-      if (axios.isAxiosError(err)) {
-        toast.error(err.response?.data?.message || "Failed to send PDF");
-      } else {
-        toast.error("Unexpected error while sending PDF");
-      }
+      toast.error(err?.response?.data?.message);
     } finally {
       setSendingPDF(false);
     }
@@ -301,6 +297,7 @@ export default function StudentDetailsPage() {
       <div className="flex justify-end">
         <Button label="Back" icon="pi pi-arrow-left" outlined onClick={() => router.back()} />
       </div>
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 }

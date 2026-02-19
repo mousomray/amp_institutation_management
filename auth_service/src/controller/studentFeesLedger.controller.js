@@ -699,7 +699,7 @@ const sentCourseFeesChallan = async (req, res) => {
     console.error("Single Fees PDF Error:", error);
 
     return res.status(500).json({
-      message: error.message,
+      message: "Please provide correct app vault password for your email in profile setting",
     });
   }
 };
@@ -795,7 +795,7 @@ const sentStudentFinancialReport = async (req, res) => {
     console.error("Single Fees PDF Error:", error);
 
     return res.status(500).json({
-      message: error.message,
+      message: 'Please provide correct app vault password for your email in profile setting',
     });
   }
 }
@@ -1789,7 +1789,7 @@ const generateSinglePDF = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Please provide correct app vault password for your email in profile setting',
     });
   }
 };

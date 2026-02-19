@@ -409,7 +409,7 @@ const sendOtherPayment = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Please provide correct app vault password for your email in profile setting'
     });
   }
 }
