@@ -344,13 +344,13 @@ export default function ReportPage() {
 						<table className="w-full text-sm">
 							<thead>
 								<tr className="text-left border-b">
-										<th className="py-2 pr-2">Name</th>
-										<th className="py-2 pr-2">Issued</th>
-										<th className="py-2 pr-2">Return</th>
-										<th className="py-2 pr-2">Actual Return</th>
-										<th className="py-2 pr-2">Delay</th>
-										<th className="py-2 pr-2">Total</th>
-										<th className="py-2 pr-2">Status</th>
+									<th className="py-2 pr-2">Name</th>
+									<th className="py-2 pr-2">Issued</th>
+									<th className="py-2 pr-2">Return</th>
+									<th className="py-2 pr-2">Actual Return</th>
+									<th className="py-2 pr-2">Delay</th>
+									<th className="py-2 pr-2">Total</th>
+									<th className="py-2 pr-2">Status</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -410,7 +410,7 @@ export default function ReportPage() {
 
 		try {
 			const token = localStorage.getItem('institution-token');
-			const res = await axios.get(`http://localhost:3004/api/generate-student-library-report/pdf`, {
+			const res = await axios.get(`${process.env.NEXT_PUBLIC_LIBRARY_API}api/generate-student-library-report/pdf`, {
 				responseType: "blob",
 				headers: token ? { Authorization: `Bearer ${token}` } : undefined,
 			});
@@ -497,40 +497,40 @@ export default function ReportPage() {
 								<div className="font-semibold mb-2">Amounts by Student (all records)</div>
 								<Chart type="bar" data={chartData.bar} options={chartOptions} style={{ height: 260 }} />
 							</div>
-								<div className="border rounded-lg p-3 lg:col-span-2">
-									<div className="flex items-center justify-between">
-										<div>
-											<div className="font-semibold mb-1">Recent Students</div>
-											<div className="text-sm text-gray-500">Showing page {pagination.page} of {pagination.totalPages}</div>
-										</div>
-									</div>
-
-									<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
-										{data.length === 0 ? (
-											<div className="text-sm text-gray-500">No students on this page.</div>
-										) : (
-											data.map((d, idx) => (
-												<div key={d.student?.id ?? idx} className="flex items-center gap-3 p-2 border rounded-md bg-white">
-													{d.student?.photo ? (
-														<img src={d.student.photo} alt={d.student?.name} className="h-12 w-12 object-cover rounded-md" />
-													) : (
-														<div className="h-12 w-12 rounded-md bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-700">{getInitials(d.student?.name)}</div>
-													)}
-
-													<div className="flex-1">
-														<div className="font-medium">{d.student?.name}</div>
-														<div className="text-xs text-gray-500">{d.student?.email}</div>
-														<div className="text-xs text-gray-500 mt-1">{d.totalBooks ?? 0} book(s) • {fmtINR(d.totalAmount)}</div>
-													</div>
-
-													<div className="text-sm">
-														<Tag value={d.totalBooks && d.totalBooks > 0 ? 'Has books' : 'No books'} severity={d.totalBooks && d.totalBooks > 0 ? 'info' : 'warning'} />
-													</div>
-												</div>
-											))
-										)}
+							<div className="border rounded-lg p-3 lg:col-span-2">
+								<div className="flex items-center justify-between">
+									<div>
+										<div className="font-semibold mb-1">Recent Students</div>
+										<div className="text-sm text-gray-500">Showing page {pagination.page} of {pagination.totalPages}</div>
 									</div>
 								</div>
+
+								<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+									{data.length === 0 ? (
+										<div className="text-sm text-gray-500">No students on this page.</div>
+									) : (
+										data.map((d, idx) => (
+											<div key={d.student?.id ?? idx} className="flex items-center gap-3 p-2 border rounded-md bg-white">
+												{d.student?.photo ? (
+													<img src={d.student.photo} alt={d.student?.name} className="h-12 w-12 object-cover rounded-md" />
+												) : (
+													<div className="h-12 w-12 rounded-md bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-700">{getInitials(d.student?.name)}</div>
+												)}
+
+												<div className="flex-1">
+													<div className="font-medium">{d.student?.name}</div>
+													<div className="text-xs text-gray-500">{d.student?.email}</div>
+													<div className="text-xs text-gray-500 mt-1">{d.totalBooks ?? 0} book(s) • {fmtINR(d.totalAmount)}</div>
+												</div>
+
+												<div className="text-sm">
+													<Tag value={d.totalBooks && d.totalBooks > 0 ? 'Has books' : 'No books'} severity={d.totalBooks && d.totalBooks > 0 ? 'info' : 'warning'} />
+												</div>
+											</div>
+										))
+									)}
+								</div>
+							</div>
 						</>
 					)}
 				</div>
