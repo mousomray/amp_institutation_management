@@ -123,7 +123,40 @@ export default function EditStudent({
       {/* NAME */}
       <div>
         <label className="text-sm font-medium">Name</label>
-        <InputText className="w-full mt-1" {...register("name")} />
+        <InputText
+          className="w-full mt-1"
+          {...register("name")}
+          onKeyDown={(e: any) => {
+            const input = e.currentTarget as HTMLInputElement;
+            const start = input.selectionStart ?? 0;
+
+            // Prevent leading space
+            if (e.key === " ") {
+              const prefix = input.value.substring(0, start);
+              if (start === 0 || prefix.trim().length === 0) {
+                e.preventDefault();
+                return;
+              }
+            }
+          }}
+          onPaste={(e: any) => {
+            e.preventDefault();
+            const pastedText = e.clipboardData.getData("text");
+            const cleanedInsert = pastedText.replace(/^\s+/, "");
+            const input = e.target as HTMLInputElement;
+            const start = input.selectionStart || 0;
+            const end = input.selectionEnd || 0;
+            const currentValue = input.value;
+            const newValue =
+              currentValue.substring(0, start) +
+              cleanedInsert +
+              currentValue.substring(end);
+            const normalized = newValue.replace(/^\s+/, "");
+            input.value = normalized;
+            setValue("name", normalized);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }}
+        />
         {errors.name && (
           <small className="text-red-500">{errors.name.message}</small>
         )}

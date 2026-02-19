@@ -59,6 +59,8 @@ export default function AddBookForm() {
   const selectedLanguage = watch("language");
   const bookFee = watch("bookFee");
   const lateFee = watch("lateFee");
+  const nameValue = watch("name");
+  const authorValue = watch("authorName");
 
   useEffect(() => {
     const storedToken = localStorage.getItem("institution-token");
@@ -250,7 +252,33 @@ export default function AddBookForm() {
                   <span className="p-inputgroup-addon bg-blue-50">
                     <i className="pi pi-book text-blue-600"></i>
                   </span>
-                  <InputText className="w-full" placeholder="Enter book title" {...register("name")} />
+                  <InputText
+                    className="w-full"
+                    placeholder="Enter book title"
+                    {...register("name")}
+                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                      // Prevent leading space when input is empty or caret at start
+                      const target = e.target as HTMLInputElement;
+                      const isSpace = e.key === " ";
+                      if (isSpace && (target.selectionStart === 0 || target.value.length === 0)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
+                      const paste = e.clipboardData.getData("text");
+                      const cleaned = paste.replace(/^\s+/, "");
+                      if (cleaned !== paste) {
+                        e.preventDefault();
+                        const newVal = (nameValue || "") + cleaned;
+                        setValue("name", newVal, { shouldValidate: true });
+                      }
+                    }}
+                    onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                      const val = e.target.value || "";
+                      const cleaned = val.replace(/^\s+/, "");
+                      if (cleaned !== val) setValue("name", cleaned, { shouldValidate: true });
+                    }}
+                  />
                 </div>
                 {errors.name && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.name.message}</small>}
               </div>
@@ -263,7 +291,37 @@ export default function AddBookForm() {
                   <span className="p-inputgroup-addon bg-blue-50">
                     <i className="pi pi-user text-blue-600"></i>
                   </span>
-                  <InputText className="w-full" placeholder="Enter author name" {...register("authorName")} />
+                  <InputText
+                    className="w-full"
+                    placeholder="Enter author name"
+                    {...register("authorName")}
+                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                      // Prevent digits
+                      if (/\d/.test(e.key)) {
+                        e.preventDefault();
+                        return;
+                      }
+                      // Prevent leading space
+                      const target = e.target as HTMLInputElement;
+                      const isSpace = e.key === " ";
+                      if (isSpace && (target.selectionStart === 0 || target.value.length === 0)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
+                      const paste = e.clipboardData.getData("text");
+                      // remove digits and leading spaces
+                      const cleaned = paste.replace(/\d+/g, "").replace(/^\s+/, "");
+                      e.preventDefault();
+                      const newVal = (authorValue || "") + cleaned;
+                      setValue("authorName", newVal, { shouldValidate: true });
+                    }}
+                    onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                      let val = e.target.value || "";
+                      val = val.replace(/\d+/g, "").replace(/^\s+/, "");
+                      if (val !== authorValue) setValue("authorName", val, { shouldValidate: true });
+                    }}
+                  />
                 </div>
                 {errors.authorName && <small className="text-red-500 flex items-center gap-1"><i className="pi pi-exclamation-circle"></i>{errors.authorName.message}</small>}
               </div>

@@ -249,33 +249,32 @@ function CourseEnroll({
 
     const handleStudentCreated = async (newStudent: any) => {
         console.log("New student created:", newStudent);
-        
+
         // Refresh the student list
         await fetchStudents();
-        
+
         // Auto-select the newly created student
         setSelectedStudents([newStudent]);
-        
-        toast.success("Student added and selected!");
+
     };
 
     return (
         <div className="space-y-6">
             {/* COURSE INFO */}
             <div className="flex gap-4 items-center bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
-                    {courseImage ? (
-                        <Image
-                            src={courseImage}
-                            alt={courseName}
-                            width={80}
-                            height={80}
-                            className="rounded-xl object-cover shadow-md"
-                        />
-                    ) : (
-                        <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center shadow-md">
-                            <i className="pi pi-image text-3xl text-gray-400" />
-                        </div>
-                    )}
+                {courseImage ? (
+                    <Image
+                        src={courseImage}
+                        alt={courseName}
+                        width={80}
+                        height={80}
+                        className="rounded-xl object-cover shadow-md"
+                    />
+                ) : (
+                    <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center shadow-md">
+                        <i className="pi pi-image text-3xl text-gray-400" />
+                    </div>
+                )}
 
                 <div>
                     <h3 className="text-lg font-semibold text-gray-800">{courseName}</h3>

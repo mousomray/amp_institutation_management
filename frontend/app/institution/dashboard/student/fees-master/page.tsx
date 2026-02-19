@@ -22,6 +22,7 @@ export default function FeesMasterTable() {
   const [fees, setFees] = useState<any[]>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [loading, setLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // pagination
   const [page, setPage] = useState(1);
@@ -47,18 +48,35 @@ export default function FeesMasterTable() {
   }, []);
 
   useEffect(() => {
+    // fetchFees will run when token, page, rows or debouncedSearch change
+  }, [token]);
+
+  // debounce search input to avoid spamming the server
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(globalFilter.trim()), 450);
+    return () => clearTimeout(t);
+  }, [globalFilter]);
+
+  useEffect(() => {
     if (token) fetchFees();
-  }, [token, page, rows]);
+  }, [token, page, rows, debouncedSearch]);
 
   const fetchFees = async () => {
     try {
       setLoading(true);
       const res = await axiosInstance.get("/fees-master/get-all-fees-master", {
-        params: { page, limit: rows },
+        params: { page, limit: rows, search: debouncedSearch || undefined },
         headers: { Authorization: `Bearer ${token}` },
       });
-      setFees(res.data.data || []);
-      setTotalRecords(res.data.totalCount || (res.data.data?.length ?? 0));
+
+      const payload = res?.data || {};
+
+      // API may return { total, data, currentPage, totalPages } or { data: [...] }
+      const list = payload.data ?? payload.data ?? [];
+      const total = payload.total ?? payload.totalCount ?? payload.totalRecords ?? (Array.isArray(list) ? list.length : 0);
+
+      setFees(list || []);
+      setTotalRecords(Number(total) || 0);
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to load fees master");

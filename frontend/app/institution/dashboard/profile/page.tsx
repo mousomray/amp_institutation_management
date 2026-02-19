@@ -4,7 +4,8 @@ import React, { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { Badge } from "primereact/badge";
 import axiosInstance from "@/service/axios.service";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
 import "leaflet/dist/leaflet.css";
@@ -604,6 +605,9 @@ export default function InstitutionProfilePage() {
                     </div>
                 </div>
             </div>
+
+            {/* Toast Container */}
+            <ToastContainer position="top-right" autoClose={3000} />
         </div>
     );
 }

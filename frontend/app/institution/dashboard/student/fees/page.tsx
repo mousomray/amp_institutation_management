@@ -291,14 +291,14 @@ export default function StudentFeesPage() {
     });
 
     // Add Other Payment option (uses enrollment id from row.enrollment._id)
-    items.push({
-      label: "Add Other Payment",
-      icon: "pi pi-plus",
-      command: () => {
-        setSelectedOtherEnrollmentId(row?.enrollment?._id ?? null);
-        setOtherVisible(true);
-      },
-    });
+    // items.push({
+    //   label: "Add Other Payment",
+    //   icon: "pi pi-plus",
+    //   command: () => {
+    //     setSelectedOtherEnrollmentId(row?.enrollment?._id ?? null);
+    //     setOtherVisible(true);
+    //   },
+    // });
 
     return (
       <div onClick={(e) => e.stopPropagation()} className="flex justify-center">

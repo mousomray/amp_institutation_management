@@ -32,7 +32,7 @@ export default function InstAppBar() {
   const [resetPasswordVisible, setResetPasswordVisible] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [institutionData, setInstitutionData] = useState<Institution | null>(null);
-  
+
   // Password reset form state
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -188,14 +188,14 @@ export default function InstAppBar() {
       );
 
       toast.success(res.data.message || "Password updated successfully!");
-      
+
       // Reset form
       setPasswordData({
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
-      
+
       setResetPasswordVisible(false);
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -370,7 +370,6 @@ export default function InstAppBar() {
           </div>
         </div>
 
-        <ToastContainer position="top-right" autoClose={3000} />
       </header>
 
       {/* Reset Password Dialog */}

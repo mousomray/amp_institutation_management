@@ -215,7 +215,7 @@ function Page() {
         <InputText
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search courses (press Enter or wait)"
+          placeholder="Search course"
           className="p-inputtext-sm"
         />
       </IconField>

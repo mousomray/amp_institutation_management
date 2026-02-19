@@ -299,6 +299,42 @@ function AddNewStudent({ onClose, onSuccess }: AddNewStudentProps) {
                   className="w-full"
                   {...register("name")}
                   placeholder="Enter full name"
+                  onKeyDown={(e: any) => {
+                    const input = e.currentTarget as HTMLInputElement;
+                    const start = input.selectionStart ?? 0;
+
+                    // prevent leading space
+                    if (e.key === " ") {
+                      const prefix = input.value.substring(0, start);
+                      if (start === 0 || prefix.trim().length === 0) {
+                        e.preventDefault();
+                        return;
+                      }
+                    }
+
+                    // prevent numbers
+                    if (e.key >= "0" && e.key <= "9") {
+                      e.preventDefault();
+                    }
+                  }}
+                  onPaste={(e: any) => {
+                    e.preventDefault();
+                    const pastedText = e.clipboardData.getData("text");
+                    const textWithoutNumbers = pastedText.replace(/[0-9]/g, "");
+                    const cleanedInsert = textWithoutNumbers.replace(/^\s+/, "");
+                    const input = e.target as HTMLInputElement;
+                    const start = input.selectionStart || 0;
+                    const end = input.selectionEnd || 0;
+                    const currentValue = input.value;
+                    const newValue =
+                      currentValue.substring(0, start) +
+                      cleanedInsert +
+                      currentValue.substring(end);
+                    const normalized = newValue.replace(/^\s+/, "");
+                    input.value = normalized;
+                    setValue("name", normalized);
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+                  }}
                 />
               </div>
               {errors.name && (
@@ -391,7 +427,7 @@ function AddNewStudent({ onClose, onSuccess }: AddNewStudentProps) {
             {/* Father Name */}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">
-                Father Name
+                Guardian's Name
               </label>
               <div className="p-inputgroup">
                 <span className="p-inputgroup-addon bg-blue-50">
@@ -400,7 +436,43 @@ function AddNewStudent({ onClose, onSuccess }: AddNewStudentProps) {
                 <InputText
                   className="w-full"
                   {...register("fatherName")}
-                  placeholder="Enter father's name"
+                  placeholder="Enter guardian's name"
+                  onKeyDown={(e: any) => {
+                    const input = e.currentTarget as HTMLInputElement;
+                    const start = input.selectionStart ?? 0;
+
+                    // prevent leading space
+                    if (e.key === " ") {
+                      const prefix = input.value.substring(0, start);
+                      if (start === 0 || prefix.trim().length === 0) {
+                        e.preventDefault();
+                        return;
+                      }
+                    }
+
+                    // prevent numbers
+                    if (e.key >= "0" && e.key <= "9") {
+                      e.preventDefault();
+                    }
+                  }}
+                  onPaste={(e: any) => {
+                    e.preventDefault();
+                    const pastedText = e.clipboardData.getData("text");
+                    const textWithoutNumbers = pastedText.replace(/[0-9]/g, "");
+                    const cleanedInsert = textWithoutNumbers.replace(/^\s+/, "");
+                    const input = e.target as HTMLInputElement;
+                    const start = input.selectionStart || 0;
+                    const end = input.selectionEnd || 0;
+                    const currentValue = input.value;
+                    const newValue =
+                      currentValue.substring(0, start) +
+                      cleanedInsert +
+                      currentValue.substring(end);
+                    const normalized = newValue.replace(/^\s+/, "");
+                    input.value = normalized;
+                    setValue("fatherName", normalized);
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+                  }}
                 />
               </div>
               {errors.fatherName && (

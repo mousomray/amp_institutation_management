@@ -54,13 +54,37 @@ const getAllFeesMaster = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const data = await FeesMasterModel.find({
+    let { page = 1, limit = 5, search = "" } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    const skip = (page - 1) * limit;
+
+    const filter = {
       userId,
       isDeleted: false,
-    }).sort({ createdAt: -1 });
+    };
+
+    // If search query exists → filter by name (case insensitive)
+    if (search) {
+      filter.name = { $regex: search, $options: "i" };
+    }
+
+    // Total Count (for pagination)
+    const total = await FeesMasterModel.countDocuments(filter);
+
+    // Data Fetch with pagination
+    const data = await FeesMasterModel.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     res.status(200).json({
-      total: data.length,
+      total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      limit,
       data,
     });
   } catch (error) {
@@ -68,6 +92,7 @@ const getAllFeesMaster = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 const getSingleFeesMaster = async (req, res) => {
@@ -102,7 +127,7 @@ const updateFeesMaster = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     //console.log("|=>", userId)
-     const payload = FeesMasterSchema.parse({
+    const payload = FeesMasterSchema.parse({
       ...req.body,
       userId,
     });
