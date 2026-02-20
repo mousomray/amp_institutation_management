@@ -98,26 +98,51 @@ export default function StudentFeesPage() {
   // student renderer: use row.student and receipt from API
   const studentBody = (row: any) => {
     const student = row.student;
-    const initials = student?.name ? student.name.split(" ").map((s: string) => s[0]).slice(0,2).join("") : "?";
+    const getInitials = (name?: string) => {
+      if (!name) return "?";
+      const parts = name.trim().split(/\s+/);
+      const letters = parts.map((p) => p.charAt(0));
+      return letters.slice(0, 2).join("").toUpperCase();
+    };
+
+    const stringToBg = (str?: string) => {
+      const colors = [
+        "bg-blue-500",
+        "bg-green-500",
+        "bg-red-500",
+        "bg-yellow-500",
+        "bg-indigo-500",
+        "bg-pink-500",
+        "bg-teal-500",
+        "bg-orange-500",
+      ];
+      if (!str) return colors[0];
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return colors[Math.abs(hash) % colors.length];
+    };
+
+    const initials = getInitials(student?.name || student?.studentId || "");
+    const bgClass = stringToBg(student?.name || student?.studentId || "");
+
     return (
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border overflow-hidden relative flex items-center justify-center flex-shrink-0">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${bgClass}`}>
+            {initials || <i className="pi pi-user text-white" />}
+          </div>
           {student?.photo ? (
             <img
               src={student.photo}
               alt={student?.name ?? "student"}
-              className="w-full h-full object-cover"
+              className="w-10 h-10 rounded-full object-cover absolute top-0 left-0"
               onError={(e) => {
-                // hide broken image and fallback to initials
-                const el = e.currentTarget as HTMLImageElement;
-                el.style.display = "none";
-                const parent = el.parentElement;
-                if (parent) parent.classList.add("bg-gray-300", "text-gray-700");
+                (e.currentTarget as HTMLImageElement).style.display = "none";
               }}
             />
-          ) : (
-            <span className="text-sm font-semibold text-gray-600">{initials}</span>
-          )}
+          ) : null}
         </div>
 
         <div className="flex flex-col">

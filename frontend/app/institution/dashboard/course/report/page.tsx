@@ -418,6 +418,33 @@ export default function ReportPage() {
 		}
 	};
 
+	// Helper: initials and background color for avatars
+	const getInitials = (name?: string) => {
+		if (!name) return "?";
+		const parts = name.trim().split(/\s+/);
+		const letters = parts.map((p) => p.charAt(0));
+		return letters.slice(0, 2).join("").toUpperCase();
+	};
+
+	const stringToBg = (str?: string) => {
+		const colors = [
+			"bg-blue-500",
+			"bg-green-500",
+			"bg-red-500",
+			"bg-yellow-500",
+			"bg-indigo-500",
+			"bg-pink-500",
+			"bg-teal-500",
+			"bg-orange-500",
+		];
+		if (!str) return colors[0];
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			hash = str.charCodeAt(i) + ((hash << 5) - hash);
+		}
+		return colors[Math.abs(hash) % colors.length];
+	};
+
 
 
 	return (
@@ -624,35 +651,59 @@ export default function ReportPage() {
 						<Column expander style={{ width: '3rem' }} />
 						<Column
 							header="Student"
-							body={(r: RecordItem) => (
-								<div className="flex items-center gap-2">
-									{r.student?.photo ? (
-										<img src={r.student.photo} alt={r.student?.name} className="h-10 w-10 object-cover rounded" />
-									) : (
-										<div className="h-10 w-10 bg-gray-200 rounded" />
-									)}
-									<div className="flex flex-col">
-										<span className="font-medium">{r.student?.name}</span>
-										<span className="text-xs text-gray-500">{r.student?.email}</span>
+							body={(r: RecordItem) => {
+								const initials = getInitials(r.student?.name || r.student?._id || '');
+								const bgClass = stringToBg(r.student?.name || r.student?._id || '');
+								return (
+									<div className="flex items-center gap-2">
+										<div className="h-10 w-10 rounded overflow-hidden relative flex items-center justify-center flex-shrink-0">
+											<div className={`h-10 w-10 rounded flex items-center justify-center text-white font-semibold ${bgClass}`}>
+												{initials || <i className="pi pi-user text-white" />}
+											</div>
+											{r.student?.photo ? (
+												<img
+													src={r.student.photo}
+													alt={r.student?.name}
+													className="h-10 w-10 object-cover rounded absolute top-0 left-0"
+													onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = 'none';}}
+												/>
+											) : null}
+										</div>
+										<div className="flex flex-col">
+											<span className="font-medium">{r.student?.name}</span>
+											<span className="text-xs text-gray-500">{r.student?.email}</span>
+										</div>
 									</div>
-								</div>
-							)}
+								);
+							}}
 						/>
 						<Column
 							header="Course"
-							body={(r: RecordItem) => (
-								<div className="flex items-center gap-2">
-									{r.course?.image ? (
-										<img src={r.course.image} alt={r.course?.name} className="h-10 w-10 object-cover rounded" />
-									) : (
-										<div className="h-10 w-10 bg-gray-200 rounded" />
-									)}
-									<div className="flex flex-col">
-										<span className="font-medium">{r.course?.name}</span>
-										<span className="text-xs text-gray-500">{r.paymentType}</span>
+							body={(r: RecordItem) => {
+								const initials = getInitials(r.course?.name || r.course?._id || '');
+								const bgClass = stringToBg(r.course?.name || r.course?._id || '');
+								return (
+									<div className="flex items-center gap-2">
+										<div className="h-10 w-10 rounded overflow-hidden relative flex items-center justify-center flex-shrink-0">
+											<div className={`h-10 w-10 rounded flex items-center justify-center text-white font-semibold ${bgClass}`}>
+												{initials || <i className="pi pi-book text-white" />}
+											</div>
+											{r.course?.image ? (
+												<img
+													src={r.course.image}
+													alt={r.course?.name}
+													className="h-10 w-10 object-cover rounded absolute top-0 left-0"
+													onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = 'none';}}
+												/>
+											) : null}
+										</div>
+										<div className="flex flex-col">
+											<span className="font-medium">{r.course?.name}</span>
+											<span className="text-xs text-gray-500">{r.paymentType}</span>
+										</div>
 									</div>
-								</div>
-							)}
+								);
+							}}
 						/>
 						<Column header="Type" body={(r: RecordItem) => <Tag value={r.paymentType} severity={typeSeverity(r.paymentType)} />} style={{ width: '140px' }} />
 						<Column header="Total" body={(r: RecordItem) => <span className="font-medium">{fmtINR(r.totalAmount)}</span>} />

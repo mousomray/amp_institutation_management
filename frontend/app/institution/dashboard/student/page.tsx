@@ -112,17 +112,53 @@ export default function StudentTable() {
   /* ================= COLUMN TEMPLATES ================= */
 
   const photoTemplate = (rowData: any) =>
-    rowData.photo ? (
-      <img
-        src={rowData.photo}
-        alt={rowData.name}
-        className="w-10 h-10 rounded-full object-cover border"
-      />
-    ) : (
-      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border">
-        <i className="pi pi-user text-gray-500" />
-      </div>
-    );
+    {
+      const getInitials = (name: string) => {
+        if (!name) return "";
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+        return (
+          parts[0].charAt(0) + parts[1].charAt(0)
+        ).toUpperCase();
+      };
+
+      const stringToBg = (str: string) => {
+        const colors = [
+          "bg-blue-500",
+          "bg-green-500",
+          "bg-red-500",
+          "bg-yellow-500",
+          "bg-indigo-500",
+          "bg-pink-500",
+          "bg-teal-500",
+          "bg-orange-500",
+        ];
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+      };
+
+      const initials = getInitials(rowData?.name || rowData?.studentId || "");
+      const bgClass = stringToBg(rowData?.name || rowData?.studentId || "");
+
+      return (
+        <div className="w-10 h-10 rounded-full border overflow-hidden relative flex items-center justify-center">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${bgClass}`}>
+            {initials || <i className="pi pi-user text-white" />}
+          </div>
+          {rowData?.photo ? (
+            <img
+              src={rowData.photo}
+              alt={rowData.name}
+              className="w-10 h-10 rounded-full object-cover border absolute top-0 left-0"
+              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+            />
+          ) : null}
+        </div>
+      );
+    }
 
   const signatureTemplate = (rowData: any) =>
     rowData.signature ? (

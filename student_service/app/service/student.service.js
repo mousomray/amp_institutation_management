@@ -9,15 +9,13 @@ async function getStudentFromStudentService(studentId, req) {
       `${STUDENT_SERVICE_URL}/api/student/onlyonestudentapi/${studentId}`,
       {
         headers: {
-          Authorization: req.headers.authorization 
+          Authorization: req.headers.authorization
         }
       }
     )
-
     return response.data.data
-
   } catch (error) {
-    console.error('Student service error:', error.message)
+    console.error('Student service error:', error)
     return null
   }
 }

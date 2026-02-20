@@ -80,6 +80,23 @@ function getInitials(name?: string) {
 		.toUpperCase();
 }
 
+function stringToBg(name?: string) {
+	const colors = [
+ 		'bg-blue-500',
+ 		'bg-green-500',
+ 		'bg-red-500',
+ 		'bg-yellow-500',
+ 		'bg-indigo-500',
+ 		'bg-pink-500',
+ 		'bg-teal-500',
+ 		'bg-orange-500'
+ 	];
+ 	if (!name) return colors[0];
+ 	let hash = 0;
+ 	for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+ 	return colors[Math.abs(hash) % colors.length];
+}
+
 function normalizePaymentStatus(value: any): string {
 	if (!value) return '';
 	return String(value).trim().toLowerCase();
@@ -511,11 +528,23 @@ export default function ReportPage() {
 									) : (
 										data.map((d, idx) => (
 											<div key={d.student?.id ?? idx} className="flex items-center gap-3 p-2 border rounded-md bg-white">
-												{d.student?.photo ? (
-													<img src={d.student.photo} alt={d.student?.name} className="h-12 w-12 object-cover rounded-md" />
-												) : (
-													<div className="h-12 w-12 rounded-md bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-700">{getInitials(d.student?.name)}</div>
-												)}
+												{
+													(() => {
+														const initials = getInitials(d.student?.name);
+														const bgClass = stringToBg(d.student?.name);
+														const src = d.student?.photo;
+														return (
+															<div className="h-12 w-12 rounded-md overflow-hidden relative flex items-center justify-center">
+																<div className={`h-12 w-12 rounded-md flex items-center justify-center text-white font-semibold ${bgClass}`}>
+																	{initials || <i className="pi pi-user text-white" />}
+																</div>
+																{src ? (
+																	<img src={src} alt={d.student?.name} className="h-12 w-12 object-cover rounded-md absolute top-0 left-0" onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = 'none';}} />
+																) : null}
+															</div>
+														);
+													})()
+												}
 
 												<div className="flex-1">
 													<div className="font-medium">{d.student?.name}</div>
@@ -556,19 +585,27 @@ export default function ReportPage() {
 						<Column expander style={{ width: '3rem' }} />
 						<Column
 							header="Student"
-							body={(r: RecordItem) => (
-								<div className="flex items-center gap-3">
-									{r.student?.photo ? (
-										<img src={r.student.photo} alt={r.student?.name} className="h-10 w-10 object-cover rounded" />
-									) : (
-										<div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-700">{getInitials(r.student?.name)}</div>
-									)}
-									<div className="flex flex-col">
-										<span className="font-medium">{r.student?.name}</span>
-										<span className="text-xs text-gray-500">{r.student?.email} • {r.student?.phone}</span>
+							body={(r: RecordItem) => {
+								const initials = getInitials(r.student?.name);
+								const bgClass = stringToBg(r.student?.name);
+								const src = r.student?.photo;
+								return (
+									<div className="flex items-center gap-3">
+										<div className="h-10 w-10 rounded overflow-hidden relative flex items-center justify-center flex-shrink-0">
+											<div className={`h-10 w-10 rounded flex items-center justify-center text-white font-semibold ${bgClass}`}>
+												{initials || <i className="pi pi-user text-white" />}
+											</div>
+											{src ? (
+												<img src={src} alt={r.student?.name} className="h-10 w-10 rounded object-cover absolute top-0 left-0" onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = 'none';}} />
+											) : null}
+										</div>
+										<div className="flex flex-col">
+											<span className="font-medium">{r.student?.name}</span>
+											<span className="text-xs text-gray-500">{r.student?.email} • {r.student?.phone}</span>
+										</div>
 									</div>
-								</div>
-							)}
+								);
+							}}
 						/>
 						<Column header="Books" body={(r: RecordItem) => <span className="font-medium">{r.totalBooks}</span>} />
 						<Column header="Book Fee" body={(r: RecordItem) => <span>{fmtINR(r.totalBookFee)}</span>} />

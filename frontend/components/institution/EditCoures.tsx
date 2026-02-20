@@ -78,7 +78,7 @@ export default function EditCourseForm({
       setLoadingFees(true);
       const res = await axiosInstance.get(`/course-fees/get-course-fees/${courseId}`);
       const fees = res?.data?.data?.fees || [];
-      
+
       // Map to include selected state (all existing fees are selected by default)
       const mappedFees: CourseFee[] = fees.map((f: any) => ({
         feesMasterId: f.feesMasterId,
@@ -86,7 +86,7 @@ export default function EditCourseForm({
         amount: Number(f.amount) || 0,
         selected: true, // existing fees are selected by default
       }));
-      
+
       setCourseFees(mappedFees);
     } catch (err) {
       console.error("Failed to fetch course fees", err);
@@ -112,7 +112,7 @@ export default function EditCourseForm({
     });
 
     setPreview(course.image);
-    
+
     // Fetch fees master and course fees
     fetchFeesMaster();
     if (course._id) {
@@ -157,7 +157,6 @@ export default function EditCourseForm({
               fees: selectedFees,
             }
           );
-          toast.success("Course fees updated successfully");
         } catch (err: any) {
           console.error("Failed to update course fees", err);
           toast.error(err.response?.data?.message || "Failed to update course fees");
@@ -560,7 +559,7 @@ export default function EditCourseForm({
         </form>
       </Card>
 
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" />
     </div>
   );
 }

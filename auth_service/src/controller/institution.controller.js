@@ -2702,4 +2702,29 @@ const resetPassword = async (req, res) => {
   }
 }
 
-module.exports = { resetPassword, updateInstitution, updateInstitutionAppPassword, getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse };
+const getInstitutionMailConfig = async (req, res) => {
+  try {
+     const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    const institution = await Institution
+      .findById(user.institution)
+      .select("+appPassword");
+
+    if (!institution)
+      return res.status(404).json({ message: "Institution not found" });
+
+    return res.json({
+      email: institution.email,
+      appPassword: institution.appPassword
+    });
+
+  } catch (error) {
+    console.error("Mail Config Error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+module.exports = { resetPassword, updateInstitution, updateInstitutionAppPassword, getInstitution, buyCourse, institutionLogOut, institutionDashboard, courseDetails, updateCourse, deleteCoures, studentDetails, getMyStudents, loginInstitution, createCourse, getMyCourses, StudentDropDown, createStudent, deleteStudent, updateStudent, OnlyOneStudentAPI, AddFeesMasterAPI, GetAllFeesMasterAPI, GetSingleFeesMasterAPI, UpdateFeesMasterAPI, DeleteFeesMasterAPI, assignStudentFees, getSingleStudentFees, listStudentFees, payStudentFees, getInstallmentPreview, assignInstallmentsToStudentFees, payInstallment, listInstallmentItems, enrollMultipleStudentsToCourse, getInstitutionMailConfig };

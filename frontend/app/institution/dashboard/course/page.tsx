@@ -153,13 +153,54 @@ function Page() {
 
   /* ================= COLUMN TEMPLATES ================= */
   const imageTemplate = (rowData: any) =>
-    rowData.image ? (
-      <img src={rowData.image} alt={rowData.name} className="h-12 w-12 object-cover rounded" />
-    ) : (
-      <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
-        <i className="pi pi-book text-gray-500" />
-      </div>
-    );
+    {
+      const getInitials = (name?: string) => {
+        if (!name) return "?";
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+        return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+      };
+
+      const stringToBg = (str?: string) => {
+        const colors = [
+          "bg-blue-500",
+          "bg-green-500",
+          "bg-red-500",
+          "bg-yellow-500",
+          "bg-indigo-500",
+          "bg-pink-500",
+          "bg-teal-500",
+          "bg-orange-500",
+        ];
+        if (!str) return colors[0];
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+      };
+
+      const initials = getInitials(rowData?.name || rowData?.courseName || "");
+      const bgClass = stringToBg(rowData?.name || rowData?.courseName || "");
+
+      return (
+        <div className="h-12 w-12 rounded overflow-hidden relative flex items-center justify-center">
+          <div className={`h-12 w-12 rounded flex items-center justify-center text-white font-semibold ${bgClass}`}>
+            {initials || <i className="pi pi-book text-white" />}
+          </div>
+          {rowData?.image ? (
+            <img
+              src={rowData.image}
+              alt={rowData.name}
+              className="h-12 w-12 object-cover rounded absolute top-0 left-0"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : null}
+        </div>
+      );
+    }
 
   const actionTemplate = (rowData: any) => (
     <div onClick={(e) => e.stopPropagation()} className="flex">

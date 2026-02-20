@@ -12,6 +12,8 @@ import axios from "axios";
 import { toast , ToastContainer } from "react-toastify";
 import { formatDate } from "@/helper/DateTime";
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { Dialog } from 'primereact/dialog';
+import SingleIssued from '@/components/institution/SingleIssued';
 import { useRouter } from "next/navigation";
 import { Menu } from "primereact/menu"; // added
 
@@ -24,6 +26,23 @@ function getInitials(name?: string) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
+
+function stringToBg(name?: string) {
+  const colors = [
+    "bg-blue-500",
+    "bg-green-500",
+    "bg-red-500",
+    "bg-yellow-500",
+    "bg-indigo-500",
+    "bg-pink-500",
+    "bg-teal-500",
+    "bg-orange-500",
+  ];
+  if (!name) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
 }
 
 export default function IssuedBooksTable() {
@@ -204,6 +223,14 @@ export default function IssuedBooksTable() {
     const isPaid = (row.payment_status ?? row.paymentStatus ?? "").toString().toLowerCase() === "paid";
     const items = [
       {
+        label: "View Report",
+        icon: "pi pi-eye",
+        command: () => {
+          setSelectedIssueId(row._id);
+          setReportVisible(true);
+        },
+      },
+      {
         label: isPaid ? "Already Paid" : "Collect Money",
         icon: "pi pi-money-bill",
         disabled: isPaid,
@@ -223,6 +250,8 @@ export default function IssuedBooksTable() {
 
   const menu = useRef<any>(null);
   const [menuModel, setMenuModel] = useState<any[]>([]);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
   const imageSrc = (img?: string): string | undefined =>
     img
@@ -233,14 +262,24 @@ export default function IssuedBooksTable() {
 
   const bookTemplate = (row: any) => {
     const src = imageSrc(row.book?.image);
+    const initials = getInitials(row.book?.name || row.bookName || "");
+    const bgClass = stringToBg(row.book?.name || row.bookName || "");
     return (
       <div className="flex items-center gap-3">
-        {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={row.book?.name} className="w-12 h-12 object-cover rounded" />
-        ) : (
-          <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400">No</div>
-        )}
+        <div className="w-12 h-12 rounded overflow-hidden relative flex items-center justify-center">
+          <div className={`w-12 h-12 rounded flex items-center justify-center text-white font-semibold ${bgClass}`}>
+            {initials || <span className="text-gray-200">No</span>}
+          </div>
+          {src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt={row.book?.name}
+              className="w-12 h-12 object-cover rounded absolute top-0 left-0"
+              onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = 'none';}}
+            />
+          ) : null}
+        </div>
         <div className="min-w-0">
           <div className="font-semibold truncate">{row.book?.name || row.bookName || "-"}</div>
           <div className="text-sm text-gray-500 truncate">{row.book?.authorName || "-"}</div>
@@ -286,12 +325,29 @@ export default function IssuedBooksTable() {
   const studentTemplate = (row: any) =>
     row.student ? (
       <div className="flex items-center gap-3">
-        {row.student.photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageSrc(row.student.photo)} alt={row.student.name} className="w-10 h-10 object-cover rounded" />
-        ) : (
-          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-700">{getInitials(row.student.name)}</div>
-        )}
+        {
+          (() => {
+            const src = imageSrc(row.student.photo);
+            const initials = getInitials(row.student.name || row.student.fullName || row.student.studentId || "");
+            const bgClass = stringToBg(row.student.name || row.student.fullName || row.student.studentId || "");
+            return (
+              <div className="w-10 h-10 rounded-full overflow-hidden relative flex items-center justify-center flex-shrink-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${bgClass}`}>
+                  {initials || <i className="pi pi-user text-white" />}
+                </div>
+                {src ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={src}
+                    alt={row.student.name}
+                    className="w-10 h-10 rounded-full object-cover absolute top-0 left-0"
+                    onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = 'none';}}
+                  />
+                ) : null}
+              </div>
+            );
+          })()
+        }
         <div className="min-w-0">
           <div className="font-semibold truncate">{row.student.name || row.student.fullName || "-"}</div>
           <div className="text-xs text-gray-500 truncate">{row.student.email ?? ''}{row.student.studentId ? ` • ${row.student.studentId}` : ''}</div>
@@ -362,6 +418,19 @@ export default function IssuedBooksTable() {
         }} />
         <Column header="Actions" body={actionTemplate} style={{ width: "4rem" }} />
       </DataTable>
+
+      <Dialog
+        header="Issue Report"
+        visible={reportVisible}
+        style={{ width: "90vw", maxWidth: "900px" }}
+        onHide={() => {
+          setReportVisible(false);
+          setSelectedIssueId(null);
+        }}
+        maximizable
+      >
+        {selectedIssueId ? <SingleIssued issueId={selectedIssueId} /> : <div className="p-4">No issue selected</div>}
+      </Dialog>
 
       <ConfirmDialog />
       <ToastContainer />
