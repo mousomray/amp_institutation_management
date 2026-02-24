@@ -13,6 +13,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import ViewListIcon from "@mui/icons-material/ViewList";
+import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 
 /* ---------- MENU CONFIG ---------- */
 
@@ -38,6 +39,25 @@ const sidebarItems = [
         id: "2-2",
         label: "Institution List",
         path: "/admin/dashboard/institution",
+        icon: <ViewListIcon />,
+      },
+    ],
+  },
+  {
+    id: "3",
+    label: "Petroll Pamp",
+    icon: <LocalGasStationIcon />,
+    children: [
+      {
+        id: "3-1",
+        label: "Add Petroll Pamp",
+        path: "/admin/dashboard/petrollpamp/add-petrollpamp",
+        icon: <NoteAltIcon />,
+      },
+      {
+        id: "3-2",
+        label: "Petroll Pamp List",
+        path: "/admin/dashboard/petrollpamp",
         icon: <ViewListIcon />,
       },
     ],

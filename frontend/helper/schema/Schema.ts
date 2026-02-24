@@ -10,8 +10,15 @@ export const AdminLoginSchema = zod.object({
   password: zod.string().min(6, 'Password must be at least 6 characters'),
 })
 
-
-
+export const PetrolPumpAdminSchema = zod.object({
+  name: zod.string().min(2, 'Name must be at least 2 characters'),
+  email: zod.string().email('Invalid email address'),
+  phone: zod
+    .string()
+    .min(10, "Phone must be at least 10 digits")
+    .max(10, "Phone number too long"),
+  password: zod.string().min(6, 'Password must be at least 6 characters'),
+})
 
 export const InstitutionSchema = zod.object({
   name: zod.string().min(2, 'Institution name must be at least 2 characters'),
