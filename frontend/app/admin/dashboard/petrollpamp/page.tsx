@@ -107,17 +107,7 @@ export default function PetrolPumpAdminTable() {
           setVisible(true);
         },
       },
-      {
-        label: "Mark Active",
-        icon: "pi pi-check",
-        command: () => updateStatus(true, rowData),
-      },
-      {
-        label: "Mark Inactive",
-        icon: "pi pi-times",
-        className: "p-menuitem-danger",
-        command: () => updateStatus(false, rowData),
-      },
+      // Removed Mark Active / Mark Inactive actions per request
     ];
 
     return (
@@ -191,15 +181,7 @@ export default function PetrolPumpAdminTable() {
         <Column field="email" header="Email Address" />
         <Column field="phone" header="Phone No" />
         <Column field="role" header="Role" />
-        <Column 
-          field="shiftType" 
-          header="Shift Type"
-          body={(row) => (
-            <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-semibold">
-              {row.shiftType}
-            </span>
-          )}
-        />
+        
         <Column
           header="Created At"
           body={(rowData) => <span>{formatDate(rowData.createdAt)}</span>}

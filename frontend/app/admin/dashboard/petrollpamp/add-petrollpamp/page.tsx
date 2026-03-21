@@ -29,10 +29,28 @@ export default function PetrolPumpAdminForm() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<PetrolPumpAdminFormData>({
     resolver: zodResolver(PetrolPumpAdminSchema),
   });
+
+  const generateRandomPassword = () => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let password = "";
+
+    for (let i = 0; i < 6; i++) {
+      const randomIndex = Math.floor(Math.random() * chars.length);
+      password += chars[randomIndex];
+    }
+
+    setValue("password", password, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  };
 
   const onSubmit = async (data: PetrolPumpAdminFormData) => {
     setIsSubmitting(true);
@@ -161,12 +179,27 @@ export default function PetrolPumpAdminForm() {
             <label className="text-sm font-medium">
               Password <span className="text-red-500 text-xl">*</span>
             </label>
-            <InputText
-              type="password"
-              placeholder="Enter password"
-              className="w-full mt-1"
-              {...register("password")}
-            />
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <InputText
+                type="text"
+                placeholder="Click generate to create password"
+                className="w-full h-11 px-3 text-sm border border-gray-300 rounded-md focus:border-blue-500"
+                readOnly
+                {...register("password")}
+              />
+              <Button
+                type="button"
+                label="Generate"
+                icon="pi pi-refresh"
+                iconPos="right"
+                onClick={generateRandomPassword}
+                disabled={isSubmitting}
+                className="h-11 min-w-[140px] rounded-md border-0 bg-gradient-to-r from-emerald-500 to-teal-600 px-4 font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-600 hover:to-teal-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Click Generate to create a secure 6-character password.
+            </p>
             {errors.password && (
               <p className="text-red-500 text-xs mt-1">
                 {errors.password.message}

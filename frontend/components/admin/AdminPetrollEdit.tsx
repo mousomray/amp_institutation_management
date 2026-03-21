@@ -17,7 +17,6 @@ const UserSchema = z.object({
   phone: z.string().min(6, "Phone is required"),
   password: z.string().optional(),
   role: z.string().optional(),
-  shiftType: z.string().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -37,6 +36,7 @@ export default function AdminPetrollEdit({ userId, onClose, onSuccess }: Props) 
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<UserFormData>({ resolver: zodResolver(UserSchema) });
 
@@ -60,7 +60,6 @@ export default function AdminPetrollEdit({ userId, onClose, onSuccess }: Props) 
           email: u.email || "",
           phone: u.phone || "",
           role: u.role || "",
-          shiftType: u.shiftType || "",
           isActive: typeof u.isActive === "boolean" ? u.isActive : true,
         });
       } catch (error: any) {
@@ -86,7 +85,6 @@ export default function AdminPetrollEdit({ userId, onClose, onSuccess }: Props) 
         email: data.email,
         phone: data.phone,
         role: data.role,
-        shiftType: data.shiftType,
         isActive: !!data.isActive,
       };
       if (data.password && data.password.trim() !== "") payload.password = data.password;
@@ -133,17 +131,45 @@ export default function AdminPetrollEdit({ userId, onClose, onSuccess }: Props) 
 
         <div>
           <label className="text-sm font-medium">Password (leave blank to keep current)</label>
-          <InputText type="password" className="w-full mt-1" {...register("password")} />
+          <div className="mt-1 flex gap-2 items-center">
+            <InputText
+              type="text"
+              className="w-full mt-0"
+              readOnly
+              placeholder="Click Generate to create password"
+              {...register("password")}
+            />
+            <Button
+              type="button"
+              label="Generate"
+              icon="pi pi-refresh"
+              iconPos="right"
+              onClick={() => {
+                const chars =
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                let password = "";
+                for (let i = 0; i < 6; i++) {
+                  const idx = Math.floor(Math.random() * chars.length);
+                  password += chars[idx];
+                }
+                setValue("password", password, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true,
+                });
+              }}
+              className="h-10 min-w-[120px] rounded-md bg-blue-600 text-white px-3"
+            />
+          </div>
         </div>
 
         <div>
           <label className="text-sm font-medium">Role</label>
-          <InputText className="w-full mt-1" {...register("role")} />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium">Shift Type</label>
-          <InputText className="w-full mt-1" {...register("shiftType")} />
+          <InputText
+            className="w-full mt-1 bg-gray-100 text-gray-700 cursor-not-allowed"
+            readOnly
+            {...register("role")}
+          />
         </div>
 
         <div className="md:col-span-2">

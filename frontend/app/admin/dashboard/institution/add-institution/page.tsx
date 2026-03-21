@@ -181,6 +181,7 @@ export default function InstitutionForm() {
       setPhotoPreview(null)
       setLocation(null)
     } catch (error: any) {
+      console.log("Error creating institution:", error)
       if (axios.isAxiosError(error)) {
         const message =
           error.response?.data?.message || 'Something went wrong'
