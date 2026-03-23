@@ -37,7 +37,7 @@ export default function PetrolPumpAdminForm() {
 
   const generateRandomPassword = () => {
     const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz123456789@#_$%&*";
     let password = "";
 
     for (let i = 0; i < 6; i++) {
