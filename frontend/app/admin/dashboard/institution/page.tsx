@@ -226,7 +226,7 @@ export default function InstitutionTable() {
           <span>{formatDate(roeData.establishDate)}</span>
         )} />
         <Column field="registrationNo" header="Registration No" />
-        <Column header="Password" body={passwordTemplate} />
+        {/* <Column header="Password" body={passwordTemplate} /> */}
         <Column
           header="Status"
           body={(row) => (
