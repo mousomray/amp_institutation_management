@@ -11,13 +11,11 @@ connectDB()
 
 
 app.use(express.json()); // use Express
-app.use(cors(
-    {
-        origin : [process.env.FRONTEND_URL],
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-        credentials: true
-    }
-)) 
+app.use(cors({
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+}));
 app.use(cookieParser())
 app.use('/uploads', express.static(__dirname + '/uploads'));
 app.set("view engine", "ejs");
@@ -43,7 +41,8 @@ app.use('/api', IssueRouter);
 const SettingRouter = require('./app/router/setting.routes.js');
 app.use('/api', SettingRouter);
 
-const port = 3004
+const port = process.env.PORT || 3004;
+const env = process.env.NODE_ENV || 'development';
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server is running on port ${port} (env: ${env})`);
 });
