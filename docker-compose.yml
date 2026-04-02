@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://institute.management.amptechnology.in/api
+        NEXT_PUBLIC_LIBRARY_API: https://institute.management.amptechnology.in/lib
+        NEXT_PUBLIC_PETROLL_PAMP_API_URL: https://institute.management.amptechnology.in/api
+    container_name: frontend
+    ports:
+      - "5000:3000"   # host:container
+    depends_on:
+      - backend1
+      - backend2
+    restart: always
+    networks:
+      - coolify
+      - institute_net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.institute-frontend.rule=Host(`institute.management.amptechnology.in`)
+      - traefik.http.routers.institute-frontend.entrypoints=websecure
+      - traefik.http.routers.institute-frontend.tls=true
+      - traefik.http.routers.institute-frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.institute-frontend.loadbalancer.server.port=3000  # container port
+      - traefik.http.routers.institute-frontend-http.rule=Host(`institute.management.amptechnology.in`)
+      - traefik.http.routers.institute-frontend-http.entrypoints=web
+      - traefik.http.routers.institute-frontend-http.middlewares=redirect-to-https
+      - traefik.http.middlewares.gzip.compress=true
+      - traefik.http.routers.institute-frontend.middlewares=gzip
+      - coolify.managed=true
+
+  backend1:
+    build:
+      context: ./backend1
+    container_name: backend1
+    ports:
+      - "5001:8080"   # host:container
+    env_file:
+      - ./backend1/.env
+    restart: always
+    networks:
+      - coolify
+      - institute_net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.institute-backend1.rule=Host(`institute.management.amptechnology.in`) && PathPrefix(`/api`)
+      - traefik.http.routers.institute-backend1.entrypoints=websecure
+      - traefik.http.routers.institute-backend1.tls=true
+      - traefik.http.routers.institute-backend1.tls.certresolver=letsencrypt
+      - traefik.http.services.institute-backend1.loadbalancer.server.port=8080  # container port
+      - traefik.http.routers.institute-backend1.middlewares=gzip
+      - traefik.http.routers.institute-backend1-http.rule=Host(`institute.management.amptechnology.in`) && PathPrefix(`/api`)
+      - traefik.http.routers.institute-backend1-http.entrypoints=web
+      - traefik.http.routers.institute-backend1-http.middlewares=redirect-to-https
+      - coolify.managed=true
+
+  backend2:
+    build:
+      context: ./backend2
+    container_name: backend2
+    ports:
+      - "5002:3004"   # host:container
+    env_file:
+      - ./backend2/.env
+    restart: always
+    networks:
+      - coolify
+      - institute_net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.institute-backend2.rule=Host(`institute.management.amptechnology.in`) && PathPrefix(`/lib`)
+      - traefik.http.routers.institute-backend2.entrypoints=websecure
+      - traefik.http.routers.institute-backend2.tls=true
+      - traefik.http.routers.institute-backend2.tls.certresolver=letsencrypt
+      - traefik.http.services.institute-backend2.loadbalancer.server.port=3004  # container port
+      - traefik.http.routers.institute-backend2.middlewares=gzip
+      - traefik.http.routers.institute-backend2-http.rule=Host(`institute.management.amptechnology.in`) && PathPrefix(`/lib`)
+      - traefik.http.routers.institute-backend2-http.entrypoints=web
+      - traefik.http.routers.institute-backend2-http.middlewares=redirect-to-https
+      - coolify.managed=true
+
+networks:
+  coolify:
+    external: true
+  institute_net:
+    name: institute_net
+    driver: bridge
